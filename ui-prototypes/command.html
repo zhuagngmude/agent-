@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>方案 04 - 指挥中心型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="command-theme">
+    <main class="command-shell">
+      <header class="command-header">
+        <div>
+          <p class="eyebrow">Prototype 04</p>
+          <h1>蜂群指挥中心</h1>
+          <p>多模型、多 Agent、多任务波次的全局态势面板。</p>
+        </div>
+        <button class="primary">启动新波次</button>
+      </header>
+
+      <section class="radar-section">
+        <div class="radar">
+          <div class="ring r1"></div>
+          <div class="ring r2"></div>
+          <div class="ring r3"></div>
+          <span class="dot d1">GPT</span>
+          <span class="dot d2">Claude</span>
+          <span class="dot d3">Gemini</span>
+          <span class="core">调度器</span>
+        </div>
+        <div class="mission-panel">
+          <h2>当前任务波次</h2>
+          <div class="mission-row"><span>架构生成</span><strong>完成</strong></div>
+          <div class="mission-row"><span>子 Agent 分析</span><strong>运行中</strong></div>
+          <div class="mission-row"><span>权限审查</span><strong>等待</strong></div>
+          <div class="mission-row"><span>Runner 执行</span><strong>未开始</strong></div>
+        </div>
+      </section>
+
+      <section class="command-cards">
+        <article>
+          <h3>团队权限</h3>
+          <p>Owner、Reviewer、Developer、自定义权限模板。</p>
+        </article>
+        <article>
+          <h3>模型预算</h3>
+          <p>每个工作区可设置每日 token 和费用上限。</p>
+        </article>
+        <article>
+          <h3>执行安全</h3>
+          <p>代码执行必须确认，执行前创建 Git checkpoint。</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>agent蜂群 UI 方案选择</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="home-page">
+    <main class="home-shell">
+      <section class="home-hero">
+        <p class="eyebrow">UI Prototype Board</p>
+        <h1>agent蜂群 UI 方案选择</h1>
+        <p>
+          这里先做 4 套静态前端方向，方便你凭感觉选。选中后再继续做正式页面、交互和功能。
+        </p>
+      </section>
+
+      <section class="prototype-grid" aria-label="UI 方案列表">
+        <a class="prototype-card" href="./console.html">
+          <span class="card-index">01</span>
+          <h2>控制台型</h2>
+          <p>适合真实工作台，信息密度高，任务、Agent、成本和审查一屏掌控。</p>
+          <strong>推荐用于正式产品</strong>
+        </a>
+        <a class="prototype-card" href="./flow.html">
+          <span class="card-index">02</span>
+          <h2>流程图型</h2>
+          <p>突出“架构师 → 调度器 → 多 Agent → 审查”的自动运行链路。</p>
+          <strong>适合讲清楚系统流程</strong>
+        </a>
+        <a class="prototype-card" href="./ide.html">
+          <span class="card-index">03</span>
+          <h2>IDE 型</h2>
+          <p>像开发工具，左边项目文件，中间任务，右边 Agent 输出和代码执行计划。</p>
+          <strong>适合后续自动改代码</strong>
+        </a>
+        <a class="prototype-card" href="./command.html">
+          <span class="card-index">04</span>
+          <h2>指挥中心型</h2>
+          <p>视觉更强，适合展示多模型蜂群状态、运行波次和团队权限。</p>
+          <strong>适合演示和汇报</strong>
+        </a>
+      </section>
+
+      <section class="choice-note">
+        <h2>怎么选</h2>
+        <p>
+          如果你想做成每天都用的工具，优先看 01。想强调智能体自动流程，看 02。
+          想以后接本地 Runner 自动改代码，看 03。想给别人展示愿景，看 04。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

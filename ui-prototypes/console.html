@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>方案 01 - 控制台型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="console-theme">
+    <div class="app-layout">
+      <aside class="side-panel">
+        <div class="brand">
+          <span>蜂</span>
+          <div>
+            <h1>agent蜂群</h1>
+            <p>多模型协作控制台</p>
+          </div>
+        </div>
+        <nav>
+          <a class="active" href="#">总览</a>
+          <a href="#">项目</a>
+          <a href="#">Agent</a>
+          <a href="#">任务</a>
+          <a href="#">Runner</a>
+          <a href="#">权限</a>
+        </nav>
+        <div class="side-status">
+          <span>当前工作区</span>
+          <strong>Private Team</strong>
+        </div>
+      </aside>
+
+      <main class="main-board">
+        <header class="board-header">
+          <div>
+            <p class="eyebrow">Prototype 01</p>
+            <h2>控制台型工作台</h2>
+          </div>
+          <div class="header-actions">
+            <button class="ghost">保存草稿</button>
+            <button class="primary">启动蜂群</button>
+          </div>
+        </header>
+
+        <section class="metric-row">
+          <article><span>运行 Agent</span><strong>8</strong></article>
+          <article><span>子 Agent</span><strong>11</strong></article>
+          <article><span>待审查</span><strong>5</strong></article>
+          <article><span>本轮成本</span><strong>$2.48</strong></article>
+        </section>
+
+        <section class="console-grid">
+          <article class="panel large">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">Pipeline</p>
+                <h3>自动协作流程</h3>
+              </div>
+              <span class="pill running">运行中</span>
+            </div>
+            <div class="agent-strip">
+              <div class="agent-node done">架构师</div>
+              <div class="line done"></div>
+              <div class="agent-node done">调度器</div>
+              <div class="line active"></div>
+              <div class="agent-node active">前端</div>
+              <div class="line"></div>
+              <div class="agent-node">审查</div>
+            </div>
+            <div class="task-table">
+              <div class="table-head">任务</div>
+              <div class="table-head">Agent</div>
+              <div class="table-head">状态</div>
+              <div class="table-head">权限</div>
+              <span>生成项目架构方案</span><span>Architect / GPT</span><span class="ok">完成</span><span>只读</span>
+              <span>拆分前端模块</span><span>Scheduler / Claude</span><span class="ok">完成</span><span>只读</span>
+              <span>生成 Runner 修改计划</span><span>Executor / GPT</span><span class="warn">待确认</span><span>需批准</span>
+              <span>审查代码风险</span><span>Reviewer / Gemini</span><span>等待</span><span>只读</span>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">Approval</p>
+                <h3>代码执行确认</h3>
+              </div>
+            </div>
+            <div class="approval-box">
+              <strong>将修改 4 个文件</strong>
+              <p>Runner 已创建 Git checkpoint，等待 Owner 确认执行。</p>
+              <button class="primary wide">查看修改计划</button>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">Cost</p>
+                <h3>模型成本</h3>
+              </div>
+            </div>
+            <div class="cost-list">
+              <span>OpenAI</span><strong>$1.12</strong>
+              <span>Claude</span><strong>$0.94</strong>
+              <span>Gemini</span><strong>$0.42</strong>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

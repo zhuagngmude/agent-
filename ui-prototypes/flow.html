@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>方案 02 - 流程图型</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="flow-theme">
+    <main class="flow-shell">
+      <header class="flow-header">
+        <div>
+          <p class="eyebrow">Prototype 02</p>
+          <h1>蜂群自动编排流程</h1>
+        </div>
+        <button class="primary">运行下一步</button>
+      </header>
+
+      <section class="flow-lane">
+        <article class="flow-step completed">
+          <span>01</span>
+          <h2>项目输入</h2>
+          <p>用户输入项目想法、约束、允许的模型和代码执行策略。</p>
+        </article>
+        <article class="flow-step completed">
+          <span>02</span>
+          <h2>架构师 Agent</h2>
+          <p>生成总体架构，并派出数据库、安全、技术栈子 Agent。</p>
+        </article>
+        <article class="flow-step active">
+          <span>03</span>
+          <h2>调度器 Agent</h2>
+          <p>把方案拆成任务，分配给前端、后端、测试、文档。</p>
+        </article>
+        <article class="flow-step">
+          <span>04</span>
+          <h2>专家 Agent</h2>
+          <p>多个模型并行生成方案、代码建议、测试计划和文档。</p>
+        </article>
+        <article class="flow-step">
+          <span>05</span>
+          <h2>审查与执行</h2>
+          <p>审查 Agent 汇总，用户确认后 Runner 执行代码修改。</p>
+        </article>
+      </section>
+
+      <section class="subagent-map">
+        <article>
+          <h3>架构师 Agent</h3>
+          <div class="mini-nodes">
+            <span>数据库子 Agent</span>
+            <span>安全子 Agent</span>
+            <span>技术栈子 Agent</span>
+          </div>
+        </article>
+        <article>
+          <h3>前端 Agent</h3>
+          <div class="mini-nodes">
+            <span>组件子 Agent</span>
+            <span>移动端子 Agent</span>
+            <span>交互子 Agent</span>
+          </div>
+        </article>
+        <article>
+          <h3>测试 Agent</h3>
+          <div class="mini-nodes">
+            <span>单测子 Agent</span>
+            <span>集成子 Agent</span>
+            <span>边界子 Agent</span>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
