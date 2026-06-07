@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>agent蜂群 UI 方向稿</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="design-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">agent swarm interface directions</p>
+          <h1>agent蜂群 UI 方向稿</h1>
+        </div>
+        <div class="switcher" aria-label="切换 UI 方向">
+          <button class="active" data-target="linear">Linear</button>
+          <button data-target="notion">Notion</button>
+          <button data-target="raycast">Raycast</button>
+          <button data-target="github">GitHub</button>
+          <button data-target="vercel">Vercel</button>
+          <button data-target="cursor">Cursor</button>
+          <button data-target="feishu">飞书</button>
+          <button data-target="ide">IDE</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="direction active linear" id="linear">
+          <aside class="rail">
+            <strong>agent蜂群</strong>
+            <nav><span>Inbox</span><span class="on">Projects</span><span>Agents</span><span>Runs</span><span>Settings</span></nav>
+          </aside>
+          <div class="surface">
+            <div class="page-head">
+              <div>
+                <span class="label">Private Team / Agent Swarm</span>
+                <h2>多模型执行队列</h2>
+              </div>
+              <button>Run plan</button>
+            </div>
+            <div class="linear-list">
+              <article><span class="status done"></span><strong>架构师输出总体方案</strong><em>GPT-5 · complete</em></article>
+              <article><span class="status active"></span><strong>调度器拆分任务依赖</strong><em>Claude · running</em></article>
+              <article><span class="status wait"></span><strong>Runner 修改计划等待确认</strong><em>Executor · blocked</em></article>
+              <article><span class="status wait"></span><strong>审查 Agent 汇总风险</strong><em>Gemini · queued</em></article>
+            </div>
+            <div class="bottom-grid">
+              <div><b>Next decision</b><p>是否允许主执行 Agent 修改 `runner/client.py` 和权限模块。</p></div>
+              <div><b>Guardrail</b><p>子 Agent 只读，代码执行必须 Owner 批准。</p></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="direction notion" id="notion">
+          <aside class="notion-side">
+            <strong>Agent Swarm OS</strong>
+            <span>项目首页</span><span>架构决策</span><span class="on">运行记录</span><span>权限表</span>
+          </aside>
+          <div class="notion-page">
+            <p class="crumb">项目 / 云端平台 + 本地 Runner</p>
+            <h2>本轮 Agent 运行笔记</h2>
+            <div class="doc-block">
+              <h3>当前目标</h3>
+              <p>让架构师、调度器和专家 Agent 自动跑完项目拆解，并在用户确认后生成 Runner 执行计划。</p>
+            </div>
+            <div class="doc-table">
+              <span>Agent</span><span>模型</span><span>输出</span><span>状态</span>
+              <strong>Architect</strong><span>GPT</span><span>架构方案</span><span>完成</span>
+              <strong>Scheduler</strong><span>Claude</span><span>任务树</span><span>进行中</span>
+              <strong>Reviewer</strong><span>Gemini</span><span>风险总结</span><span>等待</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="direction raycast" id="raycast">
+          <div class="command-card">
+            <div class="command-input">搜索命令、Agent、任务或运行记录</div>
+            <div class="command-list">
+              <article><b>Run Architect Agent</b><span>生成总体架构方案</span><kbd>⌘ 1</kbd></article>
+              <article><b>Spawn controlled sub agents</b><span>最多 3 个，深度 1</span><kbd>⌘ 2</kbd></article>
+              <article><b>Approve Runner execution</b><span>查看 diff、Git checkpoint、测试命令</span><kbd>⌘ 3</kbd></article>
+              <article><b>Open permission matrix</b><span>管理高风险权限</span><kbd>⌘ 4</kbd></article>
+            </div>
+          </div>
+          <aside class="ray-panel">
+            <h2>快速操作型</h2>
+            <p>适合把 agent蜂群做成高效率命令中心，少页面、多快捷动作。</p>
+          </aside>
+        </section>
+
+        <section class="direction github" id="github">
+          <div class="repo-head">
+            <h2>agent-swarm / execution-plan</h2>
+            <button>New run</button>
+          </div>
+          <div class="repo-grid">
+            <main class="issue-list">
+              <article><span class="open"></span><b>ARCH-12 架构师方案需要审查</b><p>权限模型从 RBAC 扩展到 RBAC + ABAC。</p></article>
+              <article><span class="open"></span><b>RUN-08 Runner 等待用户确认</b><p>将创建 checkpoint，然后修改 3 个文件。</p></article>
+              <article><span class="closed"></span><b>DOC-03 更新 AI 开发维护手册</b><p>已记录子 Agent 限制和导出安全规则。</p></article>
+            </main>
+            <aside class="repo-side">
+              <h3>Checks</h3>
+              <p>权限扫描通过</p>
+              <p>API Key 未进入日志</p>
+              <p>子 Agent 无执行权限</p>
+            </aside>
+          </div>
+        </section>
+
+        <section class="direction vercel" id="vercel">
+          <div class="deploy-head">
+            <h2>Agent Pipeline</h2>
+            <span>Production-like review before execution</span>
+          </div>
+          <div class="deploy-grid">
+            <article><small>Architect</small><b>Ready</b><p>总体方案已生成。</p></article>
+            <article><small>Scheduler</small><b>Building</b><p>正在拆分任务树。</p></article>
+            <article><small>Specialists</small><b>Queued</b><p>等待任务分发。</p></article>
+            <article><small>Runner</small><b>Blocked</b><p>等待用户确认代码执行。</p></article>
+          </div>
+          <div class="deploy-log">
+            <code>13:40:22 scheduler created 9 tasks</code>
+            <code>13:40:51 reviewer flagged high-risk permission</code>
+            <code>13:41:03 runner prepared checkpoint command</code>
+          </div>
+        </section>
+
+        <section class="direction cursor" id="cursor">
+          <aside class="cursor-files">
+            <strong>Workspace</strong>
+            <span>project.json</span><span>agents.ts</span><span>permissions.ts</span><span class="on">runner/client.py</span>
+          </aside>
+          <main class="cursor-editor">
+            <div class="editor-tabs"><span class="on">change_plan.md</span><span>review.md</span><span>test.log</span></div>
+            <pre>Executor Agent proposes:
+
+1. Create Git checkpoint
+2. Update permission guard
+3. Add runner approval prompt
+4. Run tests
+
+Blocked until Owner approval.</pre>
+          </main>
+          <aside class="cursor-chat">
+            <h3>Agent Review</h3>
+            <p>这个方向适合把产品做成“AI IDE + 云端任务编排”的形态。</p>
+            <button>Approve once</button>
+          </aside>
+        </section>
+
+        <section class="direction feishu" id="feishu">
+          <aside class="team-side">
+            <strong>agent蜂群团队</strong>
+            <span>工作台</span><span class="on">项目空间</span><span>成员权限</span><span>审查</span>
+          </aside>
+          <main class="team-main">
+            <h2>团队协作视图</h2>
+            <div class="team-grid">
+              <article><b>Owner</b><p>可管理 Key、权限和代码执行。</p></article>
+              <article><b>Reviewer</b><p>可批准审查结论，不可改 Key。</p></article>
+              <article><b>Developer</b><p>可运行 Agent，不可批准 Runner。</p></article>
+            </div>
+            <div class="approval-line"><span>高风险权限</span><strong>execute_code 需要 Owner 二次确认</strong></div>
+          </main>
+        </section>
+
+        <section class="direction ide" id="ide">
+          <div class="ide-frame">
+            <aside><b>Runner</b><span>Change plan</span><span>Git checkpoint</span><span>Test result</span></aside>
+            <main>
+              <h2>执行前确认</h2>
+              <div class="diff">
+                <p>+ add approval gate in runner/client.py</p>
+                <p>+ redact API key in execution logs</p>
+                <p>- remove direct write path from sub agent</p>
+              </div>
+              <button>确认执行一次</button>
+            </main>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./script.js"></script>
+  </body>
+</html>

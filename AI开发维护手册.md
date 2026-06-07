@@ -520,6 +520,25 @@ design/
 ui-prototypes/
 ```
 
+当前设计方向稿：
+
+```text
+design/index.html
+```
+
+包含 8 个方向：
+
+```text
+Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
+```
+
+注意：
+
+- 这些方向只用于探索信息架构和交互气质。
+- 不允许复制第三方品牌视觉资产。
+- 用户选择方向后，再基于选中方向做正式页面。
+- 后续正式 UI 仍应优先使用成熟组件系统，例如 shadcn/ui + Radix Colors + Tailwind。
+
 ## 11. 文档同步规则
 
 后续 AI 修改项目时，必须同步更新文档。
@@ -632,3 +651,4 @@ ui-prototypes/
 - 确定第一版允许主执行 Agent 在用户确认后通过 Runner 改代码。
 - 建立文档同步规则，要求后续改动同时更新人类说明书和 AI 开发维护手册。
 - 删除旧 UI 静态原型；新增 UI 设计维护规则，要求后续先收集 design context，避免通用 AI 味界面。
+- 新增 `design/index.html`，创建 8 个 UI 方向稿用于选择，不沿用已删除的旧原型。
