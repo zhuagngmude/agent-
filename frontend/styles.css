@@ -258,6 +258,7 @@ a { color: inherit; text-decoration: none; }
 .approval-actions .safe-action { border-color: #cfe9da; color: var(--green); background: #f2fbf5; }
 .approval-actions .neutral-action { border-color: #d8dce8; color: #4e5670; }
 .approval-actions .danger-action { margin-left: auto; border-color: #f4c8c8; color: var(--red); background: #fff2f2; }
+.approval-actions button:disabled { opacity: .45; cursor: not-allowed; }
 
 .bottom-grid { display: grid; grid-template-columns: 1.08fr 1fr 1fr 1fr 1fr; gap: 16px; }
 .mini-tabs { display: flex; gap: 22px; margin-bottom: 12px; color: var(--muted); }

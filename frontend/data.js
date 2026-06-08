@@ -13,6 +13,32 @@ window.AGENT_SWARM_NAV = {
   settings: ["系统设置", "全局视图 / 系统设置"],
 };
 
+window.AGENT_SWARM_STATUS = {
+  approval: {
+    draft: { label: "草稿", tone: "neutral", action: "继续编辑" },
+    pending: { label: "等待审批", tone: "warn", action: "进入审查" },
+    approved: { label: "已批准", tone: "ok", action: "等待执行" },
+    rejected: { label: "已拒绝", tone: "danger", action: "查看原因" },
+    patch_only: { label: "只生成补丁", tone: "neutral", action: "下载补丁" },
+    executed: { label: "已执行", tone: "ok", action: "查看结果" },
+    rolled_back: { label: "已回滚", tone: "danger", action: "查看回滚" },
+    expired: { label: "已过期", tone: "neutral", action: "重新申请" },
+  },
+  task: {
+    queued: { label: "排队中", tone: "neutral" },
+    running: { label: "进行中", tone: "ok" },
+    blocked: { label: "已阻塞", tone: "danger" },
+    waiting_user: { label: "等待用户", tone: "warn" },
+    completed: { label: "已完成", tone: "ok" },
+  },
+  agent: {
+    running: { label: "运行中", tone: "ok" },
+    idle: { label: "空闲中", tone: "neutral" },
+    waiting: { label: "等待中", tone: "warn" },
+    failed: { label: "异常", tone: "danger" },
+  },
+};
+
 window.AGENT_SWARM_DATA = {
   project: {
     name: "agent蜂群 MVP",
@@ -52,7 +78,7 @@ window.AGENT_SWARM_DATA = {
       risk: "高风险",
       riskTone: "high",
       diff: "+120 -36",
-      status: "等待用户确认",
+      status: "pending",
       reason: "新增 Runner 写入审批状态机，阻止本地执行绕过用户确认。",
       checkpoint: "a5d3f2c",
       operationTypes: ["写文件", "Git checkpoint", "更新审计日志"],
@@ -70,7 +96,7 @@ window.AGENT_SWARM_DATA = {
       risk: "中风险",
       riskTone: "mid",
       diff: "+56 -0",
-      status: "等待审查",
+      status: "pending",
       reason: "补充 Runner 审批规则，让后续 AI 接手时知道安全边界。",
       checkpoint: "a5d3f2c",
       operationTypes: ["更新文档"],
@@ -87,7 +113,7 @@ window.AGENT_SWARM_DATA = {
       risk: "低风险",
       riskTone: "low",
       diff: "+210 -10",
-      status: "可生成补丁",
+      status: "patch_only",
       reason: "为 Runner 审批流程增加回归测试，避免后续绕开确认步骤。",
       checkpoint: "a5d3f2c",
       operationTypes: ["新增测试"],
@@ -99,15 +125,15 @@ window.AGENT_SWARM_DATA = {
     },
   ],
   taskQueue: [
-    { icon: "A", tone: "purple", title: "抽出前端 mock 数据模型", type: "前端工程化", eta: "剩余 25m" },
-    { icon: "K", tone: "green", title: "更新知识库文档关联结构", type: "知识库更新", eta: "剩余 1h 10m" },
-    { icon: "!", tone: "red", title: "打磨 Runner 审批确认页", type: "高优先级", eta: "剩余 45m" },
+    { icon: "A", tone: "purple", title: "抽出前端 mock 数据模型", type: "前端工程化", eta: "剩余 25m", status: "completed" },
+    { icon: "K", tone: "green", title: "更新知识库文档关联结构", type: "知识库更新", eta: "剩余 1h 10m", status: "queued" },
+    { icon: "!", tone: "red", title: "打磨 Runner 审批确认页", type: "高优先级", eta: "剩余 45m", status: "running" },
   ],
   agents: [
-    { avatar: "A", name: "架构师 Agent", version: "v0.2.0", status: "运行中" },
-    { avatar: "B", name: "前端 Agent", version: "v0.2.0", status: "运行中" },
-    { avatar: "C", name: "文档 Agent", version: "v0.1.5", status: "空闲中" },
-    { avatar: "D", name: "审查 Agent", version: "v0.1.8", status: "运行中" },
+    { avatar: "A", name: "架构师 Agent", version: "v0.2.0", status: "running" },
+    { avatar: "B", name: "前端 Agent", version: "v0.2.0", status: "running" },
+    { avatar: "C", name: "文档 Agent", version: "v0.1.5", status: "idle" },
+    { avatar: "D", name: "审查 Agent", version: "v0.1.8", status: "running" },
   ],
   gitCheckpoints: [
     { hash: "620d44d", message: "Start frontend MVP engineering cleanup", time: "刚刚 ✓" },

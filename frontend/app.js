@@ -1,5 +1,6 @@
 const titles = window.AGENT_SWARM_NAV || {};
 const appData = window.AGENT_SWARM_DATA || {};
+const statusConfig = window.AGENT_SWARM_STATUS || {};
 
 function escapeHtml(value) {
   return String(value)
@@ -65,14 +66,14 @@ function renderDashboard() {
   const taskQueue = document.querySelector("#taskQueue");
   if (taskQueue && appData.taskQueue) {
     taskQueue.innerHTML = appData.taskQueue.map((item) => `
-      <li><span class="icon ${escapeHtml(item.tone)}">${escapeHtml(item.icon)}</span><b>${escapeHtml(item.title)}</b><em>${escapeHtml(item.type)}</em><strong>${escapeHtml(item.eta)}</strong></li>
+      <li><span class="icon ${escapeHtml(item.tone)}">${escapeHtml(item.icon)}</span><b>${escapeHtml(item.title)}</b><em>${escapeHtml(item.type)} · ${escapeHtml(statusLabel("task", item.status))}</em><strong>${escapeHtml(item.eta)}</strong></li>
     `).join("");
   }
 
   const agentStatusList = document.querySelector("#agentStatusList");
   if (agentStatusList && appData.agents) {
     agentStatusList.innerHTML = appData.agents.map((agent) => `
-      <li><span class="avatar small">${escapeHtml(agent.avatar)}</span><b>${escapeHtml(agent.name)}</b><em>${escapeHtml(agent.version)}</em><strong>${escapeHtml(agent.status)}</strong></li>
+      <li><span class="avatar small">${escapeHtml(agent.avatar)}</span><b>${escapeHtml(agent.name)}</b><em>${escapeHtml(agent.version)}</em><strong>${escapeHtml(statusLabel("agent", agent.status))}</strong></li>
     `).join("");
   }
 
@@ -103,6 +104,18 @@ function renderDashboard() {
   }
 }
 
+function statusLabel(group, status) {
+  return statusConfig[group]?.[status]?.label || status;
+}
+
+function statusTone(group, status) {
+  return statusConfig[group]?.[status]?.tone || "neutral";
+}
+
+function approvalAction(status) {
+  return statusConfig.approval?.[status]?.action || "查看";
+}
+
 function renderApprovalPage(selectedIndex = 0) {
   const approvals = appData.approvalRequests || [];
   const list = document.querySelector("#approvalPageList");
@@ -117,9 +130,9 @@ function renderApprovalPage(selectedIndex = 0) {
   list.innerHTML = approvals.map((item, index) => `
     <div class="${index === selectedIndex ? "active" : ""}" data-approval-index="${index}">
       <strong>${escapeHtml(item.file)}</strong>
-      <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)}</p>
+      <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)} · ${escapeHtml(statusLabel("approval", item.status))}</p>
       <span class="risk ${escapeHtml(item.riskTone)}">${escapeHtml(item.risk)}</span>
-      <small>${escapeHtml(item.diff)}</small>
+      <small>${escapeHtml(approvalAction(item.status))}</small>
     </div>
   `).join("");
 
@@ -132,7 +145,7 @@ function renderApprovalPage(selectedIndex = 0) {
   detail.innerHTML = `
     <div class="approval-meta">
       <div><span>申请 Agent</span><strong>${escapeHtml(item.agent)}</strong></div>
-      <div><span>当前状态</span><strong>${escapeHtml(item.status)}</strong></div>
+      <div><span>当前状态</span><strong>${escapeHtml(statusLabel("approval", item.status))}</strong></div>
       <div><span>操作类型</span><strong>${escapeHtml(item.operationTypes.join(" / "))}</strong></div>
       <div><span>Git checkpoint</span><strong>${escapeHtml(item.checkpoint)}</strong></div>
     </div>
@@ -149,6 +162,12 @@ function renderApprovalPage(selectedIndex = 0) {
       ${item.diffPreview.map((line) => `<code class="${line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : ""}">${escapeHtml(line)}</code>`).join("")}
     </div>
   `;
+
+  const allowButton = document.querySelector(".danger-action");
+  if (allowButton) {
+    allowButton.disabled = item.status !== "pending";
+    allowButton.textContent = item.riskTone === "high" ? "二次确认后允许执行" : "允许执行";
+  }
 
   list.querySelectorAll("[data-approval-index]").forEach((row) => {
     row.addEventListener("click", () => renderApprovalPage(Number(row.dataset.approvalIndex)));
