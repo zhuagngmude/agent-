@@ -700,6 +700,13 @@ docs/api-draft.md
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读状态追踪。
 
+## 2026-06-08 变更记录：Runner job 只读详情
+
+- 改了什么：运行与调度页的 Runner job 队列表格支持点选；新增只读详情面板，展示 Job ID、来源审批、关联任务、操作类型、影响文件、Git checkpoint、创建/更新时间和安全说明。
+- 为什么改：让用户在批准审批后能看懂后续待执行项的来源和影响范围，同时继续明确当前不会执行本地命令。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 运行页可读性增强，不改变核心用户流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

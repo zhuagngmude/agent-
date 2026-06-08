@@ -5,6 +5,7 @@ const apiBase = "http://127.0.0.1:8787";
 const projectId = "project_agent_swarm";
 let selectedApprovalIndex = 0;
 let selectedTaskIndex = 0;
+let selectedRunnerJobIndex = 0;
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
@@ -465,32 +466,82 @@ function runnerJobStatusLabel(status) {
   return labels[status] || status;
 }
 
-function renderRuntimePage() {
+function runnerJobBadgeClass(status) {
+  if (status === "failed") return "red";
+  if (status === "running") return "orange";
+  if (status === "cancelled") return "gray";
+  return "green";
+}
+
+function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   const jobs = appData.runnerJobs || [];
   const count = document.querySelector("#runnerJobCount");
   const queuedCount = document.querySelector("#runnerQueuedCount");
   const failedCount = document.querySelector("#runnerFailedCount");
   const tableBody = document.querySelector("#runnerJobTable tbody");
+  const detail = document.querySelector("#runnerJobDetail");
+  const detailStatus = document.querySelector("#runnerJobDetailStatus");
 
   if (count) count.textContent = jobs.length;
   if (queuedCount) queuedCount.textContent = jobs.filter((job) => job.status === "queued").length;
   if (failedCount) failedCount.textContent = jobs.filter((job) => job.status === "failed").length;
-  if (!tableBody) return;
+  if (!tableBody || !detail) return;
 
   if (jobs.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="5">暂无 Runner job。审批通过后会出现在这里。</td></tr>`;
+    detail.innerHTML = `
+      <div class="approval-meta">
+        <div><span>当前状态</span><strong>暂无 Runner job</strong></div>
+        <div><span>安全说明</span><strong>当前只读，不会执行本地命令。</strong></div>
+      </div>
+    `;
+    if (detailStatus) {
+      detailStatus.textContent = "只读";
+      detailStatus.className = "badge orange";
+    }
     return;
   }
 
-  tableBody.innerHTML = jobs.map((job) => `
-    <tr>
+  selectedRunnerJobIndex = Math.min(Math.max(selectedIndex, 0), jobs.length - 1);
+
+  tableBody.innerHTML = jobs.map((job, index) => `
+    <tr class="${index === selectedRunnerJobIndex ? "active" : ""}" data-runner-job-index="${index}">
       <td><strong>${escapeHtml(job.id)}</strong></td>
       <td>${escapeHtml(job.approvalId || "无")}</td>
-      <td><span class="badge ${job.status === "failed" ? "red" : job.status === "running" ? "orange" : "green"}">${escapeHtml(runnerJobStatusLabel(job.status))}</span></td>
+      <td><span class="badge ${runnerJobBadgeClass(job.status)}">${escapeHtml(runnerJobStatusLabel(job.status))}</span></td>
       <td>${escapeHtml(job.checkpoint || "未记录")}</td>
       <td>${escapeHtml((job.affectedFiles || []).length)} 个文件</td>
     </tr>
   `).join("");
+
+  const job = jobs[selectedRunnerJobIndex] || jobs[0];
+  if (detailStatus) {
+    detailStatus.textContent = runnerJobStatusLabel(job.status);
+    detailStatus.className = `badge ${runnerJobBadgeClass(job.status)}`;
+  }
+
+  detail.innerHTML = `
+    <div class="approval-meta">
+      <div><span>Job ID</span><strong>${escapeHtml(job.id)}</strong></div>
+      <div><span>来源审批</span><strong>${escapeHtml(job.approvalId || "无")}</strong></div>
+      <div><span>关联任务</span><strong>${escapeHtml(job.taskId || "未关联")}</strong></div>
+      <div><span>Git checkpoint</span><strong>${escapeHtml(job.checkpoint || "未记录")}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>操作类型</span><strong>${escapeHtml((job.operationTypes || []).join(" / ") || "未记录")}</strong></div>
+      <div><span>创建时间</span><strong>${escapeHtml(job.createdAt || "未记录")}</strong></div>
+      <div><span>更新时间</span><strong>${escapeHtml(job.updatedAt || "未记录")}</strong></div>
+      <div><span>安全说明</span><strong>当前只读，不会执行本地命令。</strong></div>
+    </div>
+    <div class="task-files">
+      <h3>影响文件</h3>
+      <ul>${(job.affectedFiles || []).map((file) => `<li>${escapeHtml(file)}</li>`).join("") || "<li>暂无影响文件</li>"}</ul>
+    </div>
+  `;
+
+  tableBody.querySelectorAll("[data-runner-job-index]").forEach((row) => {
+    row.addEventListener("click", () => renderRuntimePage(Number(row.dataset.runnerJobIndex)));
+  });
 }
 
 function renderTaskPage(selectedIndex = 0) {
