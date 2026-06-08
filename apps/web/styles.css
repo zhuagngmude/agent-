@@ -389,6 +389,23 @@ li strong { color: var(--green); font-size: 13px; }
   padding: 12px;
 }
 .model-list span { color: var(--muted); font-family: Consolas, "Courier New", monospace; }
+.agent-relation-list { display: grid; gap: 12px; }
+.agent-relation-list > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 14px;
+}
+.agent-relation-list strong, .agent-relation-list span { display: block; }
+.agent-relation-list span { margin-top: 6px; color: var(--muted); }
+.agent-relation-list ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.agent-relation-list li {
+  display: grid;
+  grid-template-columns: minmax(180px, .5fr) minmax(260px, 1fr);
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: 12px; }

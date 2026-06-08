@@ -117,6 +117,10 @@ disabled
       "model": "gpt-high-reasoning",
       "canSpawnSubAgents": true,
       "maxSubAgents": 3,
+      "parentAgentId": "",
+      "childAgentIds": ["agent_frontend", "agent_docs", "agent_reviewer"],
+      "reportsToAgentId": "",
+      "spawnDepth": 0,
       "permissions": ["read_project", "plan_tasks", "review_architecture"]
     }
   ]

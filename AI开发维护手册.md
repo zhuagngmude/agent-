@@ -721,6 +721,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 内部只读展示增强。
 
+## 2026-06-09 变更记录：子 Agent 关系只读展示
+
+- 改了什么：Mock Agent 数据新增 `parentAgentId`、`childAgentIds`、`reportsToAgentId`、`spawnDepth`；智能体管理页新增子 Agent 关系面板，并在 Agent 详情里展示父 Agent、汇总目标、派生深度和当前子 Agent 数。
+- 为什么改：把“主 Agent 可以派生受控子 Agent，子 Agent 输出必须汇总回父 Agent”的约束做成可见数据，为后续配置编辑和运行记录打基础。
+- 影响模块：`services/api/mock-data.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读展示增强。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -47,6 +47,10 @@ const agents = [
     model: "gpt-high-reasoning",
     canSpawnSubAgents: true,
     maxSubAgents: 3,
+    parentAgentId: "",
+    childAgentIds: ["agent_frontend", "agent_docs", "agent_reviewer"],
+    reportsToAgentId: "",
+    spawnDepth: 0,
     permissions: ["read_project", "plan_tasks", "review_architecture"],
   },
   {
@@ -58,6 +62,10 @@ const agents = [
     model: "claude-ui",
     canSpawnSubAgents: false,
     maxSubAgents: 0,
+    parentAgentId: "agent_architect",
+    childAgentIds: [],
+    reportsToAgentId: "agent_architect",
+    spawnDepth: 1,
     permissions: ["read_project", "write_frontend_patch"],
   },
   {
@@ -69,6 +77,10 @@ const agents = [
     model: "gpt-docs",
     canSpawnSubAgents: false,
     maxSubAgents: 0,
+    parentAgentId: "agent_architect",
+    childAgentIds: [],
+    reportsToAgentId: "agent_architect",
+    spawnDepth: 1,
     permissions: ["read_project", "write_docs_patch"],
   },
   {
@@ -80,6 +92,10 @@ const agents = [
     model: "gemini-long-context",
     canSpawnSubAgents: false,
     maxSubAgents: 0,
+    parentAgentId: "agent_architect",
+    childAgentIds: [],
+    reportsToAgentId: "agent_architect",
+    spawnDepth: 1,
     permissions: ["read_project", "review_risk", "review_diff"],
   },
 ];

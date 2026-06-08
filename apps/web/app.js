@@ -118,16 +118,19 @@ function renderDashboard() {
 
 function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   const agents = appData.agents || [];
+  const agentById = new Map(agents.map((agent) => [agent.id, agent]));
   const board = document.querySelector("#agentBoard");
   const modelList = document.querySelector("#agentModelList");
+  const relationList = document.querySelector("#agentRelationList");
   const detail = document.querySelector("#agentDetail");
   const detailStatus = document.querySelector("#agentDetailStatus");
 
-  if (!board || !modelList || !detail) return;
+  if (!board || !modelList || !relationList || !detail) return;
 
   if (agents.length === 0) {
     board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
     modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
+    relationList.innerHTML = `<p class="muted">暂无子 Agent 关系数据。</p>`;
     detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>暂无智能体</strong></div></div>`;
     if (detailStatus) {
       detailStatus.textContent = "只读";
@@ -156,7 +159,24 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
     </div>
   `).join("");
 
+  relationList.innerHTML = agents
+    .filter((agent) => (agent.childAgentIds || []).length > 0)
+    .map((agent) => `
+      <div>
+        <strong>${escapeHtml(agent.name)}</strong>
+        <span>可创建子 Agent：最多 ${escapeHtml(agent.maxSubAgents ?? 0)} 个</span>
+        <ul>
+          ${(agent.childAgentIds || []).map((childId) => {
+            const child = agentById.get(childId);
+            return `<li><b>${escapeHtml(child?.name || childId)}</b><em>${escapeHtml(child?.roleLabel || child?.role || "未设置角色")} · 汇总回 ${escapeHtml(agent.name)}</em></li>`;
+          }).join("")}
+        </ul>
+      </div>
+    `).join("") || `<p class="muted">当前没有 Agent 声明子 Agent 关系。</p>`;
+
   const agent = agents[selectedAgentIndex] || agents[0];
+  const parentAgent = agentById.get(agent.parentAgentId);
+  const reportAgent = agentById.get(agent.reportsToAgentId);
   if (detailStatus) {
     detailStatus.textContent = statusLabel("agent", agent.status);
     detailStatus.className = `badge ${badgeClassForStatus("agent", agent.status)}`;
@@ -174,6 +194,12 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
       <div><span>最大子 Agent 数</span><strong>${escapeHtml(agent.maxSubAgents ?? 0)}</strong></div>
       <div><span>当前状态</span><strong>${escapeHtml(statusLabel("agent", agent.status))}</strong></div>
       <div><span>安全说明</span><strong>当前只读，不会修改 Agent 配置。</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>父 Agent</span><strong>${escapeHtml(parentAgent?.name || "无")}</strong></div>
+      <div><span>汇总目标</span><strong>${escapeHtml(reportAgent?.name || "无")}</strong></div>
+      <div><span>派生深度</span><strong>${escapeHtml(agent.spawnDepth ?? 0)}</strong></div>
+      <div><span>当前子 Agent</span><strong>${escapeHtml((agent.childAgentIds || []).length)} 个</strong></div>
     </div>
     <div class="task-files">
       <h3>权限</h3>
@@ -283,6 +309,10 @@ function normalizeDashboard(apiData) {
       model: agent.model,
       canSpawnSubAgents: agent.canSpawnSubAgents === true,
       maxSubAgents: agent.maxSubAgents ?? 0,
+      parentAgentId: agent.parentAgentId || "",
+      childAgentIds: agent.childAgentIds || [],
+      reportsToAgentId: agent.reportsToAgentId || "",
+      spawnDepth: agent.spawnDepth ?? 0,
       permissions: agent.permissions || [],
       permissionSummary: (agent.permissions || []).join(" / "),
     })),
