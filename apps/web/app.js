@@ -13,6 +13,7 @@ let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
 let agentChangeRequestRunning = false;
+let agentConfigApplyRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -251,6 +252,14 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
     submitChangeButton.disabled = agentChangeRequestRunning;
     submitChangeButton.onclick = () => runAgentChangeRequest();
   }
+
+  const mockApplyButton = document.querySelector("#mockApplyAgentConfigApplication");
+  if (mockApplyButton) {
+    const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+    const approval = application ? approvalStatusForApplication(application) : null;
+    mockApplyButton.disabled = agentConfigApplyRunning || !canMockApplyAgentConfigApplication(application, approval);
+    mockApplyButton.onclick = () => runAgentConfigApplicationApply();
+  }
 }
 
 function normalizeDashboard(apiData) {
@@ -436,6 +445,20 @@ async function postAgentChangeRequest(agentId, body = {}) {
   return result;
 }
 
+async function postAgentConfigApplicationApply(applicationId, body = {}) {
+  const response = await fetch(`${apiBase}/api/agent-config-applications/${applicationId}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 async function requestRuntimeState(method, path = "/api/runtime-state") {
   const response = await fetch(`${apiBase}${path}`, { method });
   const result = await response.json().catch(() => ({}));
@@ -606,17 +629,21 @@ function renderAgentConfigApplicationChecklist(application, approval) {
   `).join("");
 }
 
-function renderAgentConfigManualApplyConditions(application, approval) {
-  const isReady = approval?.status === "approved"
+function canMockApplyAgentConfigApplication(application, approval) {
+  return application?.status === "pending_apply"
+    && approval?.status === "approved"
     && approval?.targetService === "agent_config"
-    && !approval?.runnerJobId
-    && application.status === "pending_apply";
+    && !approval?.runnerJobId;
+}
+
+function renderAgentConfigManualApplyConditions(application, approval) {
+  const isReady = canMockApplyAgentConfigApplication(application, approval);
   const conditions = [
     ["确认方式", "需要用户二次确认"],
-    ["接口草案", "POST /api/agent-config-applications/:applicationId/apply"],
+    ["Mock 接口", "POST /api/agent-config-applications/:applicationId/apply"],
     ["应用范围", "只修改目标 Agent 的已审批字段"],
     ["状态流转", "pending_apply -> applied / cancelled"],
-    ["当前结论", isReady ? "可进入人工应用设计" : "暂不满足应用前置条件"],
+    ["当前结论", isReady ? "可执行 Mock 状态流转" : "暂不满足应用前置条件"],
   ];
 
   return conditions.map(([label, value]) => `
@@ -679,10 +706,41 @@ function renderAgentConfigApplications(agent) {
             `).join("") || "<li>暂无字段变更明细</li>"}
           </ul>
         </div>
-        <small>只读审查：当前不会写入 Agent 配置，也不会生成 Runner job。</small>
+        <div class="agent-change-submit">
+          <button class="neutral-action" id="mockApplyAgentConfigApplication">模拟应用状态</button>
+        </div>
+        <small>Mock 状态流转：只把待应用记录标记为已应用，不会写入 Agent 配置，也不会生成 Runner job。</small>
       </div>
     </div>
   `;
+}
+
+async function runAgentConfigApplicationApply() {
+  const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+  const approval = application ? approvalStatusForApplication(application) : null;
+  if (!canMockApplyAgentConfigApplication(application, approval) || agentConfigApplyRunning) return;
+
+  agentConfigApplyRunning = true;
+  setAgentChangeFeedback("正在提交 Mock 应用状态...");
+  renderAgentsPage(selectedAgentIndex);
+
+  try {
+    const result = await postAgentConfigApplicationApply(application.id, {
+      secondConfirm: true,
+      confirmText: "我确认仅执行 Agent 配置 Mock 应用状态流转",
+      appliedBy: "local_user",
+    });
+    appData = await loadDashboardFromApi();
+    selectedAgentConfigApplicationId = result.application?.id || selectedAgentConfigApplicationId;
+    renderDashboard();
+    renderAgentsPage(selectedAgentIndex);
+    setAgentChangeFeedback("已标记为已应用；Agent 配置未被修改。", "success");
+  } catch (error) {
+    setAgentChangeFeedback(`Mock 应用失败：${error.message}`, "error");
+  } finally {
+    agentConfigApplyRunning = false;
+    renderAgentsPage(selectedAgentIndex);
+  }
 }
 
 async function runAgentChangeRequest() {

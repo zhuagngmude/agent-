@@ -231,9 +231,9 @@ disabled
 
 ### POST /api/agent-config-applications/:applicationId/apply
 
-用途：人工确认后应用已审批通过的 Agent 配置变更。
+用途：人工确认后模拟应用已审批通过的 Agent 配置变更。
 
-当前状态：草案，暂未实现。MVP-0.2 前端只展示人工应用确认条件，不提供可点击应用按钮。
+当前状态：Mock 状态流转已实现。MVP-0.2 只会把 `agentConfigApplications.status` 从 `pending_apply` 改为 `applied`，记录确认信息，不会修改 Agent 配置，也不会生成 Runner job。
 
 必须满足：
 - 来源审批状态必须是 `approved`。
@@ -246,23 +246,22 @@ disabled
 ```json
 {
   "secondConfirm": true,
-  "confirmText": "我确认应用这次 Agent 配置变更",
-  "applyFields": ["permissions"]
+  "confirmText": "我确认仅执行 Agent 配置 Mock 应用状态流转",
+  "appliedBy": "local_user"
 }
 ```
 
-返回草案：
+返回：
 ```json
 {
   "application": {
     "id": "agent_config_application_approval_agent_agent_frontend_permission",
     "status": "applied",
-    "appliedAt": "2026-06-09T12:30:00Z"
+    "appliedAt": "2026-06-09T12:30:00Z",
+    "appliedBy": "local_user",
+    "applyConfirmText": "我确认仅执行 Agent 配置 Mock 应用状态流转"
   },
-  "agent": {
-    "id": "agent_frontend",
-    "updatedAt": "2026-06-09T12:30:00Z"
-  }
+  "message": "Mock application status changed to applied. Agent config was not modified."
 }
 ```
 

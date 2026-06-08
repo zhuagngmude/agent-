@@ -403,6 +403,69 @@ async function handleAgentChangeRequest(req, res, agentId) {
   });
 }
 
+async function handleAgentConfigApplicationApply(req, res, applicationId) {
+  const application = findAgentConfigApplication(applicationId);
+  if (!application) {
+    sendJson(res, 404, { error: "agent_config_application_not_found" });
+    return;
+  }
+
+  const approval = findApproval(application.approvalId);
+  if (!approval) {
+    sendJson(res, 409, {
+      error: "source_approval_not_found",
+      message: "Agent config application must reference an existing approval.",
+    });
+    return;
+  }
+
+  const body = await readBody(req);
+  if (body.secondConfirm !== true) {
+    sendJson(res, 409, {
+      error: "second_confirm_required",
+      message: "Mock agent config apply requires secondConfirm=true.",
+    });
+    return;
+  }
+
+  if (!body.confirmText) {
+    sendJson(res, 409, {
+      error: "confirm_text_required",
+      message: "Mock agent config apply requires confirmText.",
+    });
+    return;
+  }
+
+  if (application.status !== "pending_apply") {
+    sendJson(res, 409, {
+      error: "application_not_pending_apply",
+      message: `Agent config application cannot apply from status ${application.status}.`,
+    });
+    return;
+  }
+
+  if (approval.status !== "approved" || approval.targetService !== "agent_config" || approval.runnerJobId) {
+    sendJson(res, 409, {
+      error: "application_preconditions_failed",
+      message: "Agent config application requires approved agent_config approval without Runner job.",
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  application.status = "applied";
+  application.appliedAt = now;
+  application.appliedBy = body.appliedBy || "local_user";
+  application.applyConfirmText = body.confirmText;
+  application.updatedAt = now;
+  saveRuntimeState();
+
+  sendJson(res, 200, {
+    application,
+    message: "Mock application status changed to applied. Agent config was not modified.",
+  });
+}
+
 function transitionTask(task, action, body) {
   const now = new Date().toISOString();
   const terminalStatuses = ["completed", "failed", "cancelled"];
@@ -524,6 +587,12 @@ async function handleRequest(req, res) {
   const agentChangeRequest = pathname.match(/^\/api\/agents\/([^/]+)\/change-requests$/);
   if (req.method === "POST" && agentChangeRequest) {
     await handleAgentChangeRequest(req, res, agentChangeRequest[1]);
+    return;
+  }
+
+  const agentConfigApplicationApply = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/apply$/);
+  if (req.method === "POST" && agentConfigApplicationApply) {
+    await handleAgentConfigApplicationApply(req, res, agentConfigApplicationApply[1]);
     return;
   }
 

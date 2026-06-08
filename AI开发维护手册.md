@@ -770,6 +770,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只是内部流程草案和只读展示，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置人工应用 Mock 状态流转
+
+- 改了什么：`services/api` 新增 `POST /api/agent-config-applications/:applicationId/apply`，在满足来源审批已批准、目标服务为 `agent_config`、无 Runner job、状态为 `pending_apply` 且带二次确认时，把应用记录标记为 `applied`；前端新增“模拟应用状态”按钮并刷新状态。
+- 为什么改：先验证 Agent 配置应用流程的状态闭环，同时继续阻止真实 Agent 配置写入和 Runner job 生成。
+- 影响模块：`services/api/server.js`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 Mock 状态流转，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
