@@ -749,6 +749,13 @@ docs/api-draft.md
 - 影响模块：`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前只创建审批申请，不直接改变 Agent 配置。
 
+## 2026-06-09 变更记录：Agent 配置待应用状态
+
+- 改了什么：`targetService=agent_config` 的审批通过后，会创建 `agentConfigApplications` 只读记录，状态为 `pending_apply`；智能体管理页新增“待应用配置变更”面板。
+- 为什么改：在“审批通过”和“真正修改 Agent 配置”之间增加缓冲状态，避免审批一通过就自动改权限、模型或子 Agent 能力边界。
+- 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读状态追踪，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

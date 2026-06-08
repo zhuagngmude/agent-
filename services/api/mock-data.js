@@ -286,6 +286,8 @@ const workflows = [
 
 const runnerJobs = [];
 const initialRunnerJobState = runnerJobs.map((job) => ({ ...job }));
+const agentConfigApplications = [];
+const initialAgentConfigApplicationState = agentConfigApplications.map((item) => ({ ...item }));
 
 const gitCheckpoints = [
   {
@@ -383,6 +385,7 @@ function dashboard() {
     },
     workflows,
     runnerJobs,
+    agentConfigApplications,
     pendingApprovals: approvals,
     taskQueue: tasks,
     agentStatus: agents,
@@ -438,6 +441,11 @@ function resetRuntimeData() {
   });
 
   runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => ({ ...job })));
+  agentConfigApplications.splice(
+    0,
+    agentConfigApplications.length,
+    ...initialAgentConfigApplicationState.map((item) => ({ ...item }))
+  );
 }
 
 module.exports = {
@@ -448,6 +456,7 @@ module.exports = {
   tasks,
   workflows,
   runnerJobs,
+  agentConfigApplications,
   approvals,
   gitCheckpoints,
   knowledgeUpdates,

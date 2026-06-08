@@ -196,6 +196,31 @@ disabled
 }
 ```
 
+### GET /api/projects/:projectId/agent-config-applications
+
+用途：查看已审批通过但尚未应用到 Agent 配置的变更记录。当前只读展示，不提供应用按钮，也不会生成 Runner job。
+
+返回：
+```json
+{
+  "applications": [
+    {
+      "id": "agent_config_application_approval_agent_agent_frontend_permission",
+      "approvalId": "approval_agent_agent_frontend_permission",
+      "agentId": "agent_frontend",
+      "agentName": "前端 Agent",
+      "changeType": "permission",
+      "status": "pending_apply",
+      "changes": [
+        { "field": "permissions", "before": "read_project", "after": "read_project / request_code_execution" }
+      ],
+      "createdAt": "2026-06-09T12:00:00Z",
+      "updatedAt": "2026-06-09T12:00:00Z"
+    }
+  ]
+}
+```
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks

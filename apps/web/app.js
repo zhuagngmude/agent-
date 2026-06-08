@@ -126,6 +126,7 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   const relationList = document.querySelector("#agentRelationList");
   const configRules = document.querySelector("#agentConfigRules");
   const changePreview = document.querySelector("#agentChangePreview");
+  const applicationsPanel = document.querySelector("#agentConfigApplications");
   const detail = document.querySelector("#agentDetail");
   const detailStatus = document.querySelector("#agentDetailStatus");
 
@@ -234,6 +235,9 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   });
 
   changePreview.innerHTML = renderAgentChangePreview(agent, selectedAgentChangeType);
+  if (applicationsPanel) {
+    applicationsPanel.innerHTML = renderAgentConfigApplications(agent);
+  }
 
   const submitChangeButton = document.querySelector("#submitAgentChangeRequest");
   if (submitChangeButton) {
@@ -249,6 +253,7 @@ function normalizeDashboard(apiData) {
   const agentStatus = apiData.agentStatus || [];
   const workflows = apiData.workflows || [];
   const runnerJobs = apiData.runnerJobs || [];
+  const agentConfigApplications = apiData.agentConfigApplications || [];
   const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
   const primaryWorkflow = workflows[0];
 
@@ -328,6 +333,17 @@ function normalizeDashboard(apiData) {
       checkpoint: job.checkpoint || "",
       createdAt: job.createdAt || "",
       updatedAt: job.updatedAt || "",
+    })),
+    agentConfigApplications: agentConfigApplications.map((item) => ({
+      id: item.id,
+      approvalId: item.approvalId || "",
+      agentId: item.agentId || "",
+      agentName: item.agentName || agentById.get(item.agentId)?.name || item.agentId || "",
+      changeType: item.changeType || "",
+      changes: item.changes || [],
+      status: item.status || "pending_apply",
+      createdAt: item.createdAt || "",
+      updatedAt: item.updatedAt || "",
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
@@ -540,6 +556,40 @@ function renderAgentChangePreview(agent, type) {
       </div>
     </div>
   `;
+}
+
+function agentConfigApplicationStatusLabel(status) {
+  const labels = {
+    pending_apply: "待应用",
+    applied: "已应用",
+    cancelled: "已取消",
+  };
+  return labels[status] || status || "未知";
+}
+
+function renderAgentConfigApplications(agent) {
+  const applications = (appData.agentConfigApplications || [])
+    .filter((item) => item.agentId === agent.id);
+
+  if (applications.length === 0) {
+    return `<p class="muted">当前 Agent 暂无待应用配置变更。审批通过后会先出现在这里，不会直接修改 Agent 配置。</p>`;
+  }
+
+  return applications.map((item) => `
+    <div>
+      <div class="application-head">
+        <strong>${escapeHtml(item.changeType || "config_change")}</strong>
+        <span class="badge orange">${escapeHtml(agentConfigApplicationStatusLabel(item.status))}</span>
+      </div>
+      <p>来源审批：${escapeHtml(item.approvalId || "未记录")} · 更新时间：${escapeHtml(item.updatedAt || item.createdAt || "未记录")}</p>
+      <ul>
+        ${(item.changes || []).map((change) => `
+          <li>${escapeHtml(change.field || "field")}：${escapeHtml(change.before || "")} -> ${escapeHtml(change.after || "")}</li>
+        `).join("") || "<li>暂无字段变更明细</li>"}
+      </ul>
+      <small>只读状态：当前不会写入 Agent 配置，也不会生成 Runner job。</small>
+    </div>
+  `).join("");
 }
 
 async function runAgentChangeRequest() {

@@ -63,6 +63,10 @@ function findRunnerJob(id) {
   return data.runnerJobs.find((item) => item.id === id);
 }
 
+function findAgentConfigApplication(id) {
+  return data.agentConfigApplications.find((item) => item.id === id);
+}
+
 function serializeRuntimeState() {
   return {
     version: 1,
@@ -102,6 +106,7 @@ function serializeRuntimeState() {
       updatedAt: task.updatedAt || "",
     })),
     runnerJobs: data.runnerJobs.map((job) => ({ ...job })),
+    agentConfigApplications: data.agentConfigApplications.map((item) => ({ ...item })),
   };
 }
 
@@ -171,6 +176,14 @@ function applyRuntimeState(state) {
   if (Array.isArray(state.runnerJobs)) {
     data.runnerJobs.splice(0, data.runnerJobs.length, ...state.runnerJobs.map((job) => ({ ...job })));
   }
+
+  if (Array.isArray(state.agentConfigApplications)) {
+    data.agentConfigApplications.splice(
+      0,
+      data.agentConfigApplications.length,
+      ...state.agentConfigApplications.map((item) => ({ ...item }))
+    );
+  }
 }
 
 function saveRuntimeState() {
@@ -228,6 +241,32 @@ function upsertRunnerJobFromApproval(approval) {
   }
 
   return job;
+}
+
+function upsertAgentConfigApplicationFromApproval(approval) {
+  const changeRequest = approval.changeRequest || {};
+  const agentId = changeRequest.agentId || approval.requestAgentId || "";
+  const applicationId = `agent_config_application_${approval.id}`;
+  const existing = findAgentConfigApplication(applicationId);
+  const now = new Date().toISOString();
+  const application = existing || {
+    id: applicationId,
+    approvalId: approval.id,
+    createdAt: now,
+  };
+
+  application.agentId = agentId;
+  application.agentName = findAgent(agentId)?.name || approval.requestAgentName || agentId;
+  application.changeType = changeRequest.changeType || "";
+  application.changes = Array.isArray(changeRequest.changes) ? changeRequest.changes : [];
+  application.status = existing?.status || "pending_apply";
+  application.updatedAt = now;
+
+  if (!existing) {
+    data.agentConfigApplications.push(application);
+  }
+
+  return application;
 }
 
 function riskTone(riskLevel) {
@@ -301,8 +340,10 @@ async function handleApprovalAction(req, res, approvalId, action) {
       return;
     }
     approval.status = "approved";
+    let agentConfigApplication = null;
     if (approval.targetService === "agent_config") {
       approval.runnerJobId = "";
+      agentConfigApplication = upsertAgentConfigApplicationFromApproval(approval);
     } else {
       const runnerJob = upsertRunnerJobFromApproval(approval);
       approval.runnerJobId = runnerJob.id;
@@ -314,6 +355,7 @@ async function handleApprovalAction(req, res, approvalId, action) {
       id: approval.id,
       status: approval.status,
       runnerJobId: approval.runnerJobId,
+      agentConfigApplicationId: agentConfigApplication?.id || "",
     });
     return;
   }
@@ -471,6 +513,11 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && withProject(pathname, "/agents")) {
     sendJson(res, 200, { agents: data.agents });
+    return;
+  }
+
+  if (req.method === "GET" && withProject(pathname, "/agent-config-applications")) {
+    sendJson(res, 200, { applications: data.agentConfigApplications });
     return;
   }
 

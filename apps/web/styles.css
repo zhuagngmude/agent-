@@ -435,6 +435,37 @@ li strong { color: var(--green); font-size: 13px; }
 .agent-change-actions .danger-action { border-color: #f4c8c8; color: var(--red); background: #fff2f2; }
 .agent-change-actions button.active { box-shadow: 0 0 0 3px rgba(115, 103, 240, .14); border-color: var(--purple); }
 .agent-change-preview .approval-meta strong em { display: inline-block; font-style: normal; }
+.agent-config-applications {
+  display: grid;
+  gap: 12px;
+}
+.agent-config-applications > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 14px;
+}
+.agent-config-applications .application-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.agent-config-applications p {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.agent-config-applications ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: #4e5670;
+  line-height: 1.8;
+}
+.agent-config-applications small {
+  color: var(--muted);
+  font-weight: 800;
+}
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: 12px; }
