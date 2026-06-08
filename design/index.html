@@ -1,187 +1,802 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>agent蜂群 UI 方向稿</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <div class="design-shell">
-      <header class="topbar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent蜂群 - 多 AI 智能体协作工作台</title>
+  <style>
+    :root {
+      --bg: #eef1f3;
+      --panel: #f8f9fa;
+      --panel-2: #ffffff;
+      --sidebar: #151a1f;
+      --sidebar-2: #1f262d;
+      --text: #182027;
+      --muted: #6b747d;
+      --line: #d9dee3;
+      --line-strong: #c5ccd3;
+      --green: #1f8a4c;
+      --green-soft: #e8f5ed;
+      --amber: #b86e00;
+      --amber-soft: #fff4dd;
+      --red: #c43d32;
+      --red-soft: #fdecea;
+      --ink: #27313a;
+      --blue: #2f5f7f;
+      --shadow: 0 1px 2px rgba(20, 28, 36, .08), 0 8px 24px rgba(20, 28, 36, .06);
+      --radius: 6px;
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 232px minmax(760px, 1fr) 344px;
+      grid-template-rows: 56px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      grid-row: 1 / span 2;
+      background: linear-gradient(180deg, var(--sidebar), var(--sidebar-2));
+      color: #e8edf2;
+      border-right: 1px solid #0d1116;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .brand-mark {
+      width: 26px;
+      height: 26px;
+      border: 1px solid #6d7883;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      color: #b8c2cc;
+      font-size: 13px;
+    }
+
+    .nav {
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav button {
+      border: 0;
+      background: transparent;
+      color: #c7d0d8;
+      text-align: left;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav button:hover, .nav button.active {
+      background: rgba(255, 255, 255, .08);
+      color: #fff;
+    }
+
+    .nav .count {
+      color: #9aa6b2;
+      font-size: 12px;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      border-top: 1px solid rgba(255, 255, 255, .08);
+      color: #aab4be;
+      font-size: 12px;
+    }
+
+    .topbar {
+      grid-column: 2 / span 2;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+
+    .project-switcher {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .project-title {
+      font-weight: 700;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .main {
+      grid-column: 2;
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .context {
+      grid-column: 3;
+      background: #f4f6f7;
+      border-left: 1px solid var(--line);
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: 24px;
+      letter-spacing: .2px;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 14px;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.cols-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .card.pad {
+      padding: 16px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      padding: 13px 14px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .metric .value {
+      font-size: 22px;
+      font-weight: 750;
+      margin-top: 5px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .badge.green { color: var(--green); background: var(--green-soft); border-color: #bfe3cb; }
+    .badge.amber { color: var(--amber); background: var(--amber-soft); border-color: #f0d39b; }
+    .badge.red { color: var(--red); background: var(--red-soft); border-color: #f1b7b2; }
+    .badge.dark { color: #fff; background: #25313b; border-color: #25313b; }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      display: inline-block;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--text);
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      background: #1f2a34;
+      color: #fff;
+      border-color: #1f2a34;
+    }
+
+    .btn.warn {
+      background: var(--amber);
+      color: #fff;
+      border-color: var(--amber);
+    }
+
+    .btn.danger {
+      color: var(--red);
+      border-color: #efb7b2;
+      background: #fff;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 11px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .row:first-child {
+      border-top: 0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .table th, .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table th {
+      font-size: 12px;
+      color: var(--muted);
+      background: #f5f7f8;
+      font-weight: 600;
+    }
+
+    .table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .agent-node {
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      position: relative;
+    }
+
+    .agent-node.parent {
+      border-left: 3px solid var(--blue);
+    }
+
+    .child-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+      padding-left: 14px;
+      border-left: 1px solid var(--line);
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 34px 1fr 110px;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .step-index {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #eef3f6;
+      color: #3d4c59;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .code {
+      background: #101820;
+      color: #d6e3ee;
+      border-radius: var(--radius);
+      padding: 12px;
+      overflow: auto;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 13px;
+    }
+
+    .diff {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .diff div {
+      padding: 5px 10px;
+      border-bottom: 1px solid #edf0f2;
+    }
+
+    .diff .add { background: #e8f5ed; color: #116338; }
+    .diff .del { background: #fdecea; color: #9f2f28; }
+    .diff .meta { background: #f5f7f8; color: #59636e; }
+
+    .notice {
+      border: 1px solid #efc77e;
+      background: #fff8e8;
+      color: #6f4300;
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .danger-zone {
+      border: 1px solid #efb7b2;
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .input-block textarea {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+
+    .tab {
+      padding: 9px 10px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab.active {
+      color: var(--text);
+      border-bottom-color: #1f2a34;
+      font-weight: 700;
+    }
+
+    .empty {
+      min-height: 140px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      background: #fbfcfc;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .context .card {
+      box-shadow: none;
+      margin-bottom: 12px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 8px;
+      font-size: 13px;
+      padding: 6px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .kv:first-of-type {
+      border-top: 0;
+    }
+
+    @media (max-width: 1320px) {
+      .app {
+        grid-template-columns: 210px minmax(720px, 1fr);
+      }
+      .context {
+        display: none;
+      }
+      .topbar {
+        grid-column: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">蜂</div>
+        <div>agent蜂群</div>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="active" data-page="overview">项目总览 <span class="count">3</span></button>
+        <button data-page="agents">Agent 编排 <span class="count">7</span></button>
+        <button data-page="tasks">任务拆解 <span class="count">12</span></button>
+        <button data-page="pipeline">执行流水线 <span class="count">1</span></button>
+        <button data-page="runner">Runner 确认 <span class="count">2</span></button>
+        <button data-page="git">Git 历史 <span class="count">18</span></button>
+        <button data-page="docs">知识库 <span class="count">42</span></button>
+        <button data-page="settings">系统设置</button>
+      </nav>
+      <div class="sidebar-footer">
+        本地工作区：F:\ai共同体\agent蜂群<br>
+        日志归档：今日 09:32 已完成
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div class="project-switcher">
         <div>
-          <p class="eyebrow">agent swarm interface directions</p>
-          <h1>agent蜂群 UI 方向稿</h1>
+          <div class="project-title">当前项目：agent蜂群 MVP</div>
+          <div class="subtle">多 AI 智能体协作调度系统 · 桌面端 Web App</div>
         </div>
-        <div class="switcher" aria-label="切换 UI 方向">
-          <button class="active" data-target="linear">Linear</button>
-          <button data-target="notion">Notion</button>
-          <button data-target="raycast">Raycast</button>
-          <button data-target="github">GitHub</button>
-          <button data-target="vercel">Vercel</button>
-          <button data-target="cursor">Cursor</button>
-          <button data-target="feishu">飞书</button>
-          <button data-target="ide">IDE</button>
+      </div>
+      <div class="status-row">
+        <span class="badge green"><span class="dot"></span> 运行中</span>
+        <span class="badge">云同步：已同步</span>
+        <span class="badge amber">等待确认：2</span>
+        <span>张经理</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="page active" id="overview">
+        <div class="page-head">
+          <div>
+            <h1>项目总览</h1>
+            <div class="subtle">一眼确认项目状态、Agent 活动、待确认执行和最近 Git 保存点。</div>
+          </div>
+          <div class="toolbar">
+            <button class="btn">导入需求</button>
+            <button class="btn primary">新建协作任务</button>
+          </div>
         </div>
-      </header>
-
-      <main>
-        <section class="direction active linear" id="linear">
-          <aside class="rail">
-            <strong>agent蜂群</strong>
-            <nav><span>Inbox</span><span class="on">Projects</span><span>Agents</span><span>Runs</span><span>Settings</span></nav>
-          </aside>
-          <div class="surface">
-            <div class="page-head">
-              <div>
-                <span class="label">Private Team / Agent Swarm</span>
-                <h2>多模型执行队列</h2>
-              </div>
-              <button>Run plan</button>
-            </div>
-            <div class="linear-list">
-              <article><span class="status done"></span><strong>架构师输出总体方案</strong><em>GPT-5 · complete</em></article>
-              <article><span class="status active"></span><strong>调度器拆分任务依赖</strong><em>Claude · running</em></article>
-              <article><span class="status wait"></span><strong>Runner 修改计划等待确认</strong><em>Executor · blocked</em></article>
-              <article><span class="status wait"></span><strong>审查 Agent 汇总风险</strong><em>Gemini · queued</em></article>
-            </div>
-            <div class="bottom-grid">
-              <div><b>Next decision</b><p>是否允许主执行 Agent 修改 `runner/client.py` 和权限模块。</p></div>
-              <div><b>Guardrail</b><p>子 Agent 只读，代码执行必须 Owner 批准。</p></div>
+        <div class="metric-row">
+          <div class="metric"><div class="subtle">活跃 Agent</div><div class="value">6</div></div>
+          <div class="metric"><div class="subtle">阻塞任务</div><div class="value">2</div></div>
+          <div class="metric"><div class="subtle">待确认事项</div><div class="value">3</div></div>
+          <div class="metric"><div class="subtle">最近保存点</div><div class="value">a5d3f2c</div></div>
+        </div>
+        <div class="grid cols-2">
+          <div class="card pad">
+            <h2>活跃 Agent</h2>
+            <div class="list">
+              <div class="row"><span class="badge green"><span class="dot"></span></span><div><b>架构师 Agent</b><div class="subtle">正在合并任务拆解方案</div></div><span class="badge green">进行中</span></div>
+              <div class="row"><span class="badge green"><span class="dot"></span></span><div><b>调度 Agent</b><div class="subtle">等待 Runner 权限确认</div></div><span class="badge amber">等待用户</span></div>
+              <div class="row"><span class="badge green"><span class="dot"></span></span><div><b>前端 Agent</b><div class="subtle">生成工作台页面结构</div></div><span class="badge green">进行中</span></div>
+              <div class="row"><span class="badge"><span class="dot"></span></span><div><b>测试 Agent</b><div class="subtle">待接收后端接口变更</div></div><span class="badge">待分配</span></div>
             </div>
           </div>
-        </section>
-
-        <section class="direction notion" id="notion">
-          <aside class="notion-side">
-            <strong>Agent Swarm OS</strong>
-            <span>项目首页</span><span>架构决策</span><span class="on">运行记录</span><span>权限表</span>
-          </aside>
-          <div class="notion-page">
-            <p class="crumb">项目 / 云端平台 + 本地 Runner</p>
-            <h2>本轮 Agent 运行笔记</h2>
-            <div class="doc-block">
-              <h3>当前目标</h3>
-              <p>让架构师、调度器和专家 Agent 自动跑完项目拆解，并在用户确认后生成 Runner 执行计划。</p>
-            </div>
-            <div class="doc-table">
-              <span>Agent</span><span>模型</span><span>输出</span><span>状态</span>
-              <strong>Architect</strong><span>GPT</span><span>架构方案</span><span>完成</span>
-              <strong>Scheduler</strong><span>Claude</span><span>任务树</span><span>进行中</span>
-              <strong>Reviewer</strong><span>Gemini</span><span>风险总结</span><span>等待</span>
+          <div class="card pad">
+            <h2>阻塞与确认</h2>
+            <div class="list">
+              <div class="row"><span>01</span><div><b>修改 runner/permissions.py</b><div class="subtle">涉及本地文件写入权限，需要用户确认。</div></div><span class="badge red">高风险</span></div>
+              <div class="row"><span>02</span><div><b>API Key 存储策略</b><div class="subtle">平台默认 key 与用户 key 的优先级未确认。</div></div><span class="badge amber">产品决策</span></div>
+              <div class="row"><span>03</span><div><b>Git checkpoint</b><div class="subtle">已创建 checkpoint，等待允许执行。</div></div><span class="badge green">已保护</span></div>
             </div>
           </div>
-        </section>
+        </div>
+        <div class="card pad" style="margin-top:14px;">
+          <h2>项目想法输入</h2>
+          <div class="input-block">
+            <textarea>把 agent蜂群 第一版做成桌面端 Web App：支持任务拆解、Agent 分配、执行确认、Git 历史和知识库同步。</textarea>
+          </div>
+        </div>
+      </section>
 
-        <section class="direction raycast" id="raycast">
-          <div class="command-card">
-            <div class="command-input">搜索命令、Agent、任务或运行记录</div>
-            <div class="command-list">
-              <article><b>Run Architect Agent</b><span>生成总体架构方案</span><kbd>⌘ 1</kbd></article>
-              <article><b>Spawn controlled sub agents</b><span>最多 3 个，深度 1</span><kbd>⌘ 2</kbd></article>
-              <article><b>Approve Runner execution</b><span>查看 diff、Git checkpoint、测试命令</span><kbd>⌘ 3</kbd></article>
-              <article><b>Open permission matrix</b><span>管理高风险权限</span><kbd>⌘ 4</kbd></article>
+      <section class="page" id="agents">
+        <div class="page-head">
+          <div><h1>Agent 编排</h1><div class="subtle">父 Agent 最多派生 3 个子 Agent，子 Agent 层级最多 2 层，结果回传父 Agent 汇总。</div></div>
+          <button class="btn primary">新增 Agent 模板</button>
+        </div>
+        <div class="grid">
+          <div class="agent-node parent">
+            <div class="row"><span class="badge green">父 Agent</span><div><b>架构师 Agent</b><div class="subtle">负责系统边界、模块拆分、技术方案和风险判断。</div></div><span class="badge green">进行中</span></div>
+            <div class="child-grid">
+              <div class="agent-node"><b>接口设计子 Agent</b><div class="subtle">输出 API 契约草案</div></div>
+              <div class="agent-node"><b>数据模型子 Agent</b><div class="subtle">梳理项目、任务、执行记录</div></div>
+              <div class="agent-node"><b>风险审查子 Agent</b><div class="subtle">标记 Runner 安全边界</div></div>
             </div>
           </div>
-          <aside class="ray-panel">
-            <h2>快速操作型</h2>
-            <p>适合把 agent蜂群做成高效率命令中心，少页面、多快捷动作。</p>
-          </aside>
-        </section>
-
-        <section class="direction github" id="github">
-          <div class="repo-head">
-            <h2>agent-swarm / execution-plan</h2>
-            <button>New run</button>
-          </div>
-          <div class="repo-grid">
-            <main class="issue-list">
-              <article><span class="open"></span><b>ARCH-12 架构师方案需要审查</b><p>权限模型从 RBAC 扩展到 RBAC + ABAC。</p></article>
-              <article><span class="open"></span><b>RUN-08 Runner 等待用户确认</b><p>将创建 checkpoint，然后修改 3 个文件。</p></article>
-              <article><span class="closed"></span><b>DOC-03 更新 AI 开发维护手册</b><p>已记录子 Agent 限制和导出安全规则。</p></article>
-            </main>
-            <aside class="repo-side">
-              <h3>Checks</h3>
-              <p>权限扫描通过</p>
-              <p>API Key 未进入日志</p>
-              <p>子 Agent 无执行权限</p>
-            </aside>
-          </div>
-        </section>
-
-        <section class="direction vercel" id="vercel">
-          <div class="deploy-head">
-            <h2>Agent Pipeline</h2>
-            <span>Production-like review before execution</span>
-          </div>
-          <div class="deploy-grid">
-            <article><small>Architect</small><b>Ready</b><p>总体方案已生成。</p></article>
-            <article><small>Scheduler</small><b>Building</b><p>正在拆分任务树。</p></article>
-            <article><small>Specialists</small><b>Queued</b><p>等待任务分发。</p></article>
-            <article><small>Runner</small><b>Blocked</b><p>等待用户确认代码执行。</p></article>
-          </div>
-          <div class="deploy-log">
-            <code>13:40:22 scheduler created 9 tasks</code>
-            <code>13:40:51 reviewer flagged high-risk permission</code>
-            <code>13:41:03 runner prepared checkpoint command</code>
-          </div>
-        </section>
-
-        <section class="direction cursor" id="cursor">
-          <aside class="cursor-files">
-            <strong>Workspace</strong>
-            <span>project.json</span><span>agents.ts</span><span>permissions.ts</span><span class="on">runner/client.py</span>
-          </aside>
-          <main class="cursor-editor">
-            <div class="editor-tabs"><span class="on">change_plan.md</span><span>review.md</span><span>test.log</span></div>
-            <pre>Executor Agent proposes:
-
-1. Create Git checkpoint
-2. Update permission guard
-3. Add runner approval prompt
-4. Run tests
-
-Blocked until Owner approval.</pre>
-          </main>
-          <aside class="cursor-chat">
-            <h3>Agent Review</h3>
-            <p>这个方向适合把产品做成“AI IDE + 云端任务编排”的形态。</p>
-            <button>Approve once</button>
-          </aside>
-        </section>
-
-        <section class="direction feishu" id="feishu">
-          <aside class="team-side">
-            <strong>agent蜂群团队</strong>
-            <span>工作台</span><span class="on">项目空间</span><span>成员权限</span><span>审查</span>
-          </aside>
-          <main class="team-main">
-            <h2>团队协作视图</h2>
-            <div class="team-grid">
-              <article><b>Owner</b><p>可管理 Key、权限和代码执行。</p></article>
-              <article><b>Reviewer</b><p>可批准审查结论，不可改 Key。</p></article>
-              <article><b>Developer</b><p>可运行 Agent，不可批准 Runner。</p></article>
+          <div class="agent-node parent">
+            <div class="row"><span class="badge green">父 Agent</span><div><b>调度 Agent</b><div class="subtle">负责 Agent 分配、队列、依赖关系和失败重试。</div></div><span class="badge amber">等待确认</span></div>
+            <div class="child-grid">
+              <div class="agent-node"><b>优先级子 Agent</b><div class="subtle">计算任务顺序</div></div>
+              <div class="agent-node"><b>资源子 Agent</b><div class="subtle">选择模型与上下文</div></div>
+              <div class="agent-node"><b>汇总子 Agent</b><div class="subtle">回收执行输出</div></div>
             </div>
-            <div class="approval-line"><span>高风险权限</span><strong>execute_code 需要 Owner 二次确认</strong></div>
-          </main>
-        </section>
-
-        <section class="direction ide" id="ide">
-          <div class="ide-frame">
-            <aside><b>Runner</b><span>Change plan</span><span>Git checkpoint</span><span>Test result</span></aside>
-            <main>
-              <h2>执行前确认</h2>
-              <div class="diff">
-                <p>+ add approval gate in runner/client.py</p>
-                <p>+ redact API key in execution logs</p>
-                <p>- remove direct write path from sub agent</p>
-              </div>
-              <button>确认执行一次</button>
-            </main>
           </div>
-        </section>
-      </main>
-    </div>
-    <script src="./script.js"></script>
-  </body>
+        </div>
+      </section>
+
+      <section class="page" id="tasks">
+        <div class="page-head">
+          <div><h1>任务拆解与分配</h1><div class="subtle">从大任务到模块、负责人、风险等级、相关文件与预计步骤。</div></div>
+          <button class="btn primary">运行拆解</button>
+        </div>
+        <table class="table">
+          <thead><tr><th>任务</th><th>负责人</th><th>状态</th><th>相关文件</th><th>风险</th><th>预计步骤</th></tr></thead>
+          <tbody>
+            <tr><td>工作台首页信息聚合</td><td>前端 Agent</td><td><span class="badge green">进行中</span></td><td>src/pages/overview.tsx</td><td><span class="badge">低</span></td><td>4</td></tr>
+            <tr><td>Runner 权限确认流程</td><td>后端 Agent</td><td><span class="badge amber">等待用户确认</span></td><td>runner/permissions.py</td><td><span class="badge red">高</span></td><td>6</td></tr>
+            <tr><td>Git checkpoint 记录模型</td><td>架构师 Agent</td><td><span class="badge amber">待审查</span></td><td>server/git_log.go</td><td><span class="badge amber">中</span></td><td>5</td></tr>
+            <tr><td>知识库双文档关联</td><td>文档 Agent</td><td><span class="badge">待分配</span></td><td>docs/user.md, docs/ai.md</td><td><span class="badge">低</span></td><td>3</td></tr>
+            <tr><td>失败任务回放</td><td>测试 Agent</td><td><span class="badge red">失败</span></td><td>tests/replay.spec.ts</td><td><span class="badge amber">中</span></td><td>4</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="page" id="pipeline">
+        <div class="page-head">
+          <div><h1>执行流水线详情</h1><div class="subtle">协作任务：建立 Runner 安全确认机制。</div></div>
+          <span class="badge amber">等待用户确认</span>
+        </div>
+        <div class="pipeline">
+          <div class="step"><div class="step-index">1</div><div><b>需求输入</b><div class="subtle">用户要求 Runner 修改代码前必须展示文件、原因、风险和 Git checkpoint。</div></div><span class="badge green">完成 · 12s</span></div>
+          <div class="step"><div class="step-index">2</div><div><b>架构设计</b><div class="subtle">新增 ExecutionApproval 模型，所有写操作走审批状态机。</div></div><span class="badge green">完成 · 1m 08s</span></div>
+          <div class="step"><div class="step-index">3</div><div><b>任务拆解</b><div class="subtle">拆分为权限 UI、后端策略、Git checkpoint、审查日志四个模块。</div></div><span class="badge green">完成 · 38s</span></div>
+          <div class="step"><div class="step-index">4</div><div><b>Agent 执行</b><div class="subtle">后端 Agent 请求修改 runner/permissions.py 和 server/audit_log.go。</div></div><span class="badge amber">暂停</span></div>
+          <div class="step"><div class="step-index">5</div><div><b>用户确认</b><div class="subtle">需要选择允许执行、拒绝、只生成补丁或查看差异。</div></div><span class="badge amber">当前步骤</span></div>
+        </div>
+      </section>
+
+      <section class="page" id="runner">
+        <div class="page-head">
+          <div><h1>本地 Runner 执行确认</h1><div class="subtle">自动执行必须可审查、可拒绝、可回滚。用户始终拥有最终控制权。</div></div>
+          <span class="badge red">高风险操作</span>
+        </div>
+        <div class="notice"><b>安全边界：</b>Runner 请求写入 3 个本地文件。Git checkpoint 已创建：<b>a5d3f2c</b>。执行前必须确认。</div>
+        <div class="grid cols-2" style="margin-top:14px;">
+          <div class="card pad">
+            <h2>拟修改文件</h2>
+            <div class="list">
+              <div class="row"><span>1</span><div><b>runner/permissions.py</b><div class="subtle">新增写入审批状态机。</div></div><span class="badge red">高</span></div>
+              <div class="row"><span>2</span><div><b>server/audit_log.go</b><div class="subtle">记录审批人、时间、风险说明。</div></div><span class="badge amber">中</span></div>
+              <div class="row"><span>3</span><div><b>docs/ai-maintenance.md</b><div class="subtle">更新 AI 维护手册中的 Runner 规则。</div></div><span class="badge">低</span></div>
+            </div>
+          </div>
+          <div class="danger-zone">
+            <h2>执行决策</h2>
+            <p class="subtle">建议先查看差异。如果只想保留 AI 产物但不写入工作区，可以选择只生成补丁。</p>
+            <div class="toolbar" style="flex-wrap:wrap;">
+              <button class="btn primary">查看差异</button>
+              <button class="btn">只生成补丁</button>
+              <button class="btn warn">允许执行</button>
+              <button class="btn danger">拒绝</button>
+            </div>
+          </div>
+        </div>
+        <div class="diff" style="margin-top:14px;">
+          <div class="meta">diff --git a/runner/permissions.py b/runner/permissions.py</div>
+          <div class="del">- return runner.execute(command)</div>
+          <div class="add">+ approval = require_user_approval(command, changed_files)</div>
+          <div class="add">+ return runner.execute(command) if approval.allowed else PatchOnlyResult()</div>
+        </div>
+      </section>
+
+      <section class="page" id="git">
+        <div class="page-head">
+          <div><h1>Git 保存与历史记录</h1><div class="subtle">把重要讨论、功能实现、bug 修复和大改前状态沉淀为可回溯记录。</div></div>
+          <button class="btn primary">创建保存点</button>
+        </div>
+        <table class="table">
+          <thead><tr><th>Commit</th><th>类型</th><th>摘要</th><th>关联文档</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td>a5d3f2c</td><td>大改前</td><td>Runner 执行确认前保存点</td><td>AI开发维护手册 / Runner 安全</td><td>2 分钟前</td></tr>
+            <tr><td>9c1e8aa</td><td>功能实现</td><td>新增 Agent 编排模型与父子层级约束</td><td>人类说明书 / Agent 编排</td><td>今天 08:50</td></tr>
+            <tr><td>6ba12fe</td><td>决策记录</td><td>确定任务流不采用聊天记录形态</td><td>产品决策 / 工作流回放</td><td>昨天 22:18</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="page" id="docs">
+        <div class="page-head">
+          <div><h1>知识库 / 文档管理</h1><div class="subtle">人类说明书与 AI 开发维护手册互相关联，功能变化可定位更新位置。</div></div>
+          <button class="btn primary">同步知识库</button>
+        </div>
+        <div class="grid cols-2">
+          <div class="card pad">
+            <h2>人类说明书</h2>
+            <div class="row"><span>01</span><div><b>项目工作台如何使用</b><div class="subtle">关联：AI 手册 / overview-state</div></div><span class="badge green">已同步</span></div>
+            <div class="row"><span>02</span><div><b>Runner 执行确认规则</b><div class="subtle">关联：AI 手册 / runner-approval</div></div><span class="badge amber">需更新</span></div>
+          </div>
+          <div class="card pad">
+            <h2>AI 开发维护手册</h2>
+            <div class="row"><span>01</span><div><b>Agent 层级约束</b><div class="subtle">父 Agent 最多 3 个子 Agent，子层级最多 2 层。</div></div><span class="badge green">已同步</span></div>
+            <div class="row"><span>02</span><div><b>文件写入安全边界</b><div class="subtle">所有本地写入必须经过 ExecutionApproval。</div></div><span class="badge amber">待审查</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="settings">
+        <div class="page-head">
+          <div><h1>系统设置</h1><div class="subtle">模型、密钥、权限、同步、保存策略、日志归档与清理。</div></div>
+          <button class="btn primary">保存设置</button>
+        </div>
+        <div class="grid cols-2">
+          <div class="card pad">
+            <h2>模型配置</h2>
+            <div class="kv"><span class="subtle">架构师</span><span>GPT · 高推理</span></div>
+            <div class="kv"><span class="subtle">前端</span><span>Claude · UI 代码</span></div>
+            <div class="kv"><span class="subtle">审查</span><span>Gemini · 长上下文</span></div>
+          </div>
+          <div class="card pad">
+            <h2>API Key 管理</h2>
+            <div class="kv"><span class="subtle">平台默认</span><span><span class="badge green">启用</span></span></div>
+            <div class="kv"><span class="subtle">用户 Key</span><span><span class="badge amber">仅本地保存</span></span></div>
+            <div class="kv"><span class="subtle">泄露防护</span><span>日志自动脱敏，禁止回显完整 key</span></div>
+          </div>
+          <div class="card pad">
+            <h2>权限系统</h2>
+            <div class="kv"><span class="subtle">读文件</span><span>允许</span></div>
+            <div class="kv"><span class="subtle">写文件</span><span>需要确认</span></div>
+            <div class="kv"><span class="subtle">执行命令</span><span>高风险需二次确认</span></div>
+          </div>
+          <div class="card pad">
+            <h2>数据策略</h2>
+            <div class="kv"><span class="subtle">云同步</span><span>项目元数据同步，密钥不同步</span></div>
+            <div class="kv"><span class="subtle">日志归档</span><span>每日 02:30 自动归档</span></div>
+            <div class="kv"><span class="subtle">导出清理</span><span>支持一键导出 / 一键清理</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="context">
+      <div class="card pad">
+        <h2>当前 Agent</h2>
+        <div class="kv"><span class="subtle">角色</span><span>调度 Agent</span></div>
+        <div class="kv"><span class="subtle">状态</span><span><span class="badge amber">等待用户确认</span></span></div>
+        <div class="kv"><span class="subtle">当前任务</span><span>Runner 执行审批</span></div>
+      </div>
+      <div class="card pad">
+        <h2>风险提示</h2>
+        <div class="row"><span class="badge red">高</span><div>将修改本地 Runner 权限逻辑</div><span></span></div>
+        <div class="row"><span class="badge amber">中</span><div>API Key 策略需要避免日志回显</div><span></span></div>
+      </div>
+      <div class="card pad">
+        <h2>待修改文件</h2>
+        <div class="list">
+          <div class="row"><span></span><div>runner/permissions.py</div><span></span></div>
+          <div class="row"><span></span><div>server/audit_log.go</div><span></span></div>
+          <div class="row"><span></span><div>docs/ai-maintenance.md</div><span></span></div>
+        </div>
+      </div>
+      <div class="card pad">
+        <h2>关联文档</h2>
+        <div class="list">
+          <div class="row"><span></span><div>人类说明书 / Runner 确认</div><span></span></div>
+          <div class="row"><span></span><div>AI 手册 / 安全边界</div><span></span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const buttons = document.querySelectorAll("[data-page]");
+    const pages = document.querySelectorAll(".page");
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        buttons.forEach((item) => item.classList.remove("active"));
+        pages.forEach((page) => page.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(button.dataset.page).classList.add("active");
+      });
+    });
+  </script>
+</body>
 </html>

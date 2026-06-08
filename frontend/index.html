@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="agent蜂群多 AI 智能体协作调度系统前端原型">
+  <title>agent蜂群 · 多 Agent 协作工作台</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主内容</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <span class="brand-logo">蜂</span>
+        <div>
+          <strong>agent蜂群</strong>
+          <small>Agent Swarm Console</small>
+        </div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="workspace-card">
+        <span>本地工作区</span>
+        <strong>F:\ai共同体\agent蜂群</strong>
+        <p>Runner 写入权限：需要确认</p>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div class="project">
+        <span>当前项目</span>
+        <strong>agent蜂群 MVP</strong>
+      </div>
+      <div class="top-status" aria-label="项目状态">
+        <span class="chip ok">运行中</span>
+        <span class="chip">云同步已完成</span>
+        <span class="chip warn">2 个确认</span>
+        <button class="ghost-button">张经理</button>
+      </div>
+    </header>
+
+    <main class="main" id="main">
+      <section class="page-head">
+        <div>
+          <p class="kicker" id="page-kicker">Project Console</p>
+          <h1 id="page-title">项目总览</h1>
+          <p id="page-subtitle">确认项目状态、Agent 活动、阻塞任务、Runner 风险和最近 Git 保存点。</p>
+        </div>
+        <div class="head-actions">
+          <button class="secondary-button" id="secondary-action">导出记录</button>
+          <button class="primary-button" id="primary-action">新建协作任务</button>
+        </div>
+      </section>
+
+      <section id="content" class="content" aria-live="polite"></section>
+    </main>
+
+    <aside class="context" aria-label="上下文面板">
+      <section class="context-card">
+        <h2 id="context-title">当前上下文</h2>
+        <div id="context-body"></div>
+      </section>
+      <section class="context-card">
+        <h2>风险与确认</h2>
+        <div id="risk-list"></div>
+      </section>
+      <section class="context-card">
+        <h2>关联资料</h2>
+        <div class="link-list">
+          <a href="../人类说明书.md">人类说明书</a>
+          <a href="../AI开发维护手册.md">AI 开发维护手册</a>
+          <a href="../UI第一版验收建议.md">UI 第一版验收建议</a>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
