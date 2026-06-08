@@ -1,8 +1,11 @@
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { URL } = require("url");
 const data = require("./mock-data");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
+const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
 
 function sendJson(res, statusCode, body) {
   const payload = JSON.stringify(body, null, 2);
@@ -48,6 +51,65 @@ function findApproval(id) {
   return data.approvals.find((item) => item.id === id);
 }
 
+function serializeRuntimeState() {
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    approvals: data.approvals.map((approval) => ({
+      id: approval.id,
+      status: approval.status,
+      rejectReason: approval.rejectReason || "",
+      runnerJobId: approval.runnerJobId || "",
+      patchArtifactId: approval.patchArtifactId || "",
+      approvedAt: approval.approvedAt || "",
+      rejectedAt: approval.rejectedAt || "",
+      patchOnlyAt: approval.patchOnlyAt || "",
+      updatedAt: approval.updatedAt || "",
+    })),
+  };
+}
+
+function applyRuntimeState(state) {
+  if (!state || !Array.isArray(state.approvals)) return;
+
+  state.approvals.forEach((storedApproval) => {
+    const approval = findApproval(storedApproval.id);
+    if (!approval) return;
+
+    [
+      "status",
+      "rejectReason",
+      "runnerJobId",
+      "patchArtifactId",
+      "approvedAt",
+      "rejectedAt",
+      "patchOnlyAt",
+      "updatedAt",
+    ].forEach((key) => {
+      if (storedApproval[key] !== undefined) {
+        approval[key] = storedApproval[key];
+      }
+    });
+  });
+}
+
+function saveRuntimeState() {
+  fs.mkdirSync(path.dirname(runtimeStateFile), { recursive: true });
+  const tmpFile = `${runtimeStateFile}.tmp`;
+  fs.writeFileSync(tmpFile, `${JSON.stringify(serializeRuntimeState(), null, 2)}\n`, "utf8");
+  fs.renameSync(tmpFile, runtimeStateFile);
+}
+
+function loadRuntimeState() {
+  if (!fs.existsSync(runtimeStateFile)) {
+    saveRuntimeState();
+    return;
+  }
+
+  const state = JSON.parse(fs.readFileSync(runtimeStateFile, "utf8"));
+  applyRuntimeState(state);
+}
+
 async function handleApprovalAction(req, res, approvalId, action) {
   const approval = findApproval(approvalId);
   if (!approval) {
@@ -66,10 +128,14 @@ async function handleApprovalAction(req, res, approvalId, action) {
       return;
     }
     approval.status = "approved";
+    approval.runnerJobId = `runner_job_${approval.id}`;
+    approval.approvedAt = new Date().toISOString();
+    approval.updatedAt = approval.approvedAt;
+    saveRuntimeState();
     sendJson(res, 200, {
       id: approval.id,
       status: approval.status,
-      runnerJobId: `runner_job_${approval.id}`,
+      runnerJobId: approval.runnerJobId,
     });
     return;
   }
@@ -77,16 +143,23 @@ async function handleApprovalAction(req, res, approvalId, action) {
   if (action === "reject") {
     approval.status = "rejected";
     approval.rejectReason = body.reason || "";
+    approval.rejectedAt = new Date().toISOString();
+    approval.updatedAt = approval.rejectedAt;
+    saveRuntimeState();
     sendJson(res, 200, { id: approval.id, status: approval.status });
     return;
   }
 
   if (action === "patch-only") {
     approval.status = "patch_only";
+    approval.patchArtifactId = `patch_${approval.id}`;
+    approval.patchOnlyAt = new Date().toISOString();
+    approval.updatedAt = approval.patchOnlyAt;
+    saveRuntimeState();
     sendJson(res, 200, {
       id: approval.id,
       status: approval.status,
-      patchArtifactId: `patch_${approval.id}`,
+      patchArtifactId: approval.patchArtifactId,
     });
     return;
   }
@@ -187,6 +260,8 @@ async function handleRequest(req, res) {
 
   sendJson(res, 404, { error: "not_found", path: pathname });
 }
+
+loadRuntimeState();
 
 const server = http.createServer((req, res) => {
   handleRequest(req, res).catch((error) => {

@@ -25,3 +25,5 @@ __pycache__/
 .runner/
 logs/tmp/
 logs/
+data/mock/runtime-state.json
+data/mock/runtime-state.json.tmp
