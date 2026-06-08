@@ -115,6 +115,38 @@ function renderDashboard() {
   }
 }
 
+function renderAgentsPage() {
+  const agents = appData.agents || [];
+  const board = document.querySelector("#agentBoard");
+  const modelList = document.querySelector("#agentModelList");
+
+  if (!board || !modelList) return;
+
+  if (agents.length === 0) {
+    board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
+    modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
+    return;
+  }
+
+  board.innerHTML = agents.map((agent) => `
+    <div>
+      <b>${escapeHtml(agent.name)}</b>
+      <span>${escapeHtml(agent.roleLabel || agent.role || "未设置角色")} · ${escapeHtml(statusLabel("agent", agent.status))}</span>
+      <em>${escapeHtml(agent.model || "未配置模型")}</em>
+      <p>${escapeHtml(agent.permissionSummary || "暂无权限说明")}</p>
+      <small>子 Agent：${agent.canSpawnSubAgents ? `最多 ${escapeHtml(agent.maxSubAgents)} 个` : "不允许创建"}</small>
+    </div>
+  `).join("");
+
+  modelList.innerHTML = agents.map((agent) => `
+    <div>
+      <strong>${escapeHtml(agent.name)}</strong>
+      <span>${escapeHtml(agent.model || "未配置模型")}</span>
+      <em class="badge ${badgeClassForStatus("agent", agent.status)}">${escapeHtml(statusLabel("agent", agent.status))}</em>
+    </div>
+  `).join("");
+}
+
 function normalizeDashboard(apiData) {
   const fallback = window.AGENT_SWARM_DATA || {};
   const pendingApprovals = apiData.pendingApprovals || [];
@@ -203,9 +235,17 @@ function normalizeDashboard(apiData) {
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
+      id: agent.id,
       name: agent.name,
+      role: agent.role,
+      roleLabel: roleLabel(agent.role),
       version: agent.version,
       status: agent.status,
+      model: agent.model,
+      canSpawnSubAgents: agent.canSpawnSubAgents === true,
+      maxSubAgents: agent.maxSubAgents ?? 0,
+      permissions: agent.permissions || [],
+      permissionSummary: (agent.permissions || []).join(" / "),
     })),
     gitCheckpoints: (apiData.gitCheckpoints || []).map((item) => ({
       hash: item.commit,
@@ -274,6 +314,20 @@ function statusLabel(group, status) {
 
 function statusTone(group, status) {
   return statusConfig[group]?.[status]?.tone || "neutral";
+}
+
+function roleLabel(role) {
+  const labels = {
+    architect: "架构规划",
+    frontend: "前端实现",
+    backend: "后端实现",
+    docs: "文档维护",
+    reviewer: "安全审查",
+    scheduler: "任务调度",
+    executor: "执行协调",
+    qa: "测试验证",
+  };
+  return labels[role] || role || "未设置角色";
 }
 
 function approvalAction(status) {
@@ -640,6 +694,7 @@ async function runApprovalAction(action) {
     appData = await loadDashboardFromApi();
     selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max((appData.approvalRequests || []).length - 1, 0));
     renderDashboard();
+    renderAgentsPage();
     renderWorkflowPage();
     renderRuntimePage();
     renderApprovalPage(selectedApprovalIndex);
@@ -673,6 +728,7 @@ async function runTaskAction(action) {
     appData = await loadDashboardFromApi();
     selectedTaskIndex = Math.min(selectedTaskIndex, Math.max((appData.taskQueue || []).length - 1, 0));
     renderDashboard();
+    renderAgentsPage();
     renderWorkflowPage();
     renderRuntimePage();
     renderTaskPage(selectedTaskIndex);
@@ -743,6 +799,7 @@ async function runRuntimeStateAction(action) {
       await requestRuntimeState("POST", "/api/runtime-state/reset");
       appData = await loadDashboardFromApi();
       renderDashboard();
+      renderAgentsPage();
       renderWorkflowPage();
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
@@ -751,6 +808,7 @@ async function runRuntimeStateAction(action) {
       await requestRuntimeState("DELETE");
       appData = await loadDashboardFromApi();
       renderDashboard();
+      renderAgentsPage();
       renderWorkflowPage();
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
@@ -809,6 +867,7 @@ async function boot() {
   }
 
   renderDashboard();
+  renderAgentsPage();
   renderWorkflowPage();
   renderRuntimePage();
   renderApprovalPage();

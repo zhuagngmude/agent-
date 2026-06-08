@@ -707,6 +707,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 运行页可读性增强，不改变核心用户流程。
 
+## 2026-06-08 变更记录：智能体管理页只读 Mock API
+
+- 改了什么：智能体管理页从静态占位改为渲染 Mock API 聚合数据，展示 Agent 名称、角色、状态、模型、权限摘要和子 Agent 创建限制；模型分配区同步展示各 Agent 的模型和状态。
+- 为什么改：让系统核心对象“多智能体”进入可读、可接数据的页面状态，为后续 Agent 详情、子 Agent 关系和配置编辑打基础。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读展示增强。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

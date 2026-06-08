@@ -180,15 +180,15 @@
       <section class="page-view" id="agents">
         <div class="subpage-grid">
           <article class="panel wide">
-            <div class="card-head"><h2>智能体资源池</h2><button class="primary-mini">新增智能体</button></div>
-            <div class="agent-board">
-              <div><b>架构师 Agent</b><span>项目拆解、流程设计、任务规划</span><em>Mock API</em></div>
-              <div><b>前端 Agent</b><span>控制台页面、交互和状态渲染</span><em>Mock API</em></div>
-              <div><b>文档 Agent</b><span>人类说明书和 AI 维护手册同步</span><em>Mock API</em></div>
-              <div><b>审查 Agent</b><span>风险检查、审批说明和安全边界</span><em>Mock API</em></div>
+            <div class="card-head"><h2>智能体资源池</h2><span class="badge orange">只读</span></div>
+            <div class="agent-board" id="agentBoard">
+              <div><b>正在读取智能体数据</b><span>连接 Mock API 后会显示 Agent 角色、模型、权限和子 Agent 规则。</span><em>Mock API</em></div>
             </div>
           </article>
-          <article class="panel"><div class="card-head"><h2>模型分配</h2></div><p class="muted">当前为 Mock 配置，后续再接入真实多模型调度。</p></article>
+          <article class="panel wide">
+            <div class="card-head"><h2>模型分配</h2><span class="badge orange">Mock API</span></div>
+            <div class="model-list" id="agentModelList"></div>
+          </article>
         </div>
       </section>
 
