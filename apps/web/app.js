@@ -360,6 +360,9 @@ function normalizeDashboard(apiData) {
       status: item.status || "pending_apply",
       createdAt: item.createdAt || "",
       updatedAt: item.updatedAt || "",
+      appliedAt: item.appliedAt || "",
+      appliedBy: item.appliedBy || "",
+      applyConfirmText: item.applyConfirmText || "",
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
@@ -651,6 +654,21 @@ function renderAgentConfigManualApplyConditions(application, approval) {
   `).join("");
 }
 
+function renderAgentConfigApplicationAudit(application, approval) {
+  const audit = [
+    ["应用时间", application.appliedAt || "尚未应用"],
+    ["确认人", application.appliedBy || "尚未记录"],
+    ["确认文本", application.applyConfirmText || "尚未记录"],
+    ["Agent 配置写入", "未执行真实写入"],
+    ["Runner job", approval?.runnerJobId ? `异常：${approval.runnerJobId}` : "未生成"],
+    ["执行类型", "仅 Mock 状态流转"],
+  ];
+
+  return audit.map(([label, value]) => `
+    <li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>
+  `).join("");
+}
+
 function renderAgentConfigApplications(agent) {
   const applications = (appData.agentConfigApplications || [])
     .filter((item) => item.agentId === agent.id);
@@ -697,6 +715,10 @@ function renderAgentConfigApplications(agent) {
         <div class="application-checklist">
           <h3>人工应用确认条件</h3>
           <ul>${renderAgentConfigManualApplyConditions(selectedApplication, selectedApproval)}</ul>
+        </div>
+        <div class="application-checklist">
+          <h3>应用审计记录</h3>
+          <ul>${renderAgentConfigApplicationAudit(selectedApplication, selectedApproval)}</ul>
         </div>
         <div class="task-files">
           <h3>字段变更</h3>

@@ -777,6 +777,13 @@ docs/api-draft.md
 - 影响模块：`services/api/server.js`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 Mock 状态流转，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置应用审计记录展示
+
+- 改了什么：智能体管理页待应用详情新增“应用审计记录”，展示 `appliedAt`、`appliedBy`、`applyConfirmText`，并明确 Agent 配置未真实写入、Runner job 未生成、当前仅为 Mock 状态流转。
+- 为什么改：让用户和后续 AI 能追踪一次 Agent 配置 Mock 应用是谁确认的、何时确认的、确认文本是什么，避免“已应用”状态缺少审计上下文。
+- 影响模块：`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部审计展示，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

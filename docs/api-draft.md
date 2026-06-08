@@ -205,6 +205,7 @@ disabled
 - 来源审批 ID 和审批状态。
 - 变更字段 before / after。
 - 应用前检查项：审批是否已批准、目标服务是否为 `agent_config`、是否没有 Runner job、当前是否仍为 `pending_apply`。
+- 应用审计记录：`appliedAt`、`appliedBy`、`applyConfirmText`、是否未生成 Runner job、是否未写 Agent 配置。
 
 注意：当前接口只返回待审查记录，不提供应用配置接口；真正写入 Agent 配置前还需要单独的人工应用确认流程。
 
@@ -222,12 +223,21 @@ disabled
       "changes": [
         { "field": "permissions", "before": "read_project", "after": "read_project / request_code_execution" }
       ],
+      "appliedAt": "",
+      "appliedBy": "",
+      "applyConfirmText": "",
       "createdAt": "2026-06-09T12:00:00Z",
       "updatedAt": "2026-06-09T12:00:00Z"
     }
   ]
 }
 ```
+
+字段说明：
+- `appliedAt`：Mock 应用状态流转完成时间，未应用时为空字符串。
+- `appliedBy`：触发 Mock 应用状态流转的本地用户标识。
+- `applyConfirmText`：用户提交二次确认时的确认文本。
+- 这些字段只记录状态流转审计信息，不代表 Agent 配置已经真实写入。
 
 ### POST /api/agent-config-applications/:applicationId/apply
 
