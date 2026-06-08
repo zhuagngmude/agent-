@@ -423,7 +423,7 @@ operationType
   "connected": true,
   "runnerId": "local_runner_001",
   "version": "0.1.0",
-  "workspacePath": "F:/ai共同体(知识库)/20_项目/agent蜂群",
+  "workspacePath": "F:/projects/agent-swarm",
   "permissions": {
     "readFiles": true,
     "writeFiles": "approval_required",

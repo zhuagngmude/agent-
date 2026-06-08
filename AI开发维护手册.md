@@ -699,3 +699,10 @@ docs/api-draft.md
 - 为什么改：补齐“审批通过之后会发生什么”的可追踪链路，但暂不让 Runner 真实执行本地命令。
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读状态追踪。
+
+## 2026-06-08 变更记录：迁移到英文路径
+
+- 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
+- 为什么改：减少中文路径和括号对 Node、Python、Git、Runner 和外部工具造成的编码问题。
+- 影响模块：`新窗口交接说明.md`、`services/api/server.js`、`docs/api-draft.md`、`design/index.html`。
+- 是否需要同步人类说明书：暂不需要；这是本地开发路径迁移，不改变产品功能。
