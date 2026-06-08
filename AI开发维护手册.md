@@ -658,6 +658,7 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 
 ```text
 前端交互反推架构调整.md
+下一步开发路线.md
 ```
 
 原因：`frontend/index.html` 已经把产品从最初的多 Agent 任务调度原型，扩展成 12 个模块的 AI 项目控制台。后端架构需要按照前端交互重新确认模块边界，尤其是：
