@@ -12,3 +12,87 @@ window.AGENT_SWARM_NAV = {
   integrations: ["集成与扩展", "全局视图 / 集成与扩展"],
   settings: ["系统设置", "全局视图 / 系统设置"],
 };
+
+window.AGENT_SWARM_DATA = {
+  project: {
+    name: "agent蜂群 MVP",
+    status: "运行中",
+    phase: "MVP-0.2 前端工程化与 Runner 审批原型",
+    description: "多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。",
+  },
+  dashboardMetrics: [
+    { label: "活跃智能体", value: "18", note: "较昨日 ↑ 12%", tone: "purple", icon: "A" },
+    { label: "待确认事项", value: "7", note: "Runner 审批优先", tone: "orange", icon: "!" },
+    { label: "活跃任务", value: "32", note: "进行中与排队中", tone: "blue", icon: "T" },
+    { label: "Git 检查点", value: "15", note: "最近 24 小时", tone: "green", icon: "G" },
+    { label: "Token 消耗", value: "1.23M", note: "预算使用 60%", tone: "violet", icon: "K" },
+    { label: "模型使用", value: "6", note: "GPT / Claude / Gemini", tone: "cyan", icon: "M" },
+  ],
+  workflow: {
+    steps: [
+      { name: "需求分析智能体", detail: "2 个实例运行中", progress: "100%", tone: "purple" },
+      { name: "方案设计智能体", detail: "3 个实例运行中", progress: "78%", tone: "blue" },
+      { name: "开发实现智能体", detail: "5 个实例运行中", progress: "62%", tone: "green" },
+      { name: "测试验证智能体", detail: "4 个实例运行中", progress: "45%", tone: "orange" },
+      { name: "归档审查智能体", detail: "2 个实例运行中", progress: "20%", tone: "cyan" },
+    ],
+    stats: [
+      ["总智能体数", "24"],
+      ["总任务数", "68"],
+      ["完成任务", "36"],
+      ["协作成功率", "92.3%"],
+      ["平均响应时间", "1.2s"],
+    ],
+  },
+  approvalRequests: [
+    {
+      file: "runner/permissions.py",
+      type: "写文件",
+      agent: "后端 Agent",
+      risk: "高风险",
+      riskTone: "high",
+      diff: "+120 -36",
+    },
+    {
+      file: "docs/ai-maintenance.md",
+      type: "更新文档",
+      agent: "文档 Agent",
+      risk: "中风险",
+      riskTone: "mid",
+      diff: "+56 -0",
+    },
+    {
+      file: "tests/runner-approval.spec.ts",
+      type: "新增测试",
+      agent: "测试 Agent",
+      risk: "低风险",
+      riskTone: "low",
+      diff: "+210 -10",
+    },
+  ],
+  taskQueue: [
+    { icon: "A", tone: "purple", title: "抽出前端 mock 数据模型", type: "前端工程化", eta: "剩余 25m" },
+    { icon: "K", tone: "green", title: "更新知识库文档关联结构", type: "知识库更新", eta: "剩余 1h 10m" },
+    { icon: "!", tone: "red", title: "打磨 Runner 审批确认页", type: "高优先级", eta: "剩余 45m" },
+  ],
+  agents: [
+    { avatar: "A", name: "架构师 Agent", version: "v0.2.0", status: "运行中" },
+    { avatar: "B", name: "前端 Agent", version: "v0.2.0", status: "运行中" },
+    { avatar: "C", name: "文档 Agent", version: "v0.1.5", status: "空闲中" },
+    { avatar: "D", name: "审查 Agent", version: "v0.1.8", status: "运行中" },
+  ],
+  gitCheckpoints: [
+    { hash: "620d44d", message: "Start frontend MVP engineering cleanup", time: "刚刚 ✓" },
+    { hash: "984786d", message: "Add next development roadmap", time: "今天 ✓" },
+    { hash: "eb25687", message: "Document architecture updates from frontend interactions", time: "今天 ✓" },
+  ],
+  knowledgeUpdates: [
+    { mark: "路线", tone: "purple", title: "下一步开发路线", detail: "新增 MVP-0.2 开发顺序", time: "刚刚" },
+    { mark: "架构", tone: "blue", title: "前端交互反推架构", detail: "更新 12 模块系统边界", time: "今天" },
+    { mark: "AI", tone: "orange", title: "AI 开发维护手册", detail: "补充 Runner 审批原则", time: "今天" },
+  ],
+  apiKeys: [
+    { name: "OpenAI API", status: "已配置", detail: "密钥已加密保存，界面不显示任何尾号", usage: "60%" },
+    { name: "Anthropic API", status: "已配置", detail: "密钥仅用于模型调用，日志自动脱敏", usage: "40%" },
+  ],
+};

@@ -76,18 +76,13 @@
             <p>跟踪多 Agent 协作、Runner 审批、Git 检查点和知识库同步状态。</p>
             <div class="project-box">
               <small>当前项目</small>
-              <strong>agent蜂群 MVP <span>运行中</span></strong>
-              <p>项目阶段：MVP-0.2 前端工程化与 Runner 审批原型</p>
-              <p>项目描述：多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。</p>
+              <strong><span data-project-name>agent蜂群 MVP</span> <span data-project-status>运行中</span></strong>
+              <p data-project-phase>项目阶段：MVP-0.2 前端工程化与 Runner 审批原型</p>
+              <p data-project-description>项目描述：多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。</p>
             </div>
           </div>
         </article>
-        <article class="metric-card purple"><span>🤖</span><p>活跃智能体</p><strong>18</strong><small>较昨日 ↑ 12%</small></article>
-        <article class="metric-card orange"><span>📋</span><p>待确认事项</p><strong>7</strong><small>较昨日 ↑ 16%</small></article>
-        <article class="metric-card blue"><span>✅</span><p>活跃任务</p><strong>32</strong><small>较昨日 ↑ 8%</small></article>
-        <article class="metric-card green"><span>⎇</span><p>Git 检查点</p><strong>15</strong><small>较昨日 ↑ 25%</small></article>
-        <article class="metric-card violet"><span>◉</span><p>Token 消耗</p><strong>1.23M</strong><small>≈ ￥245.60</small></article>
-        <article class="metric-card cyan"><span>🧠</span><p>模型使用</p><strong>6</strong><small>较昨日 ↑ 10%</small></article>
+        <div id="dashboardMetrics" class="metric-fragment"></div>
       </section>
 
       <section class="middle-grid">
@@ -96,7 +91,7 @@
             <h2>蜂群协作工作流总览</h2>
             <div class="tabs"><button class="active">流程视图</button><button>拓扑视图</button><button>···</button></div>
           </div>
-          <div class="flow">
+          <div class="flow" id="workflowSteps">
             <div class="agent-step purple"><b>需求分析智能体</b><span>2 个实例运行中</span><i style="--p:100%"></i></div>
             <div class="line"></div>
             <div class="agent-step blue"><b>方案设计智能体</b><span>3 个实例运行中</span><i style="--p:78%"></i></div>
@@ -107,7 +102,7 @@
             <div class="line"></div>
             <div class="agent-step cyan"><b>部署运维智能体</b><span>2 个实例运行中</span><i style="--p:20%"></i></div>
           </div>
-          <div class="workflow-stats">
+          <div class="workflow-stats" id="workflowStats">
             <div><span>总智能体数</span><strong>24</strong></div>
             <div><span>总任务数</span><strong>68</strong></div>
             <div><span>完成任务</span><strong>36</strong></div>
@@ -121,7 +116,7 @@
             <h2>Runner 待审批 <em>3</em></h2>
             <a href="#">查看全部</a>
           </div>
-          <div class="approval-list">
+          <div class="approval-list" id="approvalList">
             <div>
               <strong>src/services/user.service.ts</strong>
               <p>修改类型：更新 · 申请人：开发智能体-Alpha</p>
@@ -138,7 +133,7 @@
               <span class="risk low">低风险</span><small>+210 -10</small>
             </div>
           </div>
-          <footer>共 3 项待审批 <button>进入逐项审查</button></footer>
+          <footer><span id="approvalSummary">共 3 项待审批</span> <button>进入逐项审查</button></footer>
         </article>
       </section>
 
@@ -146,7 +141,7 @@
         <article class="panel">
           <div class="card-head"><h2>任务队列</h2></div>
           <div class="mini-tabs"><b>进行中 32</b><span>排队中 12</span><span>已完成 36</span></div>
-          <ul class="task-list">
+          <ul class="task-list" id="taskQueue">
             <li><span class="icon purple">♙</span><b>实现用户意图识别优化</b><em>开发实现</em><strong>剩余 25m</strong></li>
             <li><span class="icon green">▣</span><b>更新知识库索引结构</b><em>知识更新</em><strong>剩余 1h 10m</strong></li>
             <li><span class="icon red">!</span><b>接口性能测试与优化</b><em>高优先级</em><strong>剩余 45m</strong></li>
@@ -156,7 +151,7 @@
 
         <article class="panel">
           <div class="card-head"><h2>智能体状态</h2><a href="#">查看全部</a></div>
-          <ul class="agent-list">
+          <ul class="agent-list" id="agentStatusList">
             <li><span class="avatar small">A</span><b>开发智能体-Alpha</b><em>v1.2.3</em><strong>运行中</strong></li>
             <li><span class="avatar small">B</span><b>测试智能体-Beta</b><em>v1.1.8</em><strong>运行中</strong></li>
             <li><span class="avatar small">C</span><b>文档智能体-Gamma</b><em>v1.0.5</em><strong>空闲中</strong></li>
@@ -166,7 +161,7 @@
 
         <article class="panel">
           <div class="card-head"><h2>Git 检查点</h2><a href="#">查看全部</a></div>
-          <ul class="checkpoint-list">
+          <ul class="checkpoint-list" id="gitCheckpointList">
             <li><b>a1b2c3d</b><span>feat: 智能客服分发模型</span><em>5 分钟前 ✓</em></li>
             <li><b>d4e5f6a</b><span>docs: 更新系统架构图</span><em>18 分钟前 ✓</em></li>
             <li><b>b7c8d9e</b><span>test: 增加接口集成测试用例</span><em>32 分钟前 ✓</em></li>
@@ -176,7 +171,7 @@
 
         <article class="panel">
           <div class="card-head"><h2>知识库更新</h2><a href="#">查看全部</a></div>
-          <ul class="knowledge-list">
+          <ul class="knowledge-list" id="knowledgeUpdateList">
             <li><span class="doc purple">文</span><b>产品需求文档</b><em>新增 3 个文档片段</em><strong>1 小时前</strong></li>
             <li><span class="doc blue">技</span><b>技术方案文档</b><em>更新 12 个文档片段</em><strong>2 小时前</strong></li>
             <li><span class="doc orange">API</span><b>API 接口文档</b><em>新增 8 个文档片段</em><strong>4 小时前</strong></li>
@@ -186,11 +181,13 @@
 
         <article class="panel">
           <div class="card-head"><h2>设置与密钥</h2></div>
+          <div id="apiKeyList">
           <div class="key-card">
             <b>OpenAI API</b><span>有效</span>
             <p>sk-••••••••••••••1234</p>
             <div class="bar"><i style="--p:60%"></i></div>
             <small>额度：$120.50 · 60%</small>
+          </div>
           </div>
           <div class="key-card">
             <b>Anthropic API</b><span>有效</span>
