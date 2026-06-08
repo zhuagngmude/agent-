@@ -4,8 +4,10 @@ const statusConfig = window.AGENT_SWARM_STATUS || {};
 const apiBase = "http://127.0.0.1:8787";
 const projectId = "project_agent_swarm";
 let selectedApprovalIndex = 0;
+let selectedTaskIndex = 0;
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
+let taskActionRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -117,6 +119,7 @@ function normalizeDashboard(apiData) {
   const pendingApprovals = apiData.pendingApprovals || [];
   const taskQueue = apiData.taskQueue || [];
   const agentStatus = apiData.agentStatus || [];
+  const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
 
   return {
     ...fallback,
@@ -153,11 +156,25 @@ function normalizeDashboard(apiData) {
     })),
     taskQueue: taskQueue.map((task) => ({
       icon: task.priority === "high" ? "!" : "T",
-      tone: task.priority === "high" ? "red" : "purple",
+      tone: task.status === "completed" ? "green" : task.priority === "high" ? "red" : "purple",
       title: task.title,
       type: task.priority === "high" ? "高优先级" : "任务",
-      eta: task.status,
+      eta: statusLabel("task", task.status),
       status: task.status,
+      id: task.id,
+      description: task.description || "",
+      assignedAgentId: task.assignedAgentId || "",
+      assignedAgentName: agentById.get(task.assignedAgentId)?.name || task.assignedAgentId || "未分配",
+      priority: task.priority || "",
+      riskLevel: task.riskLevel || "low",
+      relatedFiles: task.relatedFiles || [],
+      requiresApproval: task.requiresApproval === true,
+      dependsOn: task.dependsOn || [],
+      startedAt: task.startedAt || "",
+      completedAt: task.completedAt || "",
+      failedAt: task.failedAt || "",
+      cancelledAt: task.cancelledAt || "",
+      failureReason: task.failureReason || "",
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
@@ -191,6 +208,20 @@ async function loadDashboardFromApi() {
 
 async function postApprovalAction(approvalId, action, body = {}) {
   const response = await fetch(`${apiBase}/api/approvals/${approvalId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postTaskAction(taskId, action, body = {}) {
+  const response = await fetch(`${apiBase}/api/tasks/${taskId}/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -240,6 +271,13 @@ function setApprovalFeedback(text, mode = "") {
 
 function setRuntimeStateFeedback(text, mode = "") {
   const feedback = document.querySelector("#runtimeStateFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
+function setTaskFeedback(text, mode = "") {
+  const feedback = document.querySelector("#taskFeedback");
   if (!feedback) return;
   feedback.className = `approval-feedback ${mode}`.trim();
   feedback.textContent = text;
@@ -331,6 +369,89 @@ function renderApprovalPage(selectedIndex = 0) {
   });
 }
 
+function badgeClassForStatus(group, status) {
+  const tone = statusTone(group, status);
+  if (tone === "ok") return "green";
+  if (tone === "warn") return "orange";
+  if (tone === "danger") return "red";
+  return "gray";
+}
+
+function riskLabel(riskLevel) {
+  return riskLevel === "high" ? "高风险" : riskLevel === "medium" ? "中风险" : "低风险";
+}
+
+function renderTaskPage(selectedIndex = 0) {
+  const tasks = appData.taskQueue || [];
+  const tableBody = document.querySelector("#taskPageTable tbody");
+  const count = document.querySelector("#taskPageCount");
+  const detail = document.querySelector("#taskDetail");
+  const statusBadge = document.querySelector("#taskDetailStatus");
+
+  if (!tableBody || !detail) return;
+
+  if (tasks.length === 0) {
+    if (count) count.textContent = "0";
+    tableBody.innerHTML = `<tr><td colspan="4">暂无任务</td></tr>`;
+    detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>无任务</strong></div></div>`;
+    document.querySelectorAll("#startTaskAction, #completeTaskAction, #failTaskAction, #cancelTaskAction")
+      .forEach((button) => { button.disabled = true; });
+    return;
+  }
+
+  selectedTaskIndex = Math.min(Math.max(selectedIndex, 0), tasks.length - 1);
+  if (count) count.textContent = tasks.length;
+
+  tableBody.innerHTML = tasks.map((task, index) => `
+    <tr class="${index === selectedTaskIndex ? "active" : ""}" data-task-index="${index}">
+      <td><strong>${escapeHtml(task.title)}</strong></td>
+      <td>${escapeHtml(task.assignedAgentName || "未分配")}</td>
+      <td><span class="badge ${badgeClassForStatus("task", task.status)}">${escapeHtml(statusLabel("task", task.status))}</span></td>
+      <td>${escapeHtml(riskLabel(task.riskLevel))}</td>
+    </tr>
+  `).join("");
+
+  const task = tasks[selectedTaskIndex] || tasks[0];
+  if (statusBadge) {
+    statusBadge.textContent = statusLabel("task", task.status);
+    statusBadge.className = `badge ${badgeClassForStatus("task", task.status)}`;
+  }
+
+  detail.innerHTML = `
+    <div class="approval-meta">
+      <div><span>任务标题</span><strong>${escapeHtml(task.title)}</strong></div>
+      <div><span>负责人</span><strong>${escapeHtml(task.assignedAgentName || "未分配")}</strong></div>
+      <div><span>优先级</span><strong>${escapeHtml(task.priority || "未设置")}</strong></div>
+      <div><span>风险等级</span><strong>${escapeHtml(riskLabel(task.riskLevel))}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>任务说明</span><strong>${escapeHtml(task.description || "暂无说明")}</strong></div>
+      <div><span>依赖任务</span><strong>${escapeHtml(task.dependsOn?.length ? task.dependsOn.join(" / ") : "无")}</strong></div>
+      <div><span>是否需要审批</span><strong>${task.requiresApproval ? "是" : "否"}</strong></div>
+      <div><span>最近更新</span><strong>${escapeHtml(task.updatedAt || task.completedAt || task.startedAt || "未记录")}</strong></div>
+    </div>
+    <div class="task-files">
+      <h3>关联文件</h3>
+      <ul>${(task.relatedFiles || []).map((file) => `<li>${escapeHtml(file)}</li>`).join("") || "<li>暂无关联文件</li>"}</ul>
+    </div>
+  `;
+
+  const startButton = document.querySelector("#startTaskAction");
+  const completeButton = document.querySelector("#completeTaskAction");
+  const failButton = document.querySelector("#failTaskAction");
+  const cancelButton = document.querySelector("#cancelTaskAction");
+  const isTerminal = ["completed", "failed", "cancelled"].includes(task.status);
+
+  if (startButton) startButton.disabled = taskActionRunning || !["queued", "blocked", "waiting_user", "failed", "cancelled"].includes(task.status);
+  if (completeButton) completeButton.disabled = taskActionRunning || task.status !== "running";
+  if (failButton) failButton.disabled = taskActionRunning || isTerminal;
+  if (cancelButton) cancelButton.disabled = taskActionRunning || isTerminal;
+
+  tableBody.querySelectorAll("[data-task-index]").forEach((row) => {
+    row.addEventListener("click", () => renderTaskPage(Number(row.dataset.taskIndex)));
+  });
+}
+
 async function runApprovalAction(action) {
   const item = appData.approvalRequests?.[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
@@ -366,6 +487,37 @@ async function runApprovalAction(action) {
   }
 }
 
+async function runTaskAction(action) {
+  const task = appData.taskQueue?.[selectedTaskIndex];
+  if (!task?.id || taskActionRunning) return;
+
+  const actionLabels = {
+    start: "开始任务",
+    complete: "标记完成",
+    fail: "标记失败",
+    cancel: "取消任务",
+  };
+
+  taskActionRunning = true;
+  setTaskFeedback(`正在提交：${actionLabels[action]}...`);
+  renderTaskPage(selectedTaskIndex);
+
+  try {
+    const body = action === "fail" ? { reason: "用户在控制台标记任务失败" } : {};
+    await postTaskAction(task.id, action, body);
+    appData = await loadDashboardFromApi();
+    selectedTaskIndex = Math.min(selectedTaskIndex, Math.max((appData.taskQueue || []).length - 1, 0));
+    renderDashboard();
+    renderTaskPage(selectedTaskIndex);
+    setTaskFeedback(`已提交：${actionLabels[action]}`, "success");
+  } catch (error) {
+    setTaskFeedback(`提交失败：${error.message}`, "error");
+  } finally {
+    taskActionRunning = false;
+    renderTaskPage(selectedTaskIndex);
+  }
+}
+
 document.querySelector("#viewDiffAction")?.addEventListener("click", () => {
   document.querySelector(".approval-diff")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
@@ -380,6 +532,22 @@ document.querySelector("#rejectApprovalAction")?.addEventListener("click", () =>
 
 document.querySelector("#approveApprovalAction")?.addEventListener("click", () => {
   runApprovalAction("approve");
+});
+
+document.querySelector("#startTaskAction")?.addEventListener("click", () => {
+  runTaskAction("start");
+});
+
+document.querySelector("#completeTaskAction")?.addEventListener("click", () => {
+  runTaskAction("complete");
+});
+
+document.querySelector("#failTaskAction")?.addEventListener("click", () => {
+  runTaskAction("fail");
+});
+
+document.querySelector("#cancelTaskAction")?.addEventListener("click", () => {
+  runTaskAction("cancel");
 });
 
 async function runRuntimeStateAction(action) {
@@ -409,11 +577,13 @@ async function runRuntimeStateAction(action) {
       appData = await loadDashboardFromApi();
       renderDashboard();
       renderApprovalPage(selectedApprovalIndex);
+      renderTaskPage(selectedTaskIndex);
     } else if (action === "clear") {
       await requestRuntimeState("DELETE");
       appData = await loadDashboardFromApi();
       renderDashboard();
       renderApprovalPage(selectedApprovalIndex);
+      renderTaskPage(selectedTaskIndex);
     }
 
     setRuntimeStateFeedback(`已完成：${actionText}`, "success");
@@ -469,6 +639,7 @@ async function boot() {
 
   renderDashboard();
   renderApprovalPage();
+  renderTaskPage();
 }
 
 boot();

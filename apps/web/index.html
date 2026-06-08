@@ -219,17 +219,32 @@
       </section>
 
       <section class="page-view" id="tasks">
-        <article class="panel wide">
-          <div class="card-head"><h2>任务管理</h2><button class="primary-mini">拆解新任务</button></div>
-          <table class="data-table">
-            <thead><tr><th>任务</th><th>负责人</th><th>状态</th><th>风险</th><th>剩余时间</th></tr></thead>
-            <tbody>
-              <tr><td>实现用户意图识别优化</td><td>开发智能体-Alpha</td><td><span class="badge green">进行中</span></td><td>高优先级</td><td>25m</td></tr>
-              <tr><td>更新知识库索引结构</td><td>知识库智能体-Epsilon</td><td><span class="badge orange">排队中</span></td><td>中风险</td><td>1h 10m</td></tr>
-              <tr><td>接口性能测试与优化</td><td>测试智能体-Beta</td><td><span class="badge red">待确认</span></td><td>高风险</td><td>45m</td></tr>
-            </tbody>
-          </table>
-        </article>
+        <div class="task-workspace">
+          <article class="panel">
+            <div class="card-head"><h2>任务队列 <em id="taskPageCount">0</em></h2><button class="primary-mini">拆解新任务</button></div>
+            <div class="task-table-wrap">
+              <table class="data-table selectable" id="taskPageTable">
+                <thead><tr><th>任务</th><th>负责人</th><th>状态</th><th>风险</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel task-detail">
+            <div class="card-head">
+              <h2>任务详情</h2>
+              <span class="badge orange" id="taskDetailStatus">排队中</span>
+            </div>
+            <div id="taskDetail"></div>
+            <p class="approval-feedback" id="taskFeedback" role="status"></p>
+            <div class="task-actions">
+              <button class="safe-action" id="startTaskAction">开始任务</button>
+              <button class="safe-action" id="completeTaskAction">标记完成</button>
+              <button class="neutral-action" id="failTaskAction">标记失败</button>
+              <button class="danger-action" id="cancelTaskAction">取消任务</button>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section class="page-view" id="workflow">

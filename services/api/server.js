@@ -51,6 +51,10 @@ function findApproval(id) {
   return data.approvals.find((item) => item.id === id);
 }
 
+function findTask(id) {
+  return data.tasks.find((item) => item.id === id);
+}
+
 function serializeRuntimeState() {
   return {
     version: 1,
@@ -66,31 +70,64 @@ function serializeRuntimeState() {
       patchOnlyAt: approval.patchOnlyAt || "",
       updatedAt: approval.updatedAt || "",
     })),
+    tasks: data.tasks.map((task) => ({
+      id: task.id,
+      status: task.status,
+      startedAt: task.startedAt || "",
+      completedAt: task.completedAt || "",
+      failedAt: task.failedAt || "",
+      cancelledAt: task.cancelledAt || "",
+      failureReason: task.failureReason || "",
+      updatedAt: task.updatedAt || "",
+    })),
   };
 }
 
 function applyRuntimeState(state) {
-  if (!state || !Array.isArray(state.approvals)) return;
+  if (!state) return;
 
-  state.approvals.forEach((storedApproval) => {
-    const approval = findApproval(storedApproval.id);
-    if (!approval) return;
+  if (Array.isArray(state.approvals)) {
+    state.approvals.forEach((storedApproval) => {
+      const approval = findApproval(storedApproval.id);
+      if (!approval) return;
 
-    [
-      "status",
-      "rejectReason",
-      "runnerJobId",
-      "patchArtifactId",
-      "approvedAt",
-      "rejectedAt",
-      "patchOnlyAt",
-      "updatedAt",
-    ].forEach((key) => {
-      if (storedApproval[key] !== undefined) {
-        approval[key] = storedApproval[key];
-      }
+      [
+        "status",
+        "rejectReason",
+        "runnerJobId",
+        "patchArtifactId",
+        "approvedAt",
+        "rejectedAt",
+        "patchOnlyAt",
+        "updatedAt",
+      ].forEach((key) => {
+        if (storedApproval[key] !== undefined) {
+          approval[key] = storedApproval[key];
+        }
+      });
     });
-  });
+  }
+
+  if (Array.isArray(state.tasks)) {
+    state.tasks.forEach((storedTask) => {
+      const task = findTask(storedTask.id);
+      if (!task) return;
+
+      [
+        "status",
+        "startedAt",
+        "completedAt",
+        "failedAt",
+        "cancelledAt",
+        "failureReason",
+        "updatedAt",
+      ].forEach((key) => {
+        if (storedTask[key] !== undefined) {
+          task[key] = storedTask[key];
+        }
+      });
+    });
+  }
 }
 
 function saveRuntimeState() {
@@ -179,6 +216,65 @@ async function handleApprovalAction(req, res, approvalId, action) {
   sendJson(res, 404, { error: "unknown_approval_action" });
 }
 
+function transitionTask(task, action, body) {
+  const now = new Date().toISOString();
+  const terminalStatuses = ["completed", "failed", "cancelled"];
+
+  if (action === "start") {
+    if (!["queued", "blocked", "waiting_user", "failed", "cancelled"].includes(task.status)) {
+      return { error: "task_cannot_start", message: `Task cannot start from status ${task.status}.` };
+    }
+    task.status = "running";
+    task.startedAt = now;
+    delete task.completedAt;
+    delete task.failedAt;
+    delete task.cancelledAt;
+    delete task.failureReason;
+  } else if (action === "complete") {
+    if (task.status !== "running") {
+      return { error: "task_cannot_complete", message: "Only running tasks can be completed." };
+    }
+    task.status = "completed";
+    task.completedAt = now;
+  } else if (action === "fail") {
+    if (terminalStatuses.includes(task.status)) {
+      return { error: "task_already_terminal", message: `Task is already ${task.status}.` };
+    }
+    task.status = "failed";
+    task.failedAt = now;
+    task.failureReason = body.reason || "用户在控制台标记为失败";
+  } else if (action === "cancel") {
+    if (terminalStatuses.includes(task.status)) {
+      return { error: "task_already_terminal", message: `Task is already ${task.status}.` };
+    }
+    task.status = "cancelled";
+    task.cancelledAt = now;
+  } else {
+    return { error: "unknown_task_action", message: "Unknown task action." };
+  }
+
+  task.updatedAt = now;
+  return null;
+}
+
+async function handleTaskAction(req, res, taskId, action) {
+  const task = findTask(taskId);
+  if (!task) {
+    sendJson(res, 404, { error: "task_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  const transitionError = transitionTask(task, action, body);
+  if (transitionError) {
+    sendJson(res, 409, transitionError);
+    return;
+  }
+
+  saveRuntimeState();
+  sendJson(res, 200, { task });
+}
+
 async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const { pathname } = url;
@@ -235,6 +331,19 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && withProject(pathname, "/tasks")) {
     sendJson(res, 200, { tasks: data.tasks });
+    return;
+  }
+
+  const taskDetail = pathname.match(/^\/api\/tasks\/([^/]+)$/);
+  if (req.method === "GET" && taskDetail) {
+    const task = findTask(taskDetail[1]);
+    sendJson(res, task ? 200 : 404, task || { error: "task_not_found" });
+    return;
+  }
+
+  const taskAction = pathname.match(/^\/api\/tasks\/([^/]+)\/(start|complete|fail|cancel)$/);
+  if (req.method === "POST" && taskAction) {
+    await handleTaskAction(req, res, taskAction[1], taskAction[2]);
     return;
   }
 

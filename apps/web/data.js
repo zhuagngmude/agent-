@@ -30,6 +30,8 @@ window.AGENT_SWARM_STATUS = {
     blocked: { label: "已阻塞", tone: "danger" },
     waiting_user: { label: "等待用户", tone: "warn" },
     completed: { label: "已完成", tone: "ok" },
+    failed: { label: "失败", tone: "danger" },
+    cancelled: { label: "已取消", tone: "neutral" },
   },
   agent: {
     running: { label: "运行中", tone: "ok" },

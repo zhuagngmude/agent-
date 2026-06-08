@@ -88,6 +88,7 @@ const tasks = [
   {
     id: "task_frontend_mock_data",
     title: "抽出前端 mock 数据模型",
+    description: "将首页和关键模块数据从 HTML 中抽离，为后续 API 接入留出稳定数据结构。",
     status: "completed",
     priority: "high",
     assignedAgentId: "agent_frontend",
@@ -99,6 +100,7 @@ const tasks = [
   {
     id: "task_runner_approval_page",
     title: "打磨 Runner 审批确认页",
+    description: "完善 Runner 执行前的审查详情、差异预览、拒绝和只生成补丁流程。",
     status: "running",
     priority: "high",
     assignedAgentId: "agent_frontend",
@@ -110,6 +112,7 @@ const tasks = [
   {
     id: "task_api_contract",
     title: "写 API 草案",
+    description: "定义 Dashboard、任务、审批、Runner、知识库等模块的第一版接口边界。",
     status: "completed",
     priority: "medium",
     assignedAgentId: "agent_architect",
@@ -117,6 +120,18 @@ const tasks = [
     relatedFiles: ["docs/api-draft.md"],
     requiresApproval: false,
     dependsOn: [],
+  },
+  {
+    id: "task_task_state_api",
+    title: "任务管理接入 Mock API 状态机",
+    description: "让任务页支持开始、完成、失败、取消，并把状态写入本地 runtime-state。",
+    status: "queued",
+    priority: "high",
+    assignedAgentId: "agent_architect",
+    riskLevel: "medium",
+    relatedFiles: ["services/api/server.js", "services/api/mock-data.js", "apps/web/app.js"],
+    requiresApproval: false,
+    dependsOn: ["task_api_contract"],
   },
 ];
 
@@ -203,6 +218,17 @@ const initialApprovalState = approvals.map((approval) => ({
   rejectedAt: approval.rejectedAt || "",
   patchOnlyAt: approval.patchOnlyAt || "",
   updatedAt: approval.updatedAt || "",
+}));
+
+const initialTaskState = tasks.map((task) => ({
+  id: task.id,
+  status: task.status,
+  startedAt: task.startedAt || "",
+  completedAt: task.completedAt || "",
+  failedAt: task.failedAt || "",
+  cancelledAt: task.cancelledAt || "",
+  failureReason: task.failureReason || "",
+  updatedAt: task.updatedAt || "",
 }));
 
 const gitCheckpoints = [
@@ -328,6 +354,27 @@ function resetRuntimeData() {
         approval[key] = initial[key];
       } else {
         delete approval[key];
+      }
+    });
+  });
+
+  initialTaskState.forEach((initial) => {
+    const task = tasks.find((item) => item.id === initial.id);
+    if (!task) return;
+
+    task.status = initial.status;
+    [
+      "startedAt",
+      "completedAt",
+      "failedAt",
+      "cancelledAt",
+      "failureReason",
+      "updatedAt",
+    ].forEach((key) => {
+      if (initial[key]) {
+        task[key] = initial[key];
+      } else {
+        delete task[key];
       }
     });
   });

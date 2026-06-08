@@ -678,3 +678,10 @@ docs/api-draft.md
 应用形态原则：当前阶段是电脑端 Web App，不是安装版桌面软件。先把 Web 控制台、Mock 数据、状态机和 Runner 审批流程做稳；随后接本地 Runner；最后再考虑用 Tauri 或 Electron 封装成 `agent蜂群.exe`。
 
 工程骨架原则：正式前端入口是 `apps/web/`。旧 `frontend/` 只保留兼容跳转入口，后续不要在 `frontend/` 新增业务代码。API 服务放 `services/api/`，本地 Runner 放 `services/runner/`，Agent 调度放 `services/worker/`，共享状态和类型放 `packages/shared/`。
+
+## 2026-06-08 变更记录：任务管理 Mock 状态机
+
+- 改了什么：为 `services/api` 增加任务运行时状态保存和 `POST /api/tasks/:taskId/start|complete|fail|cancel`；为 `apps/web` 任务页增加任务详情和状态操作。
+- 为什么改：让任务管理从静态展示进入可操作状态机，并让 Dashboard 的活跃任务数跟随任务状态变化。
+- 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 内部工程能力增强，用户核心流程没有变化。

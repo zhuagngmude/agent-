@@ -200,6 +200,42 @@ keyword
 }
 ```
 
+### POST /api/tasks/:taskId/start
+
+用途：开始任务，将任务状态切换为 `running`。
+
+返回：
+
+```json
+{
+  "task": {
+    "id": "task_task_state_api",
+    "status": "running",
+    "startedAt": "2026-06-08T13:00:00Z"
+  }
+}
+```
+
+### POST /api/tasks/:taskId/complete
+
+用途：标记任务完成。当前 Mock API 只允许 `running` 任务完成。
+
+### POST /api/tasks/:taskId/fail
+
+用途：标记任务失败。
+
+请求：
+
+```json
+{
+  "reason": "测试未通过"
+}
+```
+
+### POST /api/tasks/:taskId/cancel
+
+用途：取消任务。
+
 ## Workflows
 
 ### GET /api/projects/:projectId/workflows
