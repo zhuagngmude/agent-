@@ -606,6 +606,24 @@ function renderAgentConfigApplicationChecklist(application, approval) {
   `).join("");
 }
 
+function renderAgentConfigManualApplyConditions(application, approval) {
+  const isReady = approval?.status === "approved"
+    && approval?.targetService === "agent_config"
+    && !approval?.runnerJobId
+    && application.status === "pending_apply";
+  const conditions = [
+    ["确认方式", "需要用户二次确认"],
+    ["接口草案", "POST /api/agent-config-applications/:applicationId/apply"],
+    ["应用范围", "只修改目标 Agent 的已审批字段"],
+    ["状态流转", "pending_apply -> applied / cancelled"],
+    ["当前结论", isReady ? "可进入人工应用设计" : "暂不满足应用前置条件"],
+  ];
+
+  return conditions.map(([label, value]) => `
+    <li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>
+  `).join("");
+}
+
 function renderAgentConfigApplications(agent) {
   const applications = (appData.agentConfigApplications || [])
     .filter((item) => item.agentId === agent.id);
@@ -648,6 +666,10 @@ function renderAgentConfigApplications(agent) {
         <div class="application-checklist">
           <h3>应用前检查</h3>
           <ul>${renderAgentConfigApplicationChecklist(selectedApplication, selectedApproval)}</ul>
+        </div>
+        <div class="application-checklist">
+          <h3>人工应用确认条件</h3>
+          <ul>${renderAgentConfigManualApplyConditions(selectedApplication, selectedApproval)}</ul>
         </div>
         <div class="task-files">
           <h3>字段变更</h3>

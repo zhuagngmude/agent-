@@ -763,6 +763,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读审查增强，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置人工应用确认草案
+
+- 改了什么：API 草案新增 `POST /api/agent-config-applications/:applicationId/apply` 的未实现接口边界；智能体管理页待应用审查视图新增“人工应用确认条件”，说明二次确认、状态流转和只能应用已审批字段。
+- 为什么改：在真正允许写入 Agent 配置前，先固定人工应用的安全前置条件，避免 `pending_apply` 记录被自动应用或绕过审批。
+- 影响模块：`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只是内部流程草案和只读展示，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -229,6 +229,43 @@ disabled
 }
 ```
 
+### POST /api/agent-config-applications/:applicationId/apply
+
+用途：人工确认后应用已审批通过的 Agent 配置变更。
+
+当前状态：草案，暂未实现。MVP-0.2 前端只展示人工应用确认条件，不提供可点击应用按钮。
+
+必须满足：
+- 来源审批状态必须是 `approved`。
+- 来源审批 `targetService` 必须是 `agent_config`。
+- 来源审批不得关联 Runner job。
+- 应用记录状态必须是 `pending_apply`。
+- 请求体必须包含二次确认字段。
+
+请求草案：
+```json
+{
+  "secondConfirm": true,
+  "confirmText": "我确认应用这次 Agent 配置变更",
+  "applyFields": ["permissions"]
+}
+```
+
+返回草案：
+```json
+{
+  "application": {
+    "id": "agent_config_application_approval_agent_agent_frontend_permission",
+    "status": "applied",
+    "appliedAt": "2026-06-09T12:30:00Z"
+  },
+  "agent": {
+    "id": "agent_frontend",
+    "updatedAt": "2026-06-09T12:30:00Z"
+  }
+}
+```
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks
