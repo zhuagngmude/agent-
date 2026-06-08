@@ -24,3 +24,4 @@ __pycache__/
 # Local runner state
 .runner/
 logs/tmp/
+logs/

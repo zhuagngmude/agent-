@@ -15,6 +15,9 @@
 
 ```text
 start-mock-api.ps1
+start-dev.ps1
 ```
 
 启动 `services/api/server.js`。
+
+`start-dev.ps1` 会启动 mock API 并打开 `apps/web/index.html`。

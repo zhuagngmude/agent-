@@ -111,3 +111,11 @@ apps/web/index.html
 ```
 
 旧入口 `frontend/index.html` 只保留为兼容跳转页，后续不要在 `frontend/` 继续新增业务代码。
+
+## 一键启动
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+```
+
+这个脚本会启动本地 mock API，并打开电脑端 Web App。
