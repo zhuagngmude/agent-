@@ -5,7 +5,7 @@
 来源文件：
 
 - `C:/Users/zmd/Documents/初始化/agent-swarm-ui-handoff.zip`
-- 英文临时审查目录：`C:/Users/zmd/Documents/codex-work/agent-swarm-ui-review`
+- 英文临时审查目录：`F:/codex-work/agent-swarm-ui-review`
 - `agent-swarm-prototype.html`
 - `agent-swarm-ui-v1-20260608-092448.png`
 - `handoff.md`
@@ -29,7 +29,7 @@
 - 代码项目、临时工作区、脚本、构建产物、测试目录尽量使用英文 ASCII 路径。
 - 中文可以继续用于 Obsidian 文档标题、说明正文、产品 UI 文案。
 - 接收到中文路径资源时，先复制到英文临时目录再运行自动化工具。
-- 推荐临时工作目录：`C:/Users/zmd/Documents/codex-work/`。
+- 推荐临时工作目录：`F:/codex-work/`。
 
 ### P0：不要使用生成图里的小字作为正式 UI 文案
 
