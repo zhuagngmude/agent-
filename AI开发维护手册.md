@@ -652,3 +652,23 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 - 建立文档同步规则，要求后续改动同时更新人类说明书和 AI 开发维护手册。
 - 删除旧 UI 静态原型；新增 UI 设计维护规则，要求后续先收集 design context，避免通用 AI 味界面。
 - 新增 `design/index.html`，创建 8 个 UI 方向稿用于选择，不沿用已删除的旧原型。
+## 2026-06-08 重要补充：前端交互反推架构
+
+后续 AI 接手开发前，除了阅读本文档，还必须阅读：
+
+```text
+前端交互反推架构调整.md
+```
+
+原因：`frontend/index.html` 已经把产品从最初的多 Agent 任务调度原型，扩展成 12 个模块的 AI 项目控制台。后端架构需要按照前端交互重新确认模块边界，尤其是：
+
+- Dashboard 聚合接口
+- Agent 资源池
+- Task 状态机
+- Workflow 编排
+- Approval 与 Runner 安全网关
+- Knowledge 文档片段
+- Usage/Cost 统计
+- Integration 插件边界
+
+关键原则：Runner Service 不能自己决定自己是否可以执行。所有本地写文件、删文件、执行命令、网络请求、Git 操作，都必须经过 Approval Service，并在高风险场景中要求二次确认和 Git checkpoint。
