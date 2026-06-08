@@ -11,3 +11,10 @@
 
 脚本文件名和路径尽量使用英文 ASCII。
 
+## 当前脚本
+
+```text
+start-mock-api.ps1
+```
+
+启动 `services/api/server.js`。
