@@ -320,6 +320,15 @@
           <div class="key-card"><b>OpenAI API</b><span>已配置</span><p>密钥已加密保存，界面不显示任何尾号</p><div class="bar"><i style="--p:60%"></i></div><small>预算使用：60%</small></div>
           <div class="key-card"><b>Anthropic API</b><span>已配置</span><p>密钥仅用于模型调用，日志自动脱敏</p><div class="bar"><i style="--p:40%"></i></div><small>预算使用：40%</small></div>
         </article>
+        <article class="panel wide">
+          <div class="card-head"><h2>本地状态管理</h2><span class="badge orange">Mock API</span></div>
+          <div class="state-tools">
+            <button class="safe-action" id="exportRuntimeState">导出状态</button>
+            <button class="neutral-action" id="resetRuntimeState">重置 Mock 数据</button>
+            <button class="danger-action" id="clearRuntimeState">清理状态文件</button>
+          </div>
+          <p class="approval-feedback" id="runtimeStateFeedback" role="status"></p>
+        </article>
       </section>
 
       <script src="./data.js"></script>

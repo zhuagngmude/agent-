@@ -5,6 +5,7 @@ const apiBase = "http://127.0.0.1:8787";
 const projectId = "project_agent_swarm";
 let selectedApprovalIndex = 0;
 let approvalActionRunning = false;
+let runtimeStateRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -202,6 +203,15 @@ async function postApprovalAction(approvalId, action, body = {}) {
   return result;
 }
 
+async function requestRuntimeState(method, path = "/api/runtime-state") {
+  const response = await fetch(`${apiBase}${path}`, { method });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 function statusLabel(group, status) {
   return statusConfig[group]?.[status]?.label || status;
 }
@@ -226,6 +236,18 @@ function setApprovalFeedback(text, mode = "") {
   if (!feedback) return;
   feedback.className = `approval-feedback ${mode}`.trim();
   feedback.textContent = text;
+}
+
+function setRuntimeStateFeedback(text, mode = "") {
+  const feedback = document.querySelector("#runtimeStateFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
+function setRuntimeStateButtons(disabled) {
+  document.querySelectorAll("#exportRuntimeState, #resetRuntimeState, #clearRuntimeState")
+    .forEach((button) => { button.disabled = disabled; });
 }
 
 function renderApprovalPage(selectedIndex = 0) {
@@ -358,6 +380,61 @@ document.querySelector("#rejectApprovalAction")?.addEventListener("click", () =>
 
 document.querySelector("#approveApprovalAction")?.addEventListener("click", () => {
   runApprovalAction("approve");
+});
+
+async function runRuntimeStateAction(action) {
+  if (runtimeStateRunning) return;
+
+  const actionText = {
+    export: "导出状态",
+    reset: "重置 Mock 数据",
+    clear: "清理状态文件",
+  }[action];
+
+  runtimeStateRunning = true;
+  setRuntimeStateButtons(true);
+  setRuntimeStateFeedback(`正在处理：${actionText}...`);
+
+  try {
+    if (action === "export") {
+      const result = await requestRuntimeState("GET");
+      const blob = new Blob([`${JSON.stringify(result.state, null, 2)}\n`], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `agent-swarm-runtime-state-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } else if (action === "reset") {
+      await requestRuntimeState("POST", "/api/runtime-state/reset");
+      appData = await loadDashboardFromApi();
+      renderDashboard();
+      renderApprovalPage(selectedApprovalIndex);
+    } else if (action === "clear") {
+      await requestRuntimeState("DELETE");
+      appData = await loadDashboardFromApi();
+      renderDashboard();
+      renderApprovalPage(selectedApprovalIndex);
+    }
+
+    setRuntimeStateFeedback(`已完成：${actionText}`, "success");
+  } catch (error) {
+    setRuntimeStateFeedback(`处理失败：${error.message}`, "error");
+  } finally {
+    runtimeStateRunning = false;
+    setRuntimeStateButtons(false);
+  }
+}
+
+document.querySelector("#exportRuntimeState")?.addEventListener("click", () => {
+  runRuntimeStateAction("export");
+});
+
+document.querySelector("#resetRuntimeState")?.addEventListener("click", () => {
+  runRuntimeStateAction("reset");
+});
+
+document.querySelector("#clearRuntimeState")?.addEventListener("click", () => {
+  runRuntimeStateAction("clear");
 });
 
 document.querySelectorAll("[data-page]").forEach((button) => {

@@ -110,6 +110,18 @@ function loadRuntimeState() {
   applyRuntimeState(state);
 }
 
+function resetRuntimeState() {
+  data.resetRuntimeData();
+  saveRuntimeState();
+}
+
+function clearRuntimeState() {
+  data.resetRuntimeData();
+  if (fs.existsSync(runtimeStateFile)) {
+    fs.rmSync(runtimeStateFile, { force: true });
+  }
+}
+
 async function handleApprovalAction(req, res, approvalId, action) {
   const approval = findApproval(approvalId);
   if (!approval) {
@@ -178,6 +190,36 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && pathname === "/api/health") {
     sendJson(res, 200, { ok: true, service: "agent-swarm-api", projectId: data.projectId });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/runtime-state") {
+    sendJson(res, 200, {
+      stateFile: runtimeStateFile,
+      exists: fs.existsSync(runtimeStateFile),
+      state: serializeRuntimeState(),
+    });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/runtime-state/reset") {
+    resetRuntimeState();
+    sendJson(res, 200, {
+      ok: true,
+      stateFile: runtimeStateFile,
+      state: serializeRuntimeState(),
+    });
+    return;
+  }
+
+  if (req.method === "DELETE" && pathname === "/api/runtime-state") {
+    clearRuntimeState();
+    sendJson(res, 200, {
+      ok: true,
+      stateFile: runtimeStateFile,
+      exists: fs.existsSync(runtimeStateFile),
+      message: "Runtime state cleared. Restarting the API will recreate the file from mock defaults.",
+    });
     return;
   }
 

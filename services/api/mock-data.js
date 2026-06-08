@@ -193,6 +193,18 @@ const approvals = [
   },
 ];
 
+const initialApprovalState = approvals.map((approval) => ({
+  id: approval.id,
+  status: approval.status,
+  rejectReason: approval.rejectReason || "",
+  runnerJobId: approval.runnerJobId || "",
+  patchArtifactId: approval.patchArtifactId || "",
+  approvedAt: approval.approvedAt || "",
+  rejectedAt: approval.rejectedAt || "",
+  patchOnlyAt: approval.patchOnlyAt || "",
+  updatedAt: approval.updatedAt || "",
+}));
+
 const gitCheckpoints = [
   {
     commit: "620d44d",
@@ -297,6 +309,30 @@ function dashboard() {
   };
 }
 
+function resetRuntimeData() {
+  initialApprovalState.forEach((initial) => {
+    const approval = approvals.find((item) => item.id === initial.id);
+    if (!approval) return;
+
+    approval.status = initial.status;
+    [
+      "rejectReason",
+      "runnerJobId",
+      "patchArtifactId",
+      "approvedAt",
+      "rejectedAt",
+      "patchOnlyAt",
+      "updatedAt",
+    ].forEach((key) => {
+      if (initial[key]) {
+        approval[key] = initial[key];
+      } else {
+        delete approval[key];
+      }
+    });
+  });
+}
+
 module.exports = {
   projectId,
   status,
@@ -310,4 +346,5 @@ module.exports = {
   integrations,
   settings,
   dashboard,
+  resetRuntimeData,
 };

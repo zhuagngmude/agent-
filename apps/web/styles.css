@@ -293,6 +293,12 @@ a { color: inherit; text-decoration: none; }
 .approval-actions .neutral-action { border-color: #d8dce8; color: #4e5670; }
 .approval-actions .danger-action { margin-left: auto; border-color: #f4c8c8; color: var(--red); background: #fff2f2; }
 .approval-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.state-tools { display: flex; flex-wrap: wrap; gap: 10px; }
+.state-tools button { min-height: 40px; border-radius: 7px; padding: 0 14px; font-weight: 800; border: 1px solid var(--line); background: #fff; color: var(--text); }
+.state-tools .safe-action { border-color: #cfe9da; color: var(--green); background: #f2fbf5; }
+.state-tools .neutral-action { border-color: #d8dce8; color: #4e5670; }
+.state-tools .danger-action { border-color: #f4c8c8; color: var(--red); background: #fff2f2; }
+.state-tools button:disabled { opacity: .45; cursor: not-allowed; }
 
 .bottom-grid { display: grid; grid-template-columns: 1.08fr 1fr 1fr 1fr 1fr; gap: 16px; }
 .mini-tabs { display: flex; gap: 22px; margin-bottom: 12px; color: var(--muted); }
