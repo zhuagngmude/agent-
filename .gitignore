@@ -12,6 +12,9 @@ desktop.ini
 *.pem
 secrets.local.*
 
+# Local internal notes and private project material
+_internal/
+
 # Generated artifacts
 node_modules/
 .next/
