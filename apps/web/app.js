@@ -308,6 +308,14 @@ function normalizeDashboard(apiData) {
       nodes: primaryWorkflow.nodes || [],
       edges: primaryWorkflow.edges || [],
     } : fallback.workflow,
+    runnerStatus: {
+      connected: apiData.runnerStatus?.connected === true,
+      runnerId: apiData.runnerStatus?.runnerId || "",
+      version: apiData.runnerStatus?.version || "",
+      workspacePath: apiData.runnerStatus?.workspacePath || "",
+      permissions: apiData.runnerStatus?.permissions || {},
+      lastHeartbeatAt: apiData.runnerStatus?.lastHeartbeatAt || "",
+    },
     approvalRequests: pendingApprovals.map((item) => ({
       file: item.affectedFiles?.[0] || item.id,
       type: (item.operationTypes || []).join(" / ") || "unknown",
@@ -1053,6 +1061,43 @@ function runnerJobBadgeClass(status) {
   return "green";
 }
 
+function runnerPermissionLabel(value) {
+  if (value === true) return "允许";
+  if (value === false) return "禁止";
+  if (value === "approval_required") return "需要审批";
+  return value || "未配置";
+}
+
+function renderRunnerStatus() {
+  const runnerStatus = appData.runnerStatus || {};
+  const statusBadge = document.querySelector("#runnerConnectionStatus");
+  const detail = document.querySelector("#runnerStatusDetail");
+  const permissions = runnerStatus.permissions || {};
+
+  if (statusBadge) {
+    statusBadge.textContent = runnerStatus.connected ? "已连接" : "未连接";
+    statusBadge.className = `badge ${runnerStatus.connected ? "green" : "gray"}`;
+  }
+
+  if (!detail) return;
+
+  detail.innerHTML = `
+    <div class="approval-meta runner-status-meta">
+      <div><span>Runner ID</span><strong>${escapeHtml(runnerStatus.runnerId || "未连接")}</strong></div>
+      <div><span>版本</span><strong>${escapeHtml(runnerStatus.version || "未记录")}</strong></div>
+      <div><span>工作区</span><strong>${escapeHtml(runnerStatus.workspacePath || "未配置")}</strong></div>
+      <div><span>最后心跳</span><strong>${escapeHtml(runnerStatus.lastHeartbeatAt || "未记录")}</strong></div>
+    </div>
+    <div class="runner-permissions">
+      <span>读文件：${escapeHtml(runnerPermissionLabel(permissions.readFiles))}</span>
+      <span>写文件：${escapeHtml(runnerPermissionLabel(permissions.writeFiles))}</span>
+      <span>执行命令：${escapeHtml(runnerPermissionLabel(permissions.executeCommands))}</span>
+      <span>网络请求：${escapeHtml(runnerPermissionLabel(permissions.networkRequests))}</span>
+    </div>
+    <p class="runner-safety-note">当前为 Mock 只读状态页：不会执行本地命令、不会写文件、不会发起网络请求，也不会修改 Git。</p>
+  `;
+}
+
 function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   const jobs = appData.runnerJobs || [];
   const count = document.querySelector("#runnerJobCount");
@@ -1065,6 +1110,7 @@ function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   if (count) count.textContent = jobs.length;
   if (queuedCount) queuedCount.textContent = jobs.filter((job) => job.status === "queued").length;
   if (failedCount) failedCount.textContent = jobs.filter((job) => job.status === "failed").length;
+  renderRunnerStatus();
   if (!tableBody || !detail) return;
 
   if (jobs.length === 0) {

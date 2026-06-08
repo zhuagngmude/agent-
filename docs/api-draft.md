@@ -87,6 +87,19 @@ disabled
     "successRate": 0.923,
     "averageResponseMs": 1200
   },
+  "runnerStatus": {
+    "connected": true,
+    "runnerId": "local_runner_001",
+    "version": "0.1.0",
+    "workspacePath": "F:/projects/agent-swarm",
+    "permissions": {
+      "readFiles": true,
+      "writeFiles": "approval_required",
+      "executeCommands": "approval_required",
+      "networkRequests": "approval_required"
+    },
+    "lastHeartbeatAt": "2026-06-08T12:00:00Z"
+  },
   "pendingApprovals": [],
   "taskQueue": [],
   "agentStatus": [],
@@ -808,3 +821,11 @@ operationType
 - `GET /api/projects/:projectId/workflows` 返回 `workflows` 数组。
 - `GET /api/projects/:projectId/dashboard` 同时返回 `workflows`，供首页工作流总览和工作流编排页复用。
 - 当前只支持展示流程、节点和依赖连线，不支持编辑、运行和保存编排。
+
+## 2026-06-09 实现备注：Runner 状态只读展示
+
+当前 Mock API 已把 Runner 状态纳入运行与调度页：
+
+- `GET /api/projects/:projectId/runner/status` 返回本地 Runner 连接状态、版本、工作区、权限边界和最后心跳。
+- `GET /api/projects/:projectId/dashboard` 同时返回 `runnerStatus`，供前端运行与调度页一次聚合渲染。
+- 当前只读展示 Runner 状态和权限，不执行本地命令、不写文件、不发起网络请求、不修改 Git。

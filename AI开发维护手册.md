@@ -791,6 +791,13 @@ docs/api-draft.md
 - 影响模块：`services/api/server.js`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 Mock 状态流转，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Runner 状态只读面板
+
+- 改了什么：Mock Dashboard 聚合接口新增 `runnerStatus`；`GET /api/projects/:projectId/runner/status` 复用同一份 Runner 状态数据；运行与调度页新增 Runner 连接状态、版本、工作区、权限边界和最后心跳展示。
+- 为什么改：让用户能确认本地 Runner 的安全边界和连接状态，同时继续保持只读，不开放任何本地执行能力。
+- 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 只读状态展示，不改变真实 Runner 执行边界。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

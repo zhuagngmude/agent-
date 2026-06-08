@@ -288,6 +288,18 @@ const runnerJobs = [];
 const initialRunnerJobState = runnerJobs.map((job) => ({ ...job }));
 const agentConfigApplications = [];
 const initialAgentConfigApplicationState = agentConfigApplications.map((item) => ({ ...item }));
+const runnerStatus = {
+  connected: true,
+  runnerId: "local_runner_001",
+  version: "0.1.0",
+  workspacePath: "F:/projects/agent-swarm",
+  permissions: {
+    readFiles: true,
+    writeFiles: "approval_required",
+    executeCommands: "approval_required",
+    networkRequests: "approval_required",
+  },
+};
 
 const gitCheckpoints = [
   {
@@ -384,6 +396,10 @@ function dashboard() {
       averageResponseMs: 1200,
     },
     workflows,
+    runnerStatus: {
+      ...runnerStatus,
+      lastHeartbeatAt: new Date().toISOString(),
+    },
     runnerJobs,
     agentConfigApplications,
     pendingApprovals: approvals,
@@ -455,6 +471,7 @@ module.exports = {
   agents,
   tasks,
   workflows,
+  runnerStatus,
   runnerJobs,
   agentConfigApplications,
   approvals,

@@ -690,16 +690,7 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && withProject(pathname, "/runner/status")) {
     sendJson(res, 200, {
-      connected: true,
-      runnerId: "local_runner_001",
-      version: "0.1.0",
-      workspacePath: "F:/projects/agent-swarm",
-      permissions: {
-        readFiles: true,
-        writeFiles: "approval_required",
-        executeCommands: "approval_required",
-        networkRequests: "approval_required",
-      },
+      ...data.runnerStatus,
       lastHeartbeatAt: new Date().toISOString(),
     });
     return;

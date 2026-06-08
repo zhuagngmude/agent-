@@ -277,6 +277,13 @@
           <article class="metric-card blue"><span>R</span><p>Runner Job</p><strong id="runnerJobCount">0</strong><small>只读执行队列</small></article>
           <article class="metric-card green"><span>✓</span><p>等待执行</p><strong id="runnerQueuedCount">0</strong><small>已批准但未执行</small></article>
           <article class="metric-card orange"><span>!</span><p>失败任务</p><strong id="runnerFailedCount">0</strong><small>当前 Mock 阶段</small></article>
+          <article class="panel wide runner-status-panel">
+            <div class="card-head">
+              <h2>Runner 状态</h2>
+              <span class="badge orange" id="runnerConnectionStatus">Mock</span>
+            </div>
+            <div id="runnerStatusDetail"></div>
+          </article>
           <article class="panel wide">
             <div class="card-head"><h2>Runner Job 队列</h2><span class="badge orange">只读</span></div>
             <div class="task-table-wrap">
