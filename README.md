@@ -119,3 +119,9 @@ powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
 这个脚本会启动本地 mock API，并打开电脑端 Web App。
+
+本地验收步骤见：
+
+```text
+docs/demo-checklist.md
+```

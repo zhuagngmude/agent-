@@ -21,3 +21,9 @@ start-dev.ps1
 启动 `services/api/server.js`。
 
 `start-dev.ps1` 会启动 mock API 并打开 `apps/web/index.html`。
+
+本地 Demo 验收步骤见：
+
+```text
+../docs/demo-checklist.md
+```

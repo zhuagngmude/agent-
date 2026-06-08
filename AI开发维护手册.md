@@ -805,6 +805,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是只读审查展示，不执行真实回滚、不修改 Agent 配置。
 
+## 2026-06-09 变更记录：本地 Demo 验证清单
+
+- 改了什么：新增 `docs/demo-checklist.md`，汇总本地启动、健康检查、页面验收点、Mock 状态重置和当前安全边界；README 和 `scripts/README.md` 增加入口。
+- 为什么改：减少人类用户和后续 AI 接手时的试错成本，让 MVP-0.2 的可用范围和不可做事项更清楚。
+- 影响模块：`docs/demo-checklist.md`、`README.md`、`scripts/README.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是本地开发/验收说明，不改变产品功能。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
