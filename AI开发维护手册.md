@@ -735,6 +735,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部规则展示，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置变更请求预览
+
+- 改了什么：智能体管理页新增变更请求预览面板，可基于当前选中 Agent 预览模型切换、子 Agent 权限调整和权限升级，展示字段差异、风险等级和是否需要审批。
+- 为什么改：先把 Agent 配置修改变成可审查的申请预览，后续再接 Approval Request，避免直接保存高风险配置。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前不保存配置，也不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

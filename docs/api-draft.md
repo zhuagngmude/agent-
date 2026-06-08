@@ -140,6 +140,20 @@ disabled
 禁止子 Agent 修改：自己的权限、父 Agent、汇总目标、API Key、Runner 执行权限、其他 Agent 的配置
 ```
 
+当前前端仅实现变更请求预览，不会调用 PATCH 接口，也不会写入 Mock 状态。预览对象至少包含：
+
+```json
+{
+  "agentId": "agent_frontend",
+  "changeType": "permission",
+  "riskLevel": "high",
+  "requiresApproval": true,
+  "changes": [
+    { "field": "permissions", "before": ["read_project"], "after": ["read_project", "request_code_execution"] }
+  ]
+}
+```
+
 请求：
 
 ```json

@@ -197,6 +197,15 @@
             <div class="card-head"><h2>配置规则</h2><span class="badge orange">草案</span></div>
             <div class="agent-config-rules" id="agentConfigRules"></div>
           </article>
+          <article class="panel wide">
+            <div class="card-head"><h2>变更请求预览</h2><span class="badge orange">不保存</span></div>
+            <div class="agent-change-actions">
+              <button class="safe-action" data-agent-change="model">预览模型切换</button>
+              <button class="neutral-action" data-agent-change="spawn">预览子 Agent 权限</button>
+              <button class="danger-action" data-agent-change="permission">预览权限升级</button>
+            </div>
+            <div id="agentChangePreview"></div>
+          </article>
           <article class="panel wide agent-detail-panel">
             <div class="card-head">
               <h2>智能体详情</h2>

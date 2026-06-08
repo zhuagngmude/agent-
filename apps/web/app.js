@@ -7,6 +7,7 @@ let selectedApprovalIndex = 0;
 let selectedTaskIndex = 0;
 let selectedRunnerJobIndex = 0;
 let selectedAgentIndex = 0;
+let selectedAgentChangeType = "model";
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
@@ -123,16 +124,18 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   const modelList = document.querySelector("#agentModelList");
   const relationList = document.querySelector("#agentRelationList");
   const configRules = document.querySelector("#agentConfigRules");
+  const changePreview = document.querySelector("#agentChangePreview");
   const detail = document.querySelector("#agentDetail");
   const detailStatus = document.querySelector("#agentDetailStatus");
 
-  if (!board || !modelList || !relationList || !configRules || !detail) return;
+  if (!board || !modelList || !relationList || !configRules || !changePreview || !detail) return;
 
   if (agents.length === 0) {
     board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
     modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
     relationList.innerHTML = `<p class="muted">暂无子 Agent 关系数据。</p>`;
     configRules.innerHTML = `<p class="muted">暂无配置规则数据。</p>`;
+    changePreview.innerHTML = `<p class="muted">暂无可预览的 Agent 配置变更。</p>`;
     detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>暂无智能体</strong></div></div>`;
     if (detailStatus) {
       detailStatus.textContent = "只读";
@@ -220,6 +223,16 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   board.querySelectorAll("[data-agent-index]").forEach((card) => {
     card.addEventListener("click", () => renderAgentsPage(Number(card.dataset.agentIndex)));
   });
+
+  document.querySelectorAll("[data-agent-change]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.agentChange === selectedAgentChangeType);
+    button.onclick = () => {
+      selectedAgentChangeType = button.dataset.agentChange;
+      renderAgentsPage(selectedAgentIndex);
+    };
+  });
+
+  changePreview.innerHTML = renderAgentChangePreview(agent, selectedAgentChangeType);
 }
 
 function normalizeDashboard(apiData) {
@@ -432,6 +445,66 @@ function agentConfigRuleGroups() {
       items: ["自己的权限", "父 Agent", "汇总目标", "API Key", "Runner 执行权限", "其他 Agent 的配置"],
     },
   ];
+}
+
+function agentChangeDraft(agent, type) {
+  const drafts = {
+    model: {
+      title: "模型切换",
+      risk: "中风险",
+      riskClass: "orange",
+      requiresApproval: true,
+      reason: "模型变化会影响输出风格、成本和上下文能力，需要审批后才能保存。",
+      changes: [
+        ["model", agent.model || "未配置模型", "gpt-high-reasoning"],
+      ],
+    },
+    spawn: {
+      title: "子 Agent 权限调整",
+      risk: "高风险",
+      riskClass: "red",
+      requiresApproval: true,
+      reason: "允许创建子 Agent 会扩大调度能力边界，必须经过 Approval Service。",
+      changes: [
+        ["canSpawnSubAgents", agent.canSpawnSubAgents ? "允许" : "不允许", "允许"],
+        ["maxSubAgents", String(agent.maxSubAgents ?? 0), "3"],
+      ],
+    },
+    permission: {
+      title: "权限升级",
+      risk: "高风险",
+      riskClass: "red",
+      requiresApproval: true,
+      reason: "新增代码执行请求权限会影响 Runner 安全边界，必须二次确认。",
+      changes: [
+        ["permissions", (agent.permissions || []).join(" / ") || "无", `${(agent.permissions || []).join(" / ")} / request_code_execution`],
+      ],
+    },
+  };
+
+  return drafts[type] || drafts.model;
+}
+
+function renderAgentChangePreview(agent, type) {
+  const draft = agentChangeDraft(agent, type);
+  return `
+    <div class="agent-change-preview">
+      <div class="approval-meta">
+        <div><span>目标 Agent</span><strong>${escapeHtml(agent.name)}</strong></div>
+        <div><span>变更类型</span><strong>${escapeHtml(draft.title)}</strong></div>
+        <div><span>风险等级</span><strong><em class="badge ${draft.riskClass}">${escapeHtml(draft.risk)}</em></strong></div>
+        <div><span>是否需要审批</span><strong>${draft.requiresApproval ? "需要" : "不需要"}</strong></div>
+      </div>
+      <div class="approval-meta">
+        <div><span>保存状态</span><strong>仅预览，当前不会写入配置。</strong></div>
+        <div><span>审批原因</span><strong>${escapeHtml(draft.reason)}</strong></div>
+      </div>
+      <div class="task-files">
+        <h3>字段变更</h3>
+        <ul>${draft.changes.map(([field, before, after]) => `<li>${escapeHtml(field)}：${escapeHtml(before)} -> ${escapeHtml(after)}</li>`).join("")}</ul>
+      </div>
+    </div>
+  `;
 }
 
 function approvalAction(status) {
