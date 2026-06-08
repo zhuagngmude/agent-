@@ -466,6 +466,44 @@ async function handleAgentConfigApplicationApply(req, res, applicationId) {
   });
 }
 
+async function handleAgentConfigApplicationCancel(req, res, applicationId) {
+  const application = findAgentConfigApplication(applicationId);
+  if (!application) {
+    sendJson(res, 404, { error: "agent_config_application_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  if (application.status !== "pending_apply") {
+    sendJson(res, 409, {
+      error: "application_not_pending_apply",
+      message: `Agent config application cannot cancel from status ${application.status}.`,
+    });
+    return;
+  }
+
+  if (!body.reason) {
+    sendJson(res, 409, {
+      error: "cancel_reason_required",
+      message: "Mock agent config cancel requires reason.",
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  application.status = "cancelled";
+  application.cancelledAt = now;
+  application.cancelledBy = body.cancelledBy || "local_user";
+  application.cancelReason = body.reason;
+  application.updatedAt = now;
+  saveRuntimeState();
+
+  sendJson(res, 200, {
+    application,
+    message: "Mock application status changed to cancelled. Agent config was not modified.",
+  });
+}
+
 function transitionTask(task, action, body) {
   const now = new Date().toISOString();
   const terminalStatuses = ["completed", "failed", "cancelled"];
@@ -593,6 +631,12 @@ async function handleRequest(req, res) {
   const agentConfigApplicationApply = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/apply$/);
   if (req.method === "POST" && agentConfigApplicationApply) {
     await handleAgentConfigApplicationApply(req, res, agentConfigApplicationApply[1]);
+    return;
+  }
+
+  const agentConfigApplicationCancel = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/cancel$/);
+  if (req.method === "POST" && agentConfigApplicationCancel) {
+    await handleAgentConfigApplicationCancel(req, res, agentConfigApplicationCancel[1]);
     return;
   }
 

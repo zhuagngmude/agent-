@@ -206,6 +206,7 @@ disabled
 - 变更字段 before / after。
 - 应用前检查项：审批是否已批准、目标服务是否为 `agent_config`、是否没有 Runner job、当前是否仍为 `pending_apply`。
 - 应用审计记录：`appliedAt`、`appliedBy`、`applyConfirmText`、是否未生成 Runner job、是否未写 Agent 配置。
+- 取消审计记录：`cancelledAt`、`cancelledBy`、`cancelReason`。
 
 注意：当前接口只返回待审查记录，不提供应用配置接口；真正写入 Agent 配置前还需要单独的人工应用确认流程。
 
@@ -226,6 +227,9 @@ disabled
       "appliedAt": "",
       "appliedBy": "",
       "applyConfirmText": "",
+      "cancelledAt": "",
+      "cancelledBy": "",
+      "cancelReason": "",
       "createdAt": "2026-06-09T12:00:00Z",
       "updatedAt": "2026-06-09T12:00:00Z"
     }
@@ -237,6 +241,9 @@ disabled
 - `appliedAt`：Mock 应用状态流转完成时间，未应用时为空字符串。
 - `appliedBy`：触发 Mock 应用状态流转的本地用户标识。
 - `applyConfirmText`：用户提交二次确认时的确认文本。
+- `cancelledAt`：Mock 取消状态流转完成时间，未取消时为空字符串。
+- `cancelledBy`：触发 Mock 取消状态流转的本地用户标识。
+- `cancelReason`：取消待应用记录的原因。
 - 这些字段只记录状态流转审计信息，不代表 Agent 配置已经真实写入。
 
 ### POST /api/agent-config-applications/:applicationId/apply
@@ -272,6 +279,38 @@ disabled
     "applyConfirmText": "我确认仅执行 Agent 配置 Mock 应用状态流转"
   },
   "message": "Mock application status changed to applied. Agent config was not modified."
+}
+```
+
+### POST /api/agent-config-applications/:applicationId/cancel
+
+用途：在真正应用前取消已审批但尚未应用的 Agent 配置变更。
+
+当前状态：Mock 状态流转已实现。MVP-0.2 只会把 `agentConfigApplications.status` 从 `pending_apply` 改为 `cancelled`，记录取消原因，不会修改 Agent 配置，也不会生成 Runner job。
+
+必须满足：
+- 应用记录状态必须是 `pending_apply`。
+- 请求体必须包含取消原因。
+
+请求：
+```json
+{
+  "reason": "用户在控制台取消待应用 Agent 配置变更",
+  "cancelledBy": "local_user"
+}
+```
+
+返回：
+```json
+{
+  "application": {
+    "id": "agent_config_application_approval_agent_agent_frontend_permission",
+    "status": "cancelled",
+    "cancelledAt": "2026-06-09T12:40:00Z",
+    "cancelledBy": "local_user",
+    "cancelReason": "用户在控制台取消待应用 Agent 配置变更"
+  },
+  "message": "Mock application status changed to cancelled. Agent config was not modified."
 }
 ```
 

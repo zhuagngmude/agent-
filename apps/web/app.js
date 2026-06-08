@@ -14,6 +14,7 @@ let runtimeStateRunning = false;
 let taskActionRunning = false;
 let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
+let agentConfigCancelRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -260,6 +261,13 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
     mockApplyButton.disabled = agentConfigApplyRunning || !canMockApplyAgentConfigApplication(application, approval);
     mockApplyButton.onclick = () => runAgentConfigApplicationApply();
   }
+
+  const mockCancelButton = document.querySelector("#mockCancelAgentConfigApplication");
+  if (mockCancelButton) {
+    const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+    mockCancelButton.disabled = agentConfigCancelRunning || !canMockCancelAgentConfigApplication(application);
+    mockCancelButton.onclick = () => runAgentConfigApplicationCancel();
+  }
 }
 
 function normalizeDashboard(apiData) {
@@ -363,6 +371,9 @@ function normalizeDashboard(apiData) {
       appliedAt: item.appliedAt || "",
       appliedBy: item.appliedBy || "",
       applyConfirmText: item.applyConfirmText || "",
+      cancelledAt: item.cancelledAt || "",
+      cancelledBy: item.cancelledBy || "",
+      cancelReason: item.cancelReason || "",
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
@@ -450,6 +461,20 @@ async function postAgentChangeRequest(agentId, body = {}) {
 
 async function postAgentConfigApplicationApply(applicationId, body = {}) {
   const response = await fetch(`${apiBase}/api/agent-config-applications/${applicationId}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postAgentConfigApplicationCancel(applicationId, body = {}) {
+  const response = await fetch(`${apiBase}/api/agent-config-applications/${applicationId}/cancel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -639,6 +664,10 @@ function canMockApplyAgentConfigApplication(application, approval) {
     && !approval?.runnerJobId;
 }
 
+function canMockCancelAgentConfigApplication(application) {
+  return application?.status === "pending_apply";
+}
+
 function renderAgentConfigManualApplyConditions(application, approval) {
   const isReady = canMockApplyAgentConfigApplication(application, approval);
   const conditions = [
@@ -646,7 +675,8 @@ function renderAgentConfigManualApplyConditions(application, approval) {
     ["Mock 接口", "POST /api/agent-config-applications/:applicationId/apply"],
     ["应用范围", "只修改目标 Agent 的已审批字段"],
     ["状态流转", "pending_apply -> applied / cancelled"],
-    ["当前结论", isReady ? "可执行 Mock 状态流转" : "暂不满足应用前置条件"],
+    ["取消入口", canMockCancelAgentConfigApplication(application) ? "可执行 Mock 取消" : "不可取消当前状态"],
+    ["当前结论", isReady ? "可执行 Mock 应用状态流转" : "暂不满足应用前置条件"],
   ];
 
   return conditions.map(([label, value]) => `
@@ -659,6 +689,9 @@ function renderAgentConfigApplicationAudit(application, approval) {
     ["应用时间", application.appliedAt || "尚未应用"],
     ["确认人", application.appliedBy || "尚未记录"],
     ["确认文本", application.applyConfirmText || "尚未记录"],
+    ["取消时间", application.cancelledAt || "尚未取消"],
+    ["取消人", application.cancelledBy || "尚未记录"],
+    ["取消原因", application.cancelReason || "尚未记录"],
     ["Agent 配置写入", "未执行真实写入"],
     ["Runner job", approval?.runnerJobId ? `异常：${approval.runnerJobId}` : "未生成"],
     ["执行类型", "仅 Mock 状态流转"],
@@ -730,8 +763,9 @@ function renderAgentConfigApplications(agent) {
         </div>
         <div class="agent-change-submit">
           <button class="neutral-action" id="mockApplyAgentConfigApplication">模拟应用状态</button>
+          <button class="danger-action" id="mockCancelAgentConfigApplication">模拟取消应用</button>
         </div>
-        <small>Mock 状态流转：只把待应用记录标记为已应用，不会写入 Agent 配置，也不会生成 Runner job。</small>
+        <small>Mock 状态流转：只更新待应用记录状态，不会写入 Agent 配置，也不会生成 Runner job。</small>
       </div>
     </div>
   `;
@@ -761,6 +795,32 @@ async function runAgentConfigApplicationApply() {
     setAgentChangeFeedback(`Mock 应用失败：${error.message}`, "error");
   } finally {
     agentConfigApplyRunning = false;
+    renderAgentsPage(selectedAgentIndex);
+  }
+}
+
+async function runAgentConfigApplicationCancel() {
+  const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+  if (!canMockCancelAgentConfigApplication(application) || agentConfigCancelRunning) return;
+
+  agentConfigCancelRunning = true;
+  setAgentChangeFeedback("正在提交 Mock 取消状态...");
+  renderAgentsPage(selectedAgentIndex);
+
+  try {
+    const result = await postAgentConfigApplicationCancel(application.id, {
+      reason: "用户在控制台取消待应用 Agent 配置变更",
+      cancelledBy: "local_user",
+    });
+    appData = await loadDashboardFromApi();
+    selectedAgentConfigApplicationId = result.application?.id || selectedAgentConfigApplicationId;
+    renderDashboard();
+    renderAgentsPage(selectedAgentIndex);
+    setAgentChangeFeedback("已标记为已取消；Agent 配置未被修改。", "success");
+  } catch (error) {
+    setAgentChangeFeedback(`Mock 取消失败：${error.message}`, "error");
+  } finally {
+    agentConfigCancelRunning = false;
     renderAgentsPage(selectedAgentIndex);
   }
 }

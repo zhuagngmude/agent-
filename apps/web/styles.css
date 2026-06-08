@@ -449,6 +449,11 @@ li strong { color: var(--green); font-size: 13px; }
   border-color: #d8dce8;
   color: #4e5670;
 }
+.agent-change-submit .danger-action {
+  border-color: #f4c8c8;
+  color: var(--red);
+  background: #fff2f2;
+}
 .agent-change-submit button:disabled {
   opacity: .45;
   cursor: not-allowed;
