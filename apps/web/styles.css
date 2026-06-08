@@ -406,6 +406,20 @@ li strong { color: var(--green); font-size: 13px; }
   border-top: 1px solid var(--line);
   padding-top: 8px;
 }
+.agent-config-rules {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.agent-config-rules > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 14px;
+}
+.agent-config-rules strong, .agent-config-rules span { display: block; }
+.agent-config-rules span { min-height: 40px; margin-top: 6px; color: var(--muted); line-height: 1.45; }
+.agent-config-rules ul { margin: 12px 0 0; padding-left: 18px; color: #4e5670; line-height: 1.8; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: 12px; }
@@ -428,5 +442,5 @@ li strong { color: var(--green); font-size: 13px; }
   .hero-grid { grid-template-columns: repeat(6, 1fr); }
   .welcome-card { grid-column: span 2; }
   .middle-grid, .bottom-grid, .approval-review, .task-workspace, .workflow-summary, .workflow-readonly-grid { grid-template-columns: 1fr; }
-  .subpage-grid, .agent-board { grid-template-columns: 1fr; }
+  .subpage-grid, .agent-board, .agent-config-rules { grid-template-columns: 1fr; }
 }

@@ -131,6 +131,15 @@ disabled
 
 用途：更新 Agent 配置。
 
+当前 MVP-0.2 只展示配置规则草案，不开放真实修改。后续开放时必须遵守：
+
+```text
+可编辑字段：Agent 名称、使用模型、启用/禁用状态、权限列表、是否允许创建子 Agent、最大子 Agent 数
+必须审批字段：权限列表、是否允许创建子 Agent、最大子 Agent 数、代码执行请求权限、API Key / 模型 Key 访问权限
+暂时只读字段：Agent ID、角色类型、父 Agent、派生深度、汇总目标、创建来源
+禁止子 Agent 修改：自己的权限、父 Agent、汇总目标、API Key、Runner 执行权限、其他 Agent 的配置
+```
+
 请求：
 
 ```json

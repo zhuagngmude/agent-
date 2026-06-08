@@ -122,15 +122,17 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   const board = document.querySelector("#agentBoard");
   const modelList = document.querySelector("#agentModelList");
   const relationList = document.querySelector("#agentRelationList");
+  const configRules = document.querySelector("#agentConfigRules");
   const detail = document.querySelector("#agentDetail");
   const detailStatus = document.querySelector("#agentDetailStatus");
 
-  if (!board || !modelList || !relationList || !detail) return;
+  if (!board || !modelList || !relationList || !configRules || !detail) return;
 
   if (agents.length === 0) {
     board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
     modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
     relationList.innerHTML = `<p class="muted">暂无子 Agent 关系数据。</p>`;
+    configRules.innerHTML = `<p class="muted">暂无配置规则数据。</p>`;
     detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>暂无智能体</strong></div></div>`;
     if (detailStatus) {
       detailStatus.textContent = "只读";
@@ -173,6 +175,14 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
         </ul>
       </div>
     `).join("") || `<p class="muted">当前没有 Agent 声明子 Agent 关系。</p>`;
+
+  configRules.innerHTML = agentConfigRuleGroups().map((group) => `
+    <div>
+      <strong>${escapeHtml(group.title)}</strong>
+      <span>${escapeHtml(group.note)}</span>
+      <ul>${group.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    </div>
+  `).join("");
 
   const agent = agents[selectedAgentIndex] || agents[0];
   const parentAgent = agentById.get(agent.parentAgentId);
@@ -397,6 +407,31 @@ function roleLabel(role) {
     qa: "测试验证",
   };
   return labels[role] || role || "未设置角色";
+}
+
+function agentConfigRuleGroups() {
+  return [
+    {
+      title: "可编辑字段",
+      note: "后续可以开放编辑，但仍需要记录变更历史。",
+      items: ["Agent 名称", "使用模型", "启用 / 禁用状态", "权限列表", "是否允许创建子 Agent", "最大子 Agent 数"],
+    },
+    {
+      title: "必须审批字段",
+      note: "修改后可能改变系统能力边界，需要走 Approval Service。",
+      items: ["权限列表", "是否允许创建子 Agent", "最大子 Agent 数", "代码执行请求权限", "API Key / 模型 Key 访问权限"],
+    },
+    {
+      title: "暂时只读字段",
+      note: "先作为系统身份和关系数据展示，不在 MVP-0.2 开放修改。",
+      items: ["Agent ID", "角色类型", "父 Agent", "派生深度", "汇总目标", "创建来源"],
+    },
+    {
+      title: "禁止子 Agent 修改",
+      note: "子 Agent 不能扩权，也不能改写自己的归属关系。",
+      items: ["自己的权限", "父 Agent", "汇总目标", "API Key", "Runner 执行权限", "其他 Agent 的配置"],
+    },
+  ];
 }
 
 function approvalAction(status) {

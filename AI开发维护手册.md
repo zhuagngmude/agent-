@@ -728,6 +728,13 @@ docs/api-draft.md
 - 影响模块：`services/api/mock-data.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读展示增强。
 
+## 2026-06-09 变更记录：Agent 配置规则草案
+
+- 改了什么：智能体管理页新增配置规则草案面板，展示可编辑字段、必须审批字段、暂时只读字段和禁止子 Agent 修改字段；API 草案补充 `PATCH /api/agents/:agentId` 的权限边界说明。
+- 为什么改：在开放任何 Agent 配置编辑前，先把可修改范围和审批边界固定下来，避免后续子 Agent 自行扩权或绕过审批。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部规则展示，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
