@@ -812,6 +812,13 @@ docs/api-draft.md
 - 影响模块：`docs/demo-checklist.md`、`README.md`、`scripts/README.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是本地开发/验收说明，不改变产品功能。
 
+## 2026-06-09 变更记录：Mock API 状态流转验证脚本
+
+- 改了什么：新增 `scripts/verify-mock-flows.ps1`，可自动检查 Mock API 健康状态、Dashboard 聚合、任务 `start -> complete`、Runner 审批生成只读 job、Agent 配置 Mock 应用和 Mock 取消流程；脚本结束后会重置 runtime state。
+- 为什么改：给后续开发一个可重复回归入口，避免状态机改动后悄悄破坏审批、任务或 Agent 配置应用流程。
+- 影响模块：`scripts/verify-mock-flows.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是开发验证工具，不改变产品功能。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -16,11 +16,14 @@
 ```text
 start-mock-api.ps1
 start-dev.ps1
+verify-mock-flows.ps1
 ```
 
 启动 `services/api/server.js`。
 
 `start-dev.ps1` 会启动 mock API 并打开 `apps/web/index.html`。
+
+`verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
 
 本地 Demo 验收步骤见：
 

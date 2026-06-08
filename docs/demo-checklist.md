@@ -79,7 +79,25 @@ data/mock/runtime-state.json
 Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 ```
 
-## 5. 当前安全边界
+## 5. 自动验证 Mock 状态流转
+
+可以运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
+```
+
+脚本会验证：
+
+- Dashboard 聚合接口包含 Runner 状态。
+- 任务可以 `start -> complete`。
+- Runner 审批通过后只生成只读 Runner job。
+- Agent 配置审批后可以走 Mock 应用状态流转。
+- Agent 配置审批后可以走 Mock 取消状态流转。
+
+脚本结束时会重置本地 runtime state，避免留下测试状态。
+
+## 6. 当前安全边界
 
 当前 Demo 允许：
 
