@@ -710,6 +710,28 @@ function renderAgentConfigApplicationAudit(application, approval) {
   `).join("");
 }
 
+function renderAgentConfigRollbackReview(application, approval) {
+  const canReviewRollback = application.status === "applied"
+    && Boolean(application.appliedAt)
+    && Array.isArray(application.changes)
+    && application.changes.length > 0
+    && approval?.targetService === "agent_config"
+    && !approval?.runnerJobId;
+  const review = [
+    ["回滚入口", "当前未开放；必须重新创建 Agent 配置审批"],
+    ["应用状态", application.status === "applied" ? "已应用，可进入回滚前审查" : "尚未应用，不需要回滚"],
+    ["应用审计", application.appliedAt ? "已记录应用时间和确认信息" : "缺少应用审计，不允许回滚"],
+    ["来源审批", approval?.targetService === "agent_config" ? "可追溯到 agent_config 审批" : "需先确认来源审批"],
+    ["Runner job", approval?.runnerJobId ? `异常：${approval.runnerJobId}` : "未生成 Runner job"],
+    ["字段差异", application.changes?.length ? `可基于 ${application.changes.length} 个字段生成反向变更草案` : "缺少字段差异"],
+    ["当前结论", canReviewRollback ? "可展示回滚前审查；仍不执行真实回滚" : "暂不满足回滚前审查条件"],
+  ];
+
+  return review.map(([label, value]) => `
+    <li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>
+  `).join("");
+}
+
 function renderAgentConfigApplications(agent) {
   const applications = (appData.agentConfigApplications || [])
     .filter((item) => item.agentId === agent.id);
@@ -760,6 +782,10 @@ function renderAgentConfigApplications(agent) {
         <div class="application-checklist">
           <h3>应用审计记录</h3>
           <ul>${renderAgentConfigApplicationAudit(selectedApplication, selectedApproval)}</ul>
+        </div>
+        <div class="application-checklist">
+          <h3>回滚前审查</h3>
+          <ul>${renderAgentConfigRollbackReview(selectedApplication, selectedApproval)}</ul>
         </div>
         <div class="task-files">
           <h3>字段变更</h3>

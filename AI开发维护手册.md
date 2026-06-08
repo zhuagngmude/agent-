@@ -798,6 +798,13 @@ docs/api-draft.md
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 只读状态展示，不改变真实 Runner 执行边界。
 
+## 2026-06-09 变更记录：Agent 配置回滚前审查展示
+
+- 改了什么：智能体管理页待应用详情新增“回滚前审查”区块，展示回滚入口边界、应用状态、应用审计、来源审批、Runner job、字段差异和当前结论。
+- 为什么改：在真正开放回滚前，先让用户和后续 AI 看清一次已应用记录是否具备回滚审查条件，并明确真正回滚必须重新走 Approval Service。
+- 影响模块：`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是只读审查展示，不执行真实回滚、不修改 Agent 配置。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -220,6 +220,7 @@ disabled
 - 应用前检查项：审批是否已批准、目标服务是否为 `agent_config`、是否没有 Runner job、当前是否仍为 `pending_apply`。
 - 应用审计记录：`appliedAt`、`appliedBy`、`applyConfirmText`、是否未生成 Runner job、是否未写 Agent 配置。
 - 取消审计记录：`cancelledAt`、`cancelledBy`、`cancelReason`。
+- 回滚前审查：仅对 `applied` 记录展示是否具备回滚审查条件，当前不提供真实回滚接口。
 
 注意：当前接口只返回待审查记录，不提供应用配置接口；真正写入 Agent 配置前还需要单独的人工应用确认流程。
 
@@ -258,6 +259,7 @@ disabled
 - `cancelledBy`：触发 Mock 取消状态流转的本地用户标识。
 - `cancelReason`：取消待应用记录的原因。
 - 这些字段只记录状态流转审计信息，不代表 Agent 配置已经真实写入。
+- 回滚前审查只基于来源审批、应用审计和字段差异推导；真正回滚必须重新创建审批申请，不能绕过 Approval Service。
 
 ### POST /api/agent-config-applications/:applicationId/apply
 
