@@ -271,9 +271,18 @@
 
       <section class="page-view" id="runtime">
         <div class="subpage-grid">
-          <article class="metric-card blue"><span>⚙</span><p>运行队列</p><strong>12</strong><small>6 个正在执行</small></article>
-          <article class="metric-card green"><span>✓</span><p>调度成功率</p><strong>92.3%</strong><small>近 24 小时</small></article>
-          <article class="metric-card orange"><span>⏱</span><p>平均响应</p><strong>1.2s</strong><small>较昨日 -8%</small></article>
+          <article class="metric-card blue"><span>R</span><p>Runner Job</p><strong id="runnerJobCount">0</strong><small>只读执行队列</small></article>
+          <article class="metric-card green"><span>✓</span><p>等待执行</p><strong id="runnerQueuedCount">0</strong><small>已批准但未执行</small></article>
+          <article class="metric-card orange"><span>!</span><p>失败任务</p><strong id="runnerFailedCount">0</strong><small>当前 Mock 阶段</small></article>
+          <article class="panel wide">
+            <div class="card-head"><h2>Runner Job 队列</h2><span class="badge orange">只读</span></div>
+            <div class="task-table-wrap">
+              <table class="data-table" id="runnerJobTable">
+                <thead><tr><th>Job</th><th>来源审批</th><th>状态</th><th>Git checkpoint</th><th>影响文件</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
         </div>
       </section>
 

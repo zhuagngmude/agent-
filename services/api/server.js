@@ -55,6 +55,10 @@ function findTask(id) {
   return data.tasks.find((item) => item.id === id);
 }
 
+function findRunnerJob(id) {
+  return data.runnerJobs.find((item) => item.id === id);
+}
+
 function serializeRuntimeState() {
   return {
     version: 1,
@@ -80,6 +84,7 @@ function serializeRuntimeState() {
       failureReason: task.failureReason || "",
       updatedAt: task.updatedAt || "",
     })),
+    runnerJobs: data.runnerJobs.map((job) => ({ ...job })),
   };
 }
 
@@ -128,6 +133,10 @@ function applyRuntimeState(state) {
       });
     });
   }
+
+  if (Array.isArray(state.runnerJobs)) {
+    data.runnerJobs.splice(0, data.runnerJobs.length, ...state.runnerJobs.map((job) => ({ ...job })));
+  }
 }
 
 function saveRuntimeState() {
@@ -159,6 +168,34 @@ function clearRuntimeState() {
   }
 }
 
+function upsertRunnerJobFromApproval(approval) {
+  const runnerJobId = `runner_job_${approval.id}`;
+  const existing = findRunnerJob(runnerJobId);
+  const job = existing || {
+    id: runnerJobId,
+    approvalId: approval.id,
+    taskId: "",
+    status: "queued",
+    operationTypes: approval.operationTypes || [],
+    affectedFiles: approval.affectedFiles || [],
+    checkpoint: approval.checkpoint?.commit || "",
+    createdAt: new Date().toISOString(),
+  };
+
+  job.status = existing?.status || "queued";
+  job.approvalId = approval.id;
+  job.operationTypes = approval.operationTypes || [];
+  job.affectedFiles = approval.affectedFiles || [];
+  job.checkpoint = approval.checkpoint?.commit || "";
+  job.updatedAt = new Date().toISOString();
+
+  if (!existing) {
+    data.runnerJobs.push(job);
+  }
+
+  return job;
+}
+
 async function handleApprovalAction(req, res, approvalId, action) {
   const approval = findApproval(approvalId);
   if (!approval) {
@@ -177,7 +214,8 @@ async function handleApprovalAction(req, res, approvalId, action) {
       return;
     }
     approval.status = "approved";
-    approval.runnerJobId = `runner_job_${approval.id}`;
+    const runnerJob = upsertRunnerJobFromApproval(approval);
+    approval.runnerJobId = runnerJob.id;
     approval.approvedAt = new Date().toISOString();
     approval.updatedAt = approval.approvedAt;
     saveRuntimeState();
@@ -391,6 +429,11 @@ async function handleRequest(req, res) {
       },
       lastHeartbeatAt: new Date().toISOString(),
     });
+    return;
+  }
+
+  if (req.method === "GET" && withProject(pathname, "/runner/jobs")) {
+    sendJson(res, 200, { jobs: data.runnerJobs });
     return;
   }
 

@@ -434,6 +434,29 @@ operationType
 }
 ```
 
+### GET /api/projects/:projectId/runner/jobs
+
+用途：查看已批准审批生成的 Runner job 队列。
+
+当前 MVP-0.2 只读展示，不会真的执行本地命令。
+
+返回：
+```json
+{
+  "jobs": [
+    {
+      "id": "runner_job_approval_runner_permissions",
+      "approvalId": "approval_runner_permissions",
+      "status": "queued",
+      "operationTypes": ["file_write", "git_checkpoint"],
+      "affectedFiles": ["runner/permissions.py"],
+      "checkpoint": "a5d3f2c",
+      "createdAt": "2026-06-08T14:30:00Z"
+    }
+  ]
+}
+```
+
 ### POST /api/runner-jobs/:runnerJobId/start
 
 用途：启动已批准的 Runner job。

@@ -120,6 +120,7 @@ function normalizeDashboard(apiData) {
   const taskQueue = apiData.taskQueue || [];
   const agentStatus = apiData.agentStatus || [];
   const workflows = apiData.workflows || [];
+  const runnerJobs = apiData.runnerJobs || [];
   const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
   const primaryWorkflow = workflows[0];
 
@@ -187,6 +188,17 @@ function normalizeDashboard(apiData) {
       failedAt: task.failedAt || "",
       cancelledAt: task.cancelledAt || "",
       failureReason: task.failureReason || "",
+    })),
+    runnerJobs: runnerJobs.map((job) => ({
+      id: job.id,
+      approvalId: job.approvalId || "",
+      taskId: job.taskId || "",
+      status: job.status || "queued",
+      operationTypes: job.operationTypes || [],
+      affectedFiles: job.affectedFiles || [],
+      checkpoint: job.checkpoint || "",
+      createdAt: job.createdAt || "",
+      updatedAt: job.updatedAt || "",
     })),
     agents: agentStatus.map((agent, index) => ({
       avatar: String.fromCharCode(65 + index),
@@ -442,6 +454,45 @@ function renderWorkflowPage() {
   `;
 }
 
+function runnerJobStatusLabel(status) {
+  const labels = {
+    queued: "等待执行",
+    running: "执行中",
+    succeeded: "已成功",
+    failed: "已失败",
+    cancelled: "已取消",
+  };
+  return labels[status] || status;
+}
+
+function renderRuntimePage() {
+  const jobs = appData.runnerJobs || [];
+  const count = document.querySelector("#runnerJobCount");
+  const queuedCount = document.querySelector("#runnerQueuedCount");
+  const failedCount = document.querySelector("#runnerFailedCount");
+  const tableBody = document.querySelector("#runnerJobTable tbody");
+
+  if (count) count.textContent = jobs.length;
+  if (queuedCount) queuedCount.textContent = jobs.filter((job) => job.status === "queued").length;
+  if (failedCount) failedCount.textContent = jobs.filter((job) => job.status === "failed").length;
+  if (!tableBody) return;
+
+  if (jobs.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="5">暂无 Runner job。审批通过后会出现在这里。</td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = jobs.map((job) => `
+    <tr>
+      <td><strong>${escapeHtml(job.id)}</strong></td>
+      <td>${escapeHtml(job.approvalId || "无")}</td>
+      <td><span class="badge ${job.status === "failed" ? "red" : job.status === "running" ? "orange" : "green"}">${escapeHtml(runnerJobStatusLabel(job.status))}</span></td>
+      <td>${escapeHtml(job.checkpoint || "未记录")}</td>
+      <td>${escapeHtml((job.affectedFiles || []).length)} 个文件</td>
+    </tr>
+  `).join("");
+}
+
 function renderTaskPage(selectedIndex = 0) {
   const tasks = appData.taskQueue || [];
   const tableBody = document.querySelector("#taskPageTable tbody");
@@ -539,6 +590,7 @@ async function runApprovalAction(action) {
     selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max((appData.approvalRequests || []).length - 1, 0));
     renderDashboard();
     renderWorkflowPage();
+    renderRuntimePage();
     renderApprovalPage(selectedApprovalIndex);
     setApprovalFeedback(`已提交：${actionLabels[action]}`, "success");
   } catch (error) {
@@ -571,6 +623,7 @@ async function runTaskAction(action) {
     selectedTaskIndex = Math.min(selectedTaskIndex, Math.max((appData.taskQueue || []).length - 1, 0));
     renderDashboard();
     renderWorkflowPage();
+    renderRuntimePage();
     renderTaskPage(selectedTaskIndex);
     setTaskFeedback(`已提交：${actionLabels[action]}`, "success");
   } catch (error) {
@@ -640,6 +693,7 @@ async function runRuntimeStateAction(action) {
       appData = await loadDashboardFromApi();
       renderDashboard();
       renderWorkflowPage();
+      renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
     } else if (action === "clear") {
@@ -647,6 +701,7 @@ async function runRuntimeStateAction(action) {
       appData = await loadDashboardFromApi();
       renderDashboard();
       renderWorkflowPage();
+      renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
     }
@@ -704,6 +759,7 @@ async function boot() {
 
   renderDashboard();
   renderWorkflowPage();
+  renderRuntimePage();
   renderApprovalPage();
   renderTaskPage();
 }

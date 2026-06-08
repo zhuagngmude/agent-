@@ -268,6 +268,9 @@ const workflows = [
   },
 ];
 
+const runnerJobs = [];
+const initialRunnerJobState = runnerJobs.map((job) => ({ ...job }));
+
 const gitCheckpoints = [
   {
     commit: "620d44d",
@@ -363,6 +366,7 @@ function dashboard() {
       averageResponseMs: 1200,
     },
     workflows,
+    runnerJobs,
     pendingApprovals: approvals,
     taskQueue: tasks,
     agentStatus: agents,
@@ -416,6 +420,8 @@ function resetRuntimeData() {
       }
     });
   });
+
+  runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => ({ ...job })));
 }
 
 module.exports = {
@@ -425,6 +431,7 @@ module.exports = {
   agents,
   tasks,
   workflows,
+  runnerJobs,
   approvals,
   gitCheckpoints,
   knowledgeUpdates,

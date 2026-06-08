@@ -692,3 +692,10 @@ docs/api-draft.md
 - 为什么改：让工作流编排页从静态占位进入可接数据状态，为后续流程运行记录、Runner job 队列和编排编辑做准备。
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前只读展示不改变用户核心操作流程。
+
+## 2026-06-08 变更记录：Runner job 只读队列
+
+- 改了什么：审批批准时创建 `runner_job_*` 只读队列项；新增 `GET /api/projects/:projectId/runner/jobs`；运行与调度页展示 Runner job 数量、等待执行数量、失败数量和队列表格。
+- 为什么改：补齐“审批通过之后会发生什么”的可追踪链路，但暂不让 Runner 真实执行本地命令。
+- 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读状态追踪。
