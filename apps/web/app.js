@@ -3,6 +3,8 @@ let appData = window.AGENT_SWARM_DATA || {};
 const statusConfig = window.AGENT_SWARM_STATUS || {};
 const apiBase = "http://127.0.0.1:8787";
 const projectId = "project_agent_swarm";
+let selectedApprovalIndex = 0;
+let approvalActionRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -55,6 +57,7 @@ function renderDashboard() {
 
   const approvalList = document.querySelector("#approvalList");
   if (approvalList && appData.approvalRequests) {
+    const pendingApprovalCount = appData.approvalRequests.filter((item) => item.status === "pending").length;
     approvalList.innerHTML = appData.approvalRequests.map((item) => `
       <div>
         <strong>${escapeHtml(item.file)}</strong>
@@ -62,7 +65,9 @@ function renderDashboard() {
         <span class="risk ${escapeHtml(item.riskTone)}">${escapeHtml(item.risk)}</span><small>${escapeHtml(item.diff)}</small>
       </div>
     `).join("");
-    document.querySelector("#approvalSummary").textContent = `共 ${appData.approvalRequests.length} 项待审批`;
+    document.querySelector("#approvalSummary").textContent = `共 ${pendingApprovalCount} 项待审批`;
+    document.querySelectorAll("[data-page='approval'] em, .approval-card .card-head h2 em")
+      .forEach((item) => { item.textContent = pendingApprovalCount; });
   }
 
   const taskQueue = document.querySelector("#taskQueue");
@@ -142,6 +147,8 @@ function normalizeDashboard(apiData) {
       operationTypes: item.operationTypes || [],
       affectedFiles: item.affectedFiles || [],
       diffPreview: item.diffPreview || [],
+      id: item.id,
+      requiresSecondConfirm: item.requiresSecondConfirm === true,
     })),
     taskQueue: taskQueue.map((task) => ({
       icon: task.priority === "high" ? "!" : "T",
@@ -181,6 +188,20 @@ async function loadDashboardFromApi() {
   return normalizeDashboard(await response.json());
 }
 
+async function postApprovalAction(approvalId, action, body = {}) {
+  const response = await fetch(`${apiBase}/api/approvals/${approvalId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 function statusLabel(group, status) {
   return statusConfig[group]?.[status]?.label || status;
 }
@@ -200,19 +221,41 @@ function setApiStatus(mode, text) {
   status.textContent = text;
 }
 
+function setApprovalFeedback(text, mode = "") {
+  const feedback = document.querySelector("#approvalFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
 function renderApprovalPage(selectedIndex = 0) {
   const approvals = appData.approvalRequests || [];
   const list = document.querySelector("#approvalPageList");
   const count = document.querySelector("#approvalPageCount");
   const detail = document.querySelector("#approvalDetail");
   const detailRisk = document.querySelector("#approvalDetailRisk");
+  const feedback = document.querySelector("#approvalFeedback");
 
-  if (!list || !detail || approvals.length === 0) return;
+  if (!list || !detail) return;
 
+  if (approvals.length === 0) {
+    if (count) count.textContent = "0";
+    list.innerHTML = `<div><strong>暂无待审批项</strong><p>Runner 没有新的本地执行申请。</p></div>`;
+    detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>无待处理审批</strong></div></div>`;
+    if (detailRisk) {
+      detailRisk.textContent = "安全";
+      detailRisk.className = "badge green";
+    }
+    document.querySelectorAll("#patchOnlyAction, #rejectApprovalAction, #approveApprovalAction, #viewDiffAction")
+      .forEach((button) => { button.disabled = true; });
+    return;
+  }
+
+  selectedApprovalIndex = Math.min(Math.max(selectedIndex, 0), approvals.length - 1);
   if (count) count.textContent = approvals.length;
 
   list.innerHTML = approvals.map((item, index) => `
-    <div class="${index === selectedIndex ? "active" : ""}" data-approval-index="${index}">
+    <div class="${index === selectedApprovalIndex ? "active" : ""}" data-approval-index="${index}">
       <strong>${escapeHtml(item.file)}</strong>
       <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)} · ${escapeHtml(statusLabel("approval", item.status))}</p>
       <span class="risk ${escapeHtml(item.riskTone)}">${escapeHtml(item.risk)}</span>
@@ -220,7 +263,7 @@ function renderApprovalPage(selectedIndex = 0) {
     </div>
   `).join("");
 
-  const item = approvals[selectedIndex] || approvals[0];
+  const item = approvals[selectedApprovalIndex] || approvals[0];
   if (detailRisk) {
     detailRisk.textContent = item.risk;
     detailRisk.className = `badge ${item.riskTone === "high" ? "red" : item.riskTone === "mid" ? "orange" : "green"}`;
@@ -248,15 +291,74 @@ function renderApprovalPage(selectedIndex = 0) {
   `;
 
   const allowButton = document.querySelector(".danger-action");
+  const patchOnlyButton = document.querySelector("#patchOnlyAction");
+  const rejectButton = document.querySelector("#rejectApprovalAction");
+  const viewDiffButton = document.querySelector("#viewDiffAction");
+  const isPending = item.status === "pending";
+
   if (allowButton) {
-    allowButton.disabled = item.status !== "pending";
-    allowButton.textContent = item.riskTone === "high" ? "二次确认后允许执行" : "允许执行";
+    allowButton.disabled = !isPending || approvalActionRunning;
+    allowButton.textContent = item.requiresSecondConfirm || item.riskTone === "high" ? "二次确认后允许执行" : "允许执行";
   }
+  if (patchOnlyButton) patchOnlyButton.disabled = !isPending || approvalActionRunning;
+  if (rejectButton) rejectButton.disabled = !isPending || approvalActionRunning;
+  if (viewDiffButton) viewDiffButton.disabled = approvalActionRunning;
 
   list.querySelectorAll("[data-approval-index]").forEach((row) => {
     row.addEventListener("click", () => renderApprovalPage(Number(row.dataset.approvalIndex)));
   });
 }
+
+async function runApprovalAction(action) {
+  const item = appData.approvalRequests?.[selectedApprovalIndex];
+  if (!item?.id || approvalActionRunning) return;
+
+  const actionLabels = {
+    approve: "允许执行",
+    reject: "拒绝",
+    "patch-only": "只生成补丁",
+  };
+
+  approvalActionRunning = true;
+  setApprovalFeedback(`正在提交：${actionLabels[action]}...`);
+  renderApprovalPage(selectedApprovalIndex);
+
+  try {
+    const body = action === "approve"
+      ? { secondConfirm: item.requiresSecondConfirm || item.riskTone === "high" }
+      : action === "reject"
+        ? { reason: "用户在控制台拒绝本次 Runner 申请" }
+        : {};
+
+    await postApprovalAction(item.id, action, body);
+    appData = await loadDashboardFromApi();
+    selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max((appData.approvalRequests || []).length - 1, 0));
+    renderDashboard();
+    renderApprovalPage(selectedApprovalIndex);
+    setApprovalFeedback(`已提交：${actionLabels[action]}`, "success");
+  } catch (error) {
+    setApprovalFeedback(`提交失败：${error.message}`, "error");
+  } finally {
+    approvalActionRunning = false;
+    renderApprovalPage(selectedApprovalIndex);
+  }
+}
+
+document.querySelector("#viewDiffAction")?.addEventListener("click", () => {
+  document.querySelector(".approval-diff")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+document.querySelector("#patchOnlyAction")?.addEventListener("click", () => {
+  runApprovalAction("patch-only");
+});
+
+document.querySelector("#rejectApprovalAction")?.addEventListener("click", () => {
+  runApprovalAction("reject");
+});
+
+document.querySelector("#approveApprovalAction")?.addEventListener("click", () => {
+  runApprovalAction("approve");
+});
 
 document.querySelectorAll("[data-page]").forEach((button) => {
   button.addEventListener("click", () => {

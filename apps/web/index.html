@@ -281,11 +281,12 @@
               <span class="badge red" id="approvalDetailRisk">高风险</span>
             </div>
             <div id="approvalDetail"></div>
+            <p class="approval-feedback" id="approvalFeedback" role="status"></p>
             <div class="approval-actions">
-              <button class="safe-action">查看差异</button>
-              <button class="safe-action">只生成补丁</button>
-              <button class="neutral-action">拒绝</button>
-              <button class="danger-action">二次确认后允许执行</button>
+              <button class="safe-action" id="viewDiffAction">查看差异</button>
+              <button class="safe-action" id="patchOnlyAction">只生成补丁</button>
+              <button class="neutral-action" id="rejectApprovalAction">拒绝</button>
+              <button class="danger-action" id="approveApprovalAction">二次确认后允许执行</button>
             </div>
           </article>
         </div>
