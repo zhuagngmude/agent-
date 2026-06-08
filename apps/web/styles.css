@@ -363,7 +363,15 @@ li strong { color: var(--green); font-size: 13px; }
   padding: 0 14px;
 }
 .agent-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.agent-board div { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.agent-board div {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.agent-board div:hover { transform: translateY(-1px); border-color: #c7c2ff; }
+.agent-board div.active { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(115, 103, 240, .14); }
 .agent-board b, .agent-board span, .agent-board em, .agent-board small { display: block; }
 .agent-board span { margin: 10px 0 18px; color: var(--muted); }
 .agent-board em { color: var(--green); font-style: normal; font-weight: 800; }

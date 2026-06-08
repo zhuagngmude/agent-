@@ -714,6 +714,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读展示增强。
 
+## 2026-06-08 变更记录：智能体详情只读面板
+
+- 改了什么：智能体资源池卡片支持点选；新增智能体详情面板，展示 Agent ID、角色、模型、版本、状态、权限和子 Agent 创建限制。
+- 为什么改：让用户可以从资源池进入单个 Agent 的配置视图，但当前仍不允许修改配置。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 内部只读展示增强。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

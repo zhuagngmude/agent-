@@ -6,6 +6,7 @@ const projectId = "project_agent_swarm";
 let selectedApprovalIndex = 0;
 let selectedTaskIndex = 0;
 let selectedRunnerJobIndex = 0;
+let selectedAgentIndex = 0;
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
@@ -115,21 +116,30 @@ function renderDashboard() {
   }
 }
 
-function renderAgentsPage() {
+function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   const agents = appData.agents || [];
   const board = document.querySelector("#agentBoard");
   const modelList = document.querySelector("#agentModelList");
+  const detail = document.querySelector("#agentDetail");
+  const detailStatus = document.querySelector("#agentDetailStatus");
 
-  if (!board || !modelList) return;
+  if (!board || !modelList || !detail) return;
 
   if (agents.length === 0) {
     board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
     modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
+    detail.innerHTML = `<div class="approval-meta"><div><span>当前状态</span><strong>暂无智能体</strong></div></div>`;
+    if (detailStatus) {
+      detailStatus.textContent = "只读";
+      detailStatus.className = "badge orange";
+    }
     return;
   }
 
-  board.innerHTML = agents.map((agent) => `
-    <div>
+  selectedAgentIndex = Math.min(Math.max(selectedIndex, 0), agents.length - 1);
+
+  board.innerHTML = agents.map((agent, index) => `
+    <div class="${index === selectedAgentIndex ? "active" : ""}" data-agent-index="${index}">
       <b>${escapeHtml(agent.name)}</b>
       <span>${escapeHtml(agent.roleLabel || agent.role || "未设置角色")} · ${escapeHtml(statusLabel("agent", agent.status))}</span>
       <em>${escapeHtml(agent.model || "未配置模型")}</em>
@@ -145,6 +155,35 @@ function renderAgentsPage() {
       <em class="badge ${badgeClassForStatus("agent", agent.status)}">${escapeHtml(statusLabel("agent", agent.status))}</em>
     </div>
   `).join("");
+
+  const agent = agents[selectedAgentIndex] || agents[0];
+  if (detailStatus) {
+    detailStatus.textContent = statusLabel("agent", agent.status);
+    detailStatus.className = `badge ${badgeClassForStatus("agent", agent.status)}`;
+  }
+
+  detail.innerHTML = `
+    <div class="approval-meta">
+      <div><span>Agent ID</span><strong>${escapeHtml(agent.id || "未记录")}</strong></div>
+      <div><span>角色</span><strong>${escapeHtml(agent.roleLabel || agent.role || "未设置角色")}</strong></div>
+      <div><span>模型</span><strong>${escapeHtml(agent.model || "未配置模型")}</strong></div>
+      <div><span>版本</span><strong>${escapeHtml(agent.version || "未记录")}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>是否允许创建子 Agent</span><strong>${agent.canSpawnSubAgents ? "允许" : "不允许"}</strong></div>
+      <div><span>最大子 Agent 数</span><strong>${escapeHtml(agent.maxSubAgents ?? 0)}</strong></div>
+      <div><span>当前状态</span><strong>${escapeHtml(statusLabel("agent", agent.status))}</strong></div>
+      <div><span>安全说明</span><strong>当前只读，不会修改 Agent 配置。</strong></div>
+    </div>
+    <div class="task-files">
+      <h3>权限</h3>
+      <ul>${(agent.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("") || "<li>暂无权限</li>"}</ul>
+    </div>
+  `;
+
+  board.querySelectorAll("[data-agent-index]").forEach((card) => {
+    card.addEventListener("click", () => renderAgentsPage(Number(card.dataset.agentIndex)));
+  });
 }
 
 function normalizeDashboard(apiData) {
