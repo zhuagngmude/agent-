@@ -193,6 +193,13 @@ function approvalAction(status) {
   return statusConfig.approval?.[status]?.action || "查看";
 }
 
+function setApiStatus(mode, text) {
+  const status = document.querySelector("#apiStatus");
+  if (!status) return;
+  status.className = `api-status ${mode}`;
+  status.textContent = text;
+}
+
 function renderApprovalPage(selectedIndex = 0) {
   const approvals = appData.approvalRequests || [];
   const list = document.querySelector("#approvalPageList");
@@ -272,10 +279,13 @@ document.querySelectorAll("[data-page]").forEach((button) => {
 });
 
 async function boot() {
+  setApiStatus("connecting", "Mock API：连接中");
   try {
     appData = await loadDashboardFromApi();
+    setApiStatus("connected", "Mock API：已连接");
   } catch (error) {
     console.info("Using local fallback data:", error.message);
+    setApiStatus("offline", "Mock API：离线模式");
   }
 
   renderDashboard();
