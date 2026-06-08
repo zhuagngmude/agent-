@@ -1,6 +1,8 @@
 const titles = window.AGENT_SWARM_NAV || {};
-const appData = window.AGENT_SWARM_DATA || {};
+let appData = window.AGENT_SWARM_DATA || {};
 const statusConfig = window.AGENT_SWARM_STATUS || {};
+const apiBase = "http://127.0.0.1:8787";
+const projectId = "project_agent_swarm";
 
 function escapeHtml(value) {
   return String(value)
@@ -104,6 +106,81 @@ function renderDashboard() {
   }
 }
 
+function normalizeDashboard(apiData) {
+  const fallback = window.AGENT_SWARM_DATA || {};
+  const pendingApprovals = apiData.pendingApprovals || [];
+  const taskQueue = apiData.taskQueue || [];
+  const agentStatus = apiData.agentStatus || [];
+
+  return {
+    ...fallback,
+    project: {
+      name: apiData.project?.name || fallback.project?.name || "agent蜂群 MVP",
+      status: apiData.project?.status || fallback.project?.status || "running",
+      phase: apiData.project?.phase || fallback.project?.phase || "MVP-0.2",
+      description: apiData.project?.description || fallback.project?.description || "",
+    },
+    dashboardMetrics: [
+      { label: "活跃智能体", value: apiData.metrics?.activeAgents ?? "-", note: "来自 mock API", tone: "purple", icon: "A" },
+      { label: "待确认事项", value: apiData.metrics?.pendingApprovals ?? "-", note: "Runner 审批优先", tone: "orange", icon: "!" },
+      { label: "活跃任务", value: apiData.metrics?.activeTasks ?? "-", note: "运行中与排队中", tone: "blue", icon: "T" },
+      { label: "Git 检查点", value: apiData.metrics?.gitCheckpoints ?? "-", note: "项目保存点", tone: "green", icon: "G" },
+      { label: "Token 消耗", value: apiData.metrics?.tokenUsage ?? "-", note: "预算追踪", tone: "violet", icon: "K" },
+      { label: "模型使用", value: apiData.metrics?.modelCount ?? "-", note: "模型配置数", tone: "cyan", icon: "M" },
+    ],
+    workflow: fallback.workflow,
+    approvalRequests: pendingApprovals.map((item) => ({
+      file: item.affectedFiles?.[0] || item.id,
+      type: (item.operationTypes || []).join(" / ") || "unknown",
+      agent: item.requestAgentName || item.requestAgentId || "Agent",
+      risk: item.riskLevel === "high" ? "高风险" : item.riskLevel === "medium" ? "中风险" : "低风险",
+      riskTone: item.riskTone || (item.riskLevel === "high" ? "high" : item.riskLevel === "medium" ? "mid" : "low"),
+      diff: item.diffSummary || "",
+      status: item.status,
+      reason: item.reason || "",
+      checkpoint: item.checkpoint?.commit || "",
+      operationTypes: item.operationTypes || [],
+      affectedFiles: item.affectedFiles || [],
+      diffPreview: item.diffPreview || [],
+    })),
+    taskQueue: taskQueue.map((task) => ({
+      icon: task.priority === "high" ? "!" : "T",
+      tone: task.priority === "high" ? "red" : "purple",
+      title: task.title,
+      type: task.priority === "high" ? "高优先级" : "任务",
+      eta: task.status,
+      status: task.status,
+    })),
+    agents: agentStatus.map((agent, index) => ({
+      avatar: String.fromCharCode(65 + index),
+      name: agent.name,
+      version: agent.version,
+      status: agent.status,
+    })),
+    gitCheckpoints: (apiData.gitCheckpoints || []).map((item) => ({
+      hash: item.commit,
+      message: item.message,
+      time: item.createdAt || "",
+    })),
+    knowledgeUpdates: (apiData.knowledgeUpdates || []).map((item) => ({
+      mark: item.section || "文档",
+      tone: "blue",
+      title: item.document,
+      detail: item.relatedFeature || item.status,
+      time: item.updatedAt || "",
+    })),
+    apiKeys: fallback.apiKeys,
+  };
+}
+
+async function loadDashboardFromApi() {
+  const response = await fetch(`${apiBase}/api/projects/${projectId}/dashboard`);
+  if (!response.ok) {
+    throw new Error(`API returned ${response.status}`);
+  }
+  return normalizeDashboard(await response.json());
+}
+
 function statusLabel(group, status) {
   return statusConfig[group]?.[status]?.label || status;
 }
@@ -194,5 +271,15 @@ document.querySelectorAll("[data-page]").forEach((button) => {
   });
 });
 
-renderDashboard();
-renderApprovalPage();
+async function boot() {
+  try {
+    appData = await loadDashboardFromApi();
+  } catch (error) {
+    console.info("Using local fallback data:", error.message);
+  }
+
+  renderDashboard();
+  renderApprovalPage();
+}
+
+boot();
