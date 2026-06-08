@@ -231,6 +231,43 @@ const initialTaskState = tasks.map((task) => ({
   updatedAt: task.updatedAt || "",
 }));
 
+const workflows = [
+  {
+    id: "workflow_runner_safe_execute",
+    name: "Runner 安全执行流程",
+    status: "active",
+    description: "从执行计划、用户审批、Git checkpoint 到本地 Runner 执行的受控链路。",
+    steps: [
+      { id: "step_plan", name: "生成执行计划", detail: "架构师 Agent 输出变更范围", progress: "100%", tone: "purple" },
+      { id: "step_review", name: "风险审查", detail: "审查 Agent 检查权限与影响文件", progress: "86%", tone: "blue" },
+      { id: "step_approval", name: "用户审批", detail: "Approval Service 等待确认", progress: "68%", tone: "orange" },
+      { id: "step_checkpoint", name: "Git checkpoint", detail: "执行前创建保存点", progress: "48%", tone: "green" },
+      { id: "step_runner", name: "Runner 执行", detail: "本地 Runner 只执行已批准 job", progress: "28%", tone: "cyan" },
+    ],
+    stats: [
+      ["流程节点", "5"],
+      ["当前运行", "2"],
+      ["等待审批", String(approvals.filter((item) => item.status === "pending").length)],
+      ["已完成任务", String(tasks.filter((item) => item.status === "completed").length)],
+      ["平均响应时间", "1.2s"],
+    ],
+    nodes: [
+      { id: "node_plan", type: "agent", label: "生成执行计划", ownerAgentId: "agent_architect" },
+      { id: "node_review", type: "agent", label: "风险审查", ownerAgentId: "agent_reviewer" },
+      { id: "node_approval", type: "approval", label: "用户审批", ownerAgentId: "" },
+      { id: "node_checkpoint", type: "git", label: "Git checkpoint", ownerAgentId: "" },
+      { id: "node_runner", type: "runner", label: "本地 Runner 执行", ownerAgentId: "" },
+    ],
+    edges: [
+      { from: "node_plan", to: "node_review", label: "提交计划" },
+      { from: "node_review", to: "node_approval", label: "风险通过" },
+      { from: "node_approval", to: "node_checkpoint", label: "用户批准" },
+      { from: "node_checkpoint", to: "node_runner", label: "保存点已创建" },
+    ],
+    updatedAt: "2026-06-08T14:00:00Z",
+  },
+];
+
 const gitCheckpoints = [
   {
     commit: "620d44d",
@@ -325,6 +362,7 @@ function dashboard() {
       successRate: 0.923,
       averageResponseMs: 1200,
     },
+    workflows,
     pendingApprovals: approvals,
     taskQueue: tasks,
     agentStatus: agents,
@@ -386,6 +424,7 @@ module.exports = {
   project,
   agents,
   tasks,
+  workflows,
   approvals,
   gitCheckpoints,
   knowledgeUpdates,

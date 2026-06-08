@@ -245,6 +245,27 @@ a { color: inherit; text-decoration: none; }
 .workflow-stats div { display: flex; align-items: center; gap: 10px; }
 .workflow-stats span { color: var(--muted); }
 .workflow-stats strong { font-size: 21px; }
+.workflow-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, .7fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.workflow-summary div, .workflow-readonly-grid section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 14px;
+}
+.workflow-summary span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
+.workflow-summary strong { display: block; font-size: 18px; }
+.workflow-summary p { margin: 8px 0 0; color: #4e5670; }
+.workflow-readonly-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.workflow-readonly-grid h3 { margin: 0 0 12px; font-size: 14px; }
+.workflow-readonly-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.workflow-readonly-grid li { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.workflow-readonly-grid li:first-child { border-top: 0; padding-top: 0; }
+.workflow-readonly-grid span { color: var(--muted); }
 
 .approval-list { display: grid; }
 .approval-list div {
@@ -367,6 +388,6 @@ li strong { color: var(--green); font-size: 13px; }
 @media (max-width: 1500px) {
   .hero-grid { grid-template-columns: repeat(6, 1fr); }
   .welcome-card { grid-column: span 2; }
-  .middle-grid, .bottom-grid, .approval-review, .task-workspace { grid-template-columns: 1fr; }
+  .middle-grid, .bottom-grid, .approval-review, .task-workspace, .workflow-summary, .workflow-readonly-grid { grid-template-columns: 1fr; }
   .subpage-grid, .agent-board { grid-template-columns: 1fr; }
 }

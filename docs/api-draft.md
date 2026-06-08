@@ -600,3 +600,11 @@ operationType
 4. 最后接真实模型调用和本地 Runner。
 
 不要跳过 Approval Service 直接让 Runner 执行。
+
+## 2026-06-08 实现备注：工作流只读接口
+
+当前 Mock API 已实现工作流只读数据：
+
+- `GET /api/projects/:projectId/workflows` 返回 `workflows` 数组。
+- `GET /api/projects/:projectId/dashboard` 同时返回 `workflows`，供首页工作流总览和工作流编排页复用。
+- 当前只支持展示流程、节点和依赖连线，不支持编辑、运行和保存编排。

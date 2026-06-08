@@ -334,6 +334,11 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && withProject(pathname, "/workflows")) {
+    sendJson(res, 200, { workflows: data.workflows });
+    return;
+  }
+
   const taskDetail = pathname.match(/^\/api\/tasks\/([^/]+)$/);
   if (req.method === "GET" && taskDetail) {
     const task = findTask(taskDetail[1]);

@@ -685,3 +685,10 @@ docs/api-draft.md
 - 为什么改：让任务管理从静态展示进入可操作状态机，并让 Dashboard 的活跃任务数跟随任务状态变化。
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；这是 MVP-0.2 内部工程能力增强，用户核心流程没有变化。
+
+## 2026-06-08 变更记录：工作流编排只读 Mock API
+
+- 改了什么：为 `services/api` 增加 `GET /api/projects/:projectId/workflows`，并让 Dashboard 聚合接口返回 `workflows`；为 `apps/web` 工作流编排页增加只读流程、节点和依赖连线渲染。
+- 为什么改：让工作流编排页从静态占位进入可接数据状态，为后续流程运行记录、Runner job 队列和编排编辑做准备。
+- 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前只读展示不改变用户核心操作流程。

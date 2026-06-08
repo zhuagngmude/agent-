@@ -119,7 +119,9 @@ function normalizeDashboard(apiData) {
   const pendingApprovals = apiData.pendingApprovals || [];
   const taskQueue = apiData.taskQueue || [];
   const agentStatus = apiData.agentStatus || [];
+  const workflows = apiData.workflows || [];
   const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
+  const primaryWorkflow = workflows[0];
 
   return {
     ...fallback,
@@ -137,7 +139,17 @@ function normalizeDashboard(apiData) {
       { label: "Token 消耗", value: apiData.metrics?.tokenUsage ?? "-", note: "预算追踪", tone: "violet", icon: "K" },
       { label: "模型使用", value: apiData.metrics?.modelCount ?? "-", note: "模型配置数", tone: "cyan", icon: "M" },
     ],
-    workflow: fallback.workflow,
+    workflow: primaryWorkflow ? {
+      id: primaryWorkflow.id,
+      name: primaryWorkflow.name,
+      status: primaryWorkflow.status,
+      description: primaryWorkflow.description || "",
+      updatedAt: primaryWorkflow.updatedAt || "",
+      steps: primaryWorkflow.steps || fallback.workflow?.steps || [],
+      stats: primaryWorkflow.stats || fallback.workflow?.stats || [],
+      nodes: primaryWorkflow.nodes || [],
+      edges: primaryWorkflow.edges || [],
+    } : fallback.workflow,
     approvalRequests: pendingApprovals.map((item) => ({
       file: item.affectedFiles?.[0] || item.id,
       type: (item.operationTypes || []).join(" / ") || "unknown",
@@ -381,6 +393,55 @@ function riskLabel(riskLevel) {
   return riskLevel === "high" ? "高风险" : riskLevel === "medium" ? "中风险" : "低风险";
 }
 
+function renderWorkflowPage() {
+  const workflow = appData.workflow;
+  const page = document.querySelector("#workflowPage");
+  if (!page || !workflow) return;
+
+  const steps = workflow.steps || [];
+  const stats = workflow.stats || [];
+  const nodes = workflow.nodes || [];
+  const edges = workflow.edges || [];
+
+  page.innerHTML = `
+    <div class="workflow-summary">
+      <div>
+        <span>当前流程</span>
+        <strong>${escapeHtml(workflow.name || "未命名流程")}</strong>
+        <p>${escapeHtml(workflow.description || "暂无流程说明")}</p>
+      </div>
+      <div>
+        <span>状态</span>
+        <strong>${escapeHtml(workflow.status || "unknown")}</strong>
+        <p>${escapeHtml(workflow.updatedAt || "未记录更新时间")}</p>
+      </div>
+    </div>
+    <div class="flow">
+      ${steps.map((step, index) => `
+        ${index === 0 ? "" : '<div class="line"></div>'}
+        <div class="agent-step ${escapeHtml(step.tone || "purple")}">
+          <b>${escapeHtml(step.name)}</b>
+          <span>${escapeHtml(step.detail || "")}</span>
+          <i style="--p:${escapeHtml(step.progress || "0%")}"></i>
+        </div>
+      `).join("")}
+    </div>
+    <div class="workflow-stats">
+      ${stats.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}
+    </div>
+    <div class="workflow-readonly-grid">
+      <section>
+        <h3>节点</h3>
+        <ul>${nodes.map((node) => `<li><b>${escapeHtml(node.label)}</b><span>${escapeHtml(node.type)}</span></li>`).join("")}</ul>
+      </section>
+      <section>
+        <h3>依赖连线</h3>
+        <ul>${edges.map((edge) => `<li><b>${escapeHtml(edge.from)} → ${escapeHtml(edge.to)}</b><span>${escapeHtml(edge.label || "依赖")}</span></li>`).join("")}</ul>
+      </section>
+    </div>
+  `;
+}
+
 function renderTaskPage(selectedIndex = 0) {
   const tasks = appData.taskQueue || [];
   const tableBody = document.querySelector("#taskPageTable tbody");
@@ -477,6 +538,7 @@ async function runApprovalAction(action) {
     appData = await loadDashboardFromApi();
     selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max((appData.approvalRequests || []).length - 1, 0));
     renderDashboard();
+    renderWorkflowPage();
     renderApprovalPage(selectedApprovalIndex);
     setApprovalFeedback(`已提交：${actionLabels[action]}`, "success");
   } catch (error) {
@@ -508,6 +570,7 @@ async function runTaskAction(action) {
     appData = await loadDashboardFromApi();
     selectedTaskIndex = Math.min(selectedTaskIndex, Math.max((appData.taskQueue || []).length - 1, 0));
     renderDashboard();
+    renderWorkflowPage();
     renderTaskPage(selectedTaskIndex);
     setTaskFeedback(`已提交：${actionLabels[action]}`, "success");
   } catch (error) {
@@ -576,12 +639,14 @@ async function runRuntimeStateAction(action) {
       await requestRuntimeState("POST", "/api/runtime-state/reset");
       appData = await loadDashboardFromApi();
       renderDashboard();
+      renderWorkflowPage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
     } else if (action === "clear") {
       await requestRuntimeState("DELETE");
       appData = await loadDashboardFromApi();
       renderDashboard();
+      renderWorkflowPage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
     }
@@ -638,6 +703,7 @@ async function boot() {
   }
 
   renderDashboard();
+  renderWorkflowPage();
   renderApprovalPage();
   renderTaskPage();
 }
