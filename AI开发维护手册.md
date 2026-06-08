@@ -756,6 +756,13 @@ docs/api-draft.md
 - 影响模块：`services/api/mock-data.js`、`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读状态追踪，不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置待应用审查视图
+
+- 改了什么：智能体管理页的“待应用配置变更”面板从简单列表升级为只读审查视图，可选中待应用记录，查看目标 Agent、来源审批、审批状态、字段变更和应用前检查项。
+- 为什么改：在开放真正应用配置之前，先让用户和后续 AI 能看清每条 `pending_apply` 记录是否来自 `agent_config` 审批、是否没有 Runner job、是否仍等待人工应用。
+- 影响模块：`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是 MVP-0.2 内部只读审查增强，不改变用户核心流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -8,6 +8,7 @@ let selectedTaskIndex = 0;
 let selectedRunnerJobIndex = 0;
 let selectedAgentIndex = 0;
 let selectedAgentChangeType = "model";
+let selectedAgentConfigApplicationId = "";
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
@@ -237,6 +238,12 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   changePreview.innerHTML = renderAgentChangePreview(agent, selectedAgentChangeType);
   if (applicationsPanel) {
     applicationsPanel.innerHTML = renderAgentConfigApplications(agent);
+    applicationsPanel.querySelectorAll("[data-agent-config-application-id]").forEach((card) => {
+      card.addEventListener("click", () => {
+        selectedAgentConfigApplicationId = card.dataset.agentConfigApplicationId;
+        renderAgentsPage(selectedAgentIndex);
+      });
+    });
   }
 
   const submitChangeButton = document.querySelector("#submitAgentChangeRequest");
@@ -567,6 +574,38 @@ function agentConfigApplicationStatusLabel(status) {
   return labels[status] || status || "未知";
 }
 
+function agentConfigApplicationStatusBadge(status) {
+  if (status === "applied") return "green";
+  if (status === "cancelled") return "gray";
+  return "orange";
+}
+
+function changeTypeLabel(type) {
+  const labels = {
+    model: "模型切换",
+    spawn: "子 Agent 权限",
+    permission: "权限升级",
+  };
+  return labels[type] || type || "配置变更";
+}
+
+function approvalStatusForApplication(application) {
+  return (appData.approvalRequests || []).find((approval) => approval.id === application.approvalId);
+}
+
+function renderAgentConfigApplicationChecklist(application, approval) {
+  const checks = [
+    ["来源审批", approval?.status === "approved" ? "已批准" : "需确认审批状态"],
+    ["目标服务", approval?.targetService === "agent_config" ? "agent_config" : "需确认目标服务"],
+    ["Runner 队列", approval?.runnerJobId ? "异常：存在 Runner job" : "不会生成 Runner job"],
+    ["应用入口", application.status === "pending_apply" ? "等待人工应用入口开放" : agentConfigApplicationStatusLabel(application.status)],
+  ];
+
+  return checks.map(([label, value]) => `
+    <li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>
+  `).join("");
+}
+
 function renderAgentConfigApplications(agent) {
   const applications = (appData.agentConfigApplications || [])
     .filter((item) => item.agentId === agent.id);
@@ -575,21 +614,53 @@ function renderAgentConfigApplications(agent) {
     return `<p class="muted">当前 Agent 暂无待应用配置变更。审批通过后会先出现在这里，不会直接修改 Agent 配置。</p>`;
   }
 
-  return applications.map((item) => `
-    <div>
-      <div class="application-head">
-        <strong>${escapeHtml(item.changeType || "config_change")}</strong>
-        <span class="badge orange">${escapeHtml(agentConfigApplicationStatusLabel(item.status))}</span>
+  if (!applications.some((item) => item.id === selectedAgentConfigApplicationId)) {
+    selectedAgentConfigApplicationId = applications[0].id;
+  }
+
+  const selectedApplication = applications.find((item) => item.id === selectedAgentConfigApplicationId) || applications[0];
+  const selectedApproval = approvalStatusForApplication(selectedApplication);
+
+  return `
+    <div class="application-review-layout">
+      <div class="application-list">
+        ${applications.map((item) => `
+          <button class="${item.id === selectedApplication.id ? "active" : ""}" type="button" data-agent-config-application-id="${escapeHtml(item.id)}">
+            <span>
+              <strong>${escapeHtml(changeTypeLabel(item.changeType))}</strong>
+              <small>${escapeHtml(item.approvalId || "未记录审批")}</small>
+            </span>
+            <em class="badge ${agentConfigApplicationStatusBadge(item.status)}">${escapeHtml(agentConfigApplicationStatusLabel(item.status))}</em>
+          </button>
+        `).join("")}
       </div>
-      <p>来源审批：${escapeHtml(item.approvalId || "未记录")} · 更新时间：${escapeHtml(item.updatedAt || item.createdAt || "未记录")}</p>
-      <ul>
-        ${(item.changes || []).map((change) => `
-          <li>${escapeHtml(change.field || "field")}：${escapeHtml(change.before || "")} -> ${escapeHtml(change.after || "")}</li>
-        `).join("") || "<li>暂无字段变更明细</li>"}
-      </ul>
-      <small>只读状态：当前不会写入 Agent 配置，也不会生成 Runner job。</small>
+      <div class="application-review-detail">
+        <div class="application-head">
+          <strong>${escapeHtml(changeTypeLabel(selectedApplication.changeType))}</strong>
+          <span class="badge ${agentConfigApplicationStatusBadge(selectedApplication.status)}">${escapeHtml(agentConfigApplicationStatusLabel(selectedApplication.status))}</span>
+        </div>
+        <div class="approval-meta">
+          <div><span>目标 Agent</span><strong>${escapeHtml(selectedApplication.agentName || agent.name)}</strong></div>
+          <div><span>来源审批</span><strong>${escapeHtml(selectedApplication.approvalId || "未记录")}</strong></div>
+          <div><span>审批状态</span><strong>${escapeHtml(statusLabel("approval", selectedApproval?.status || "approved"))}</strong></div>
+          <div><span>更新时间</span><strong>${escapeHtml(selectedApplication.updatedAt || selectedApplication.createdAt || "未记录")}</strong></div>
+        </div>
+        <div class="application-checklist">
+          <h3>应用前检查</h3>
+          <ul>${renderAgentConfigApplicationChecklist(selectedApplication, selectedApproval)}</ul>
+        </div>
+        <div class="task-files">
+          <h3>字段变更</h3>
+          <ul>
+            ${(selectedApplication.changes || []).map((change) => `
+              <li>${escapeHtml(change.field || "field")}：${escapeHtml(change.before || "")} -> ${escapeHtml(change.after || "")}</li>
+            `).join("") || "<li>暂无字段变更明细</li>"}
+          </ul>
+        </div>
+        <small>只读审查：当前不会写入 Agent 配置，也不会生成 Runner job。</small>
+      </div>
     </div>
-  `).join("");
+  `;
 }
 
 async function runAgentChangeRequest() {

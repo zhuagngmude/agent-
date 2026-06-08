@@ -466,6 +466,80 @@ li strong { color: var(--green); font-size: 13px; }
   color: var(--muted);
   font-weight: 800;
 }
+.application-review-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr);
+  gap: 14px;
+}
+.application-list {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.application-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.application-list button:hover {
+  transform: translateY(-1px);
+  border-color: #c7c2ff;
+}
+.application-list button.active {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(115, 103, 240, .14);
+}
+.application-list span {
+  display: grid;
+  gap: 5px;
+}
+.application-list small {
+  word-break: break-all;
+}
+.application-review-detail {
+  min-width: 0;
+}
+.application-checklist {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  overflow: hidden;
+}
+.application-checklist h3 {
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.application-checklist ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.application-checklist li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: #4e5670;
+}
+.application-checklist li:last-child {
+  border-bottom: 0;
+}
+.application-checklist b {
+  color: var(--text);
+}
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: 12px; }
@@ -488,5 +562,5 @@ li strong { color: var(--green); font-size: 13px; }
   .hero-grid { grid-template-columns: repeat(6, 1fr); }
   .welcome-card { grid-column: span 2; }
   .middle-grid, .bottom-grid, .approval-review, .task-workspace, .workflow-summary, .workflow-readonly-grid { grid-template-columns: 1fr; }
-  .subpage-grid, .agent-board, .agent-config-rules { grid-template-columns: 1fr; }
+  .subpage-grid, .agent-board, .agent-config-rules, .application-review-layout { grid-template-columns: 1fr; }
 }
