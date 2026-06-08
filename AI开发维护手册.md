@@ -673,3 +673,5 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 - Integration 插件边界
 
 关键原则：Runner Service 不能自己决定自己是否可以执行。所有本地写文件、删文件、执行命令、网络请求、Git 操作，都必须经过 Approval Service，并在高风险场景中要求二次确认和 Git checkpoint。
+
+应用形态原则：当前阶段是电脑端 Web App，不是安装版桌面软件。先把 Web 控制台、Mock 数据、状态机和 Runner 审批流程做稳；随后接本地 Runner；最后再考虑用 Tauri 或 Electron 封装成 `agent蜂群.exe`。
