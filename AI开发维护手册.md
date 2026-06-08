@@ -742,6 +742,13 @@ docs/api-draft.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`下一步开发路线.md`。
 - 是否需要同步人类说明书：暂不需要；当前不保存配置，也不改变用户核心流程。
 
+## 2026-06-09 变更记录：Agent 配置变更申请接口
+
+- 改了什么：新增 `POST /api/agents/:agentId/change-requests`，可把 Agent 配置变更预览转换为 `targetService=agent_config` 的 Approval Request；前端新增“生成审批申请”按钮并刷新审批列表。
+- 为什么改：让 Agent 配置修改先进入审批流，而不是直接写配置；`agent_config` 审批通过后不会生成 Runner job。
+- 影响模块：`services/api/server.js`、`apps/web/index.html`、`apps/web/app.js`、`docs/api-draft.md`、`下一步开发路线.md`。
+- 是否需要同步人类说明书：暂不需要；当前只创建审批申请，不直接改变 Agent 配置。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

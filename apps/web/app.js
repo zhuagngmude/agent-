@@ -11,6 +11,7 @@ let selectedAgentChangeType = "model";
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
+let agentChangeRequestRunning = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -233,6 +234,12 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   });
 
   changePreview.innerHTML = renderAgentChangePreview(agent, selectedAgentChangeType);
+
+  const submitChangeButton = document.querySelector("#submitAgentChangeRequest");
+  if (submitChangeButton) {
+    submitChangeButton.disabled = agentChangeRequestRunning;
+    submitChangeButton.onclick = () => runAgentChangeRequest();
+  }
 }
 
 function normalizeDashboard(apiData) {
@@ -286,6 +293,7 @@ function normalizeDashboard(apiData) {
       affectedFiles: item.affectedFiles || [],
       diffPreview: item.diffPreview || [],
       id: item.id,
+      targetService: item.targetService || "runner",
       requiresSecondConfirm: item.requiresSecondConfirm === true,
     })),
     taskQueue: taskQueue.map((task) => ({
@@ -379,6 +387,20 @@ async function postApprovalAction(approvalId, action, body = {}) {
 
 async function postTaskAction(taskId, action, body = {}) {
   const response = await fetch(`${apiBase}/api/tasks/${taskId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postAgentChangeRequest(agentId, body = {}) {
+  const response = await fetch(`${apiBase}/api/agents/${agentId}/change-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -485,6 +507,16 @@ function agentChangeDraft(agent, type) {
   return drafts[type] || drafts.model;
 }
 
+function agentChangeRequestBody(agent, type) {
+  const draft = agentChangeDraft(agent, type);
+  return {
+    changeType: type,
+    riskLevel: draft.riskClass === "red" ? "high" : draft.riskClass === "orange" ? "medium" : "low",
+    reason: draft.reason,
+    changes: draft.changes.map(([field, before, after]) => ({ field, before, after })),
+  };
+}
+
 function renderAgentChangePreview(agent, type) {
   const draft = agentChangeDraft(agent, type);
   return `
@@ -503,8 +535,35 @@ function renderAgentChangePreview(agent, type) {
         <h3>字段变更</h3>
         <ul>${draft.changes.map(([field, before, after]) => `<li>${escapeHtml(field)}：${escapeHtml(before)} -> ${escapeHtml(after)}</li>`).join("")}</ul>
       </div>
+      <div class="agent-change-submit">
+        <button class="neutral-action" id="submitAgentChangeRequest">生成审批申请</button>
+      </div>
     </div>
   `;
+}
+
+async function runAgentChangeRequest() {
+  const agent = appData.agents?.[selectedAgentIndex];
+  if (!agent?.id || agentChangeRequestRunning) return;
+
+  agentChangeRequestRunning = true;
+  setAgentChangeFeedback("正在生成审批申请...");
+  renderAgentsPage(selectedAgentIndex);
+
+  try {
+    const body = agentChangeRequestBody(agent, selectedAgentChangeType);
+    const result = await postAgentChangeRequest(agent.id, body);
+    appData = await loadDashboardFromApi();
+    renderDashboard();
+    renderAgentsPage(selectedAgentIndex);
+    renderApprovalPage(selectedApprovalIndex);
+    setAgentChangeFeedback(`已生成审批申请：${result.approval?.id || "未知 ID"}`, "success");
+  } catch (error) {
+    setAgentChangeFeedback(`生成失败：${error.message}`, "error");
+  } finally {
+    agentChangeRequestRunning = false;
+    renderAgentsPage(selectedAgentIndex);
+  }
 }
 
 function approvalAction(status) {
@@ -534,6 +593,13 @@ function setRuntimeStateFeedback(text, mode = "") {
 
 function setTaskFeedback(text, mode = "") {
   const feedback = document.querySelector("#taskFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
+function setAgentChangeFeedback(text, mode = "") {
+  const feedback = document.querySelector("#agentChangeFeedback");
   if (!feedback) return;
   feedback.className = `approval-feedback ${mode}`.trim();
   feedback.textContent = text;
@@ -590,11 +656,11 @@ function renderApprovalPage(selectedIndex = 0) {
       <div><span>申请 Agent</span><strong>${escapeHtml(item.agent)}</strong></div>
       <div><span>当前状态</span><strong>${escapeHtml(statusLabel("approval", item.status))}</strong></div>
       <div><span>操作类型</span><strong>${escapeHtml(item.operationTypes.join(" / "))}</strong></div>
-      <div><span>Git checkpoint</span><strong>${escapeHtml(item.checkpoint)}</strong></div>
+      <div><span>目标服务</span><strong>${escapeHtml(item.targetService)}</strong></div>
     </div>
     <div class="approval-meta">
       <div><span>修改原因</span><strong>${escapeHtml(item.reason)}</strong></div>
-      <div><span>执行后果</span><strong>会影响 ${escapeHtml(item.affectedFiles.length)} 个本地文件，执行前必须由用户确认。</strong></div>
+      <div><span>执行后果</span><strong>${item.targetService === "agent_config" ? "只创建 Agent 配置审批申请，当前不会修改 Agent 配置，也不会进入 Runner 队列。" : `会影响 ${escapeHtml(item.affectedFiles.length)} 个本地文件，执行前必须由用户确认。`}</strong></div>
     </div>
     <div class="approval-files">
       <h3>影响文件</h3>

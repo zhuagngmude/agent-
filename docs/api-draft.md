@@ -154,6 +154,38 @@ disabled
 }
 ```
 
+### POST /api/agents/:agentId/change-requests
+
+用途：把 Agent 配置变更预览转换为审批申请。当前只创建 Approval Request，不修改 Agent 配置。
+
+请求：
+
+```json
+{
+  "changeType": "permission",
+  "riskLevel": "high",
+  "reason": "新增代码执行请求权限会影响 Runner 安全边界，必须二次确认。",
+  "changes": [
+    { "field": "permissions", "before": "read_project", "after": "read_project / request_code_execution" }
+  ]
+}
+```
+
+返回：
+
+```json
+{
+  "approval": {
+    "id": "approval_agent_agent_frontend_permission",
+    "status": "pending",
+    "targetService": "agent_config"
+  },
+  "message": "Agent change request created. Agent config was not modified."
+}
+```
+
+注意：`targetService = agent_config` 的审批通过后不生成 Runner job。
+
 请求：
 
 ```json

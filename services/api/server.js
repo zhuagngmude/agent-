@@ -55,6 +55,10 @@ function findTask(id) {
   return data.tasks.find((item) => item.id === id);
 }
 
+function findAgent(id) {
+  return data.agents.find((item) => item.id === id);
+}
+
 function findRunnerJob(id) {
   return data.runnerJobs.find((item) => item.id === id);
 }
@@ -66,6 +70,19 @@ function serializeRuntimeState() {
     approvals: data.approvals.map((approval) => ({
       id: approval.id,
       status: approval.status,
+      riskLevel: approval.riskLevel || "",
+      riskTone: approval.riskTone || "",
+      requestAgentId: approval.requestAgentId || "",
+      requestAgentName: approval.requestAgentName || "",
+      operationTypes: approval.operationTypes || [],
+      reason: approval.reason || "",
+      checkpoint: approval.checkpoint || {},
+      affectedFiles: approval.affectedFiles || [],
+      diffSummary: approval.diffSummary || "",
+      diffPreview: approval.diffPreview || [],
+      requiresSecondConfirm: approval.requiresSecondConfirm === true,
+      targetService: approval.targetService || "",
+      changeRequest: approval.changeRequest || null,
       rejectReason: approval.rejectReason || "",
       runnerJobId: approval.runnerJobId || "",
       patchArtifactId: approval.patchArtifactId || "",
@@ -93,11 +110,27 @@ function applyRuntimeState(state) {
 
   if (Array.isArray(state.approvals)) {
     state.approvals.forEach((storedApproval) => {
-      const approval = findApproval(storedApproval.id);
-      if (!approval) return;
+      let approval = findApproval(storedApproval.id);
+      if (!approval) {
+        approval = { id: storedApproval.id };
+        data.approvals.push(approval);
+      }
 
       [
         "status",
+        "riskLevel",
+        "riskTone",
+        "requestAgentId",
+        "requestAgentName",
+        "operationTypes",
+        "reason",
+        "checkpoint",
+        "affectedFiles",
+        "diffSummary",
+        "diffPreview",
+        "requiresSecondConfirm",
+        "targetService",
+        "changeRequest",
         "rejectReason",
         "runnerJobId",
         "patchArtifactId",
@@ -105,6 +138,7 @@ function applyRuntimeState(state) {
         "rejectedAt",
         "patchOnlyAt",
         "updatedAt",
+        "createdAt",
       ].forEach((key) => {
         if (storedApproval[key] !== undefined) {
           approval[key] = storedApproval[key];
@@ -196,6 +230,59 @@ function upsertRunnerJobFromApproval(approval) {
   return job;
 }
 
+function riskTone(riskLevel) {
+  if (riskLevel === "high") return "high";
+  if (riskLevel === "medium") return "mid";
+  return "low";
+}
+
+function createAgentChangeApproval(agent, body) {
+  const now = new Date().toISOString();
+  const changeType = body.changeType || "model";
+  const riskLevel = body.riskLevel || (changeType === "model" ? "medium" : "high");
+  const changes = Array.isArray(body.changes) ? body.changes : [];
+  const approvalId = `approval_agent_${agent.id}_${changeType}`;
+  const existing = findApproval(approvalId);
+  const diffPreview = changes.length
+    ? changes.map((change) => `~ ${change.field}: ${change.before} -> ${change.after}`)
+    : [`~ ${changeType}: 等待补充变更字段`];
+
+  const approval = existing || {
+    id: approvalId,
+    requestAgentId: agent.id,
+    requestAgentName: agent.name,
+    operationTypes: ["agent_config_change"],
+    affectedFiles: [`agent-config/${agent.id}`],
+  };
+
+  approval.status = "pending";
+  approval.riskLevel = riskLevel;
+  approval.riskTone = riskTone(riskLevel);
+  approval.reason = body.reason || `申请修改 ${agent.name} 的 Agent 配置。`;
+  approval.checkpoint = {
+    required: true,
+    created: false,
+    commit: "",
+  };
+  approval.diffSummary = `${changes.length} fields`;
+  approval.diffPreview = diffPreview;
+  approval.requiresSecondConfirm = riskLevel === "high";
+  approval.targetService = "agent_config";
+  approval.createdAt = existing?.createdAt || now;
+  approval.updatedAt = now;
+  approval.changeRequest = {
+    agentId: agent.id,
+    changeType,
+    changes,
+  };
+
+  if (!existing) {
+    data.approvals.push(approval);
+  }
+
+  return approval;
+}
+
 async function handleApprovalAction(req, res, approvalId, action) {
   const approval = findApproval(approvalId);
   if (!approval) {
@@ -214,8 +301,12 @@ async function handleApprovalAction(req, res, approvalId, action) {
       return;
     }
     approval.status = "approved";
-    const runnerJob = upsertRunnerJobFromApproval(approval);
-    approval.runnerJobId = runnerJob.id;
+    if (approval.targetService === "agent_config") {
+      approval.runnerJobId = "";
+    } else {
+      const runnerJob = upsertRunnerJobFromApproval(approval);
+      approval.runnerJobId = runnerJob.id;
+    }
     approval.approvedAt = new Date().toISOString();
     approval.updatedAt = approval.approvedAt;
     saveRuntimeState();
@@ -252,6 +343,22 @@ async function handleApprovalAction(req, res, approvalId, action) {
   }
 
   sendJson(res, 404, { error: "unknown_approval_action" });
+}
+
+async function handleAgentChangeRequest(req, res, agentId) {
+  const agent = findAgent(agentId);
+  if (!agent) {
+    sendJson(res, 404, { error: "agent_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  const approval = createAgentChangeApproval(agent, body);
+  saveRuntimeState();
+  sendJson(res, 201, {
+    approval,
+    message: "Agent change request created. Agent config was not modified.",
+  });
 }
 
 function transitionTask(task, action, body) {
@@ -364,6 +471,12 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && withProject(pathname, "/agents")) {
     sendJson(res, 200, { agents: data.agents });
+    return;
+  }
+
+  const agentChangeRequest = pathname.match(/^\/api\/agents\/([^/]+)\/change-requests$/);
+  if (req.method === "POST" && agentChangeRequest) {
+    await handleAgentChangeRequest(req, res, agentChangeRequest[1]);
     return;
   }
 
