@@ -119,22 +119,11 @@
           </div>
           <div class="approval-list" id="approvalList">
             <div>
-              <strong>src/services/user.service.ts</strong>
-              <p>修改类型：更新 · 申请人：开发智能体-Alpha</p>
-              <span class="risk high">高风险</span><small>+320 -120</small>
-            </div>
-            <div>
-              <strong>docs/系统设计文档.md</strong>
-              <p>修改类型：新增 · 申请人：文档智能体-Beta</p>
-              <span class="risk mid">中风险</span><small>+560 -0</small>
-            </div>
-            <div>
-              <strong>tests/integration/api.test.ts</strong>
-              <p>修改类型：新增 · 申请人：测试智能体-Gamma</p>
-              <span class="risk low">低风险</span><small>+210 -10</small>
+              <strong>正在读取 Runner 审批数据</strong>
+              <p>连接 Mock API 后会显示真实审批申请。</p>
             </div>
           </div>
-          <footer><span id="approvalSummary">共 3 项待审批</span> <button>进入逐项审查</button></footer>
+          <footer><span id="approvalSummary">共 3 项待审批</span> <button>进入审批页</button></footer>
         </article>
       </section>
 
@@ -143,9 +132,7 @@
           <div class="card-head"><h2>任务队列</h2></div>
           <div class="mini-tabs"><b>进行中 32</b><span>排队中 12</span><span>已完成 36</span></div>
           <ul class="task-list" id="taskQueue">
-            <li><span class="icon purple">♙</span><b>实现用户意图识别优化</b><em>开发实现</em><strong>剩余 25m</strong></li>
-            <li><span class="icon green">▣</span><b>更新知识库索引结构</b><em>知识更新</em><strong>剩余 1h 10m</strong></li>
-            <li><span class="icon red">!</span><b>接口性能测试与优化</b><em>高优先级</em><strong>剩余 45m</strong></li>
+            <li><span class="icon purple">T</span><b>正在读取任务队列</b><em>Mock API</em><strong>等待数据</strong></li>
           </ul>
           <a class="panel-link" href="#">查看全部任务 →</a>
         </article>
@@ -153,29 +140,22 @@
         <article class="panel">
           <div class="card-head"><h2>智能体状态</h2><a href="#">查看全部</a></div>
           <ul class="agent-list" id="agentStatusList">
-            <li><span class="avatar small">A</span><b>开发智能体-Alpha</b><em>v1.2.3</em><strong>运行中</strong></li>
-            <li><span class="avatar small">B</span><b>测试智能体-Beta</b><em>v1.1.8</em><strong>运行中</strong></li>
-            <li><span class="avatar small">C</span><b>文档智能体-Gamma</b><em>v1.0.5</em><strong>空闲中</strong></li>
-            <li><span class="avatar small">D</span><b>知识库智能体-Epsilon</b><em>v1.3.0</em><strong>运行中</strong></li>
+            <li><span class="avatar small">A</span><b>正在读取智能体状态</b><em>Mock API</em><strong>等待数据</strong></li>
           </ul>
         </article>
 
         <article class="panel">
           <div class="card-head"><h2>Git 检查点</h2><a href="#">查看全部</a></div>
           <ul class="checkpoint-list" id="gitCheckpointList">
-            <li><b>a1b2c3d</b><span>feat: 智能客服分发模型</span><em>5 分钟前 ✓</em></li>
-            <li><b>d4e5f6a</b><span>docs: 更新系统架构图</span><em>18 分钟前 ✓</em></li>
-            <li><b>b7c8d9e</b><span>test: 增加接口集成测试用例</span><em>32 分钟前 ✓</em></li>
+            <li><b>Git</b><span>正在读取项目保存点</span><em>等待数据</em></li>
           </ul>
-          <a class="panel-link" href="#">查看全部检查点 →</a>
+          <a class="panel-link" href="#">查看全部保存点 →</a>
         </article>
 
         <article class="panel">
           <div class="card-head"><h2>知识库更新</h2><a href="#">查看全部</a></div>
           <ul class="knowledge-list" id="knowledgeUpdateList">
-            <li><span class="doc purple">文</span><b>产品需求文档</b><em>新增 3 个文档片段</em><strong>1 小时前</strong></li>
-            <li><span class="doc blue">技</span><b>技术方案文档</b><em>更新 12 个文档片段</em><strong>2 小时前</strong></li>
-            <li><span class="doc orange">API</span><b>API 接口文档</b><em>新增 8 个文档片段</em><strong>4 小时前</strong></li>
+            <li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>Mock API</em><strong>等待数据</strong></li>
           </ul>
           <a class="panel-link" href="#">查看全部更新 →</a>
         </article>
@@ -183,18 +163,12 @@
         <article class="panel">
           <div class="card-head"><h2>设置与密钥</h2></div>
           <div id="apiKeyList">
-          <div class="key-card">
-            <b>OpenAI API</b><span>有效</span>
-            <p>sk-••••••••••••••1234</p>
-            <div class="bar"><i style="--p:60%"></i></div>
-            <small>额度：$120.50 · 60%</small>
-          </div>
-          </div>
-          <div class="key-card">
-            <b>Anthropic API</b><span>有效</span>
-            <p>sk-ant-••••••••••5678</p>
-            <div class="bar"><i style="--p:40%"></i></div>
-            <small>额度：$80.30 · 40%</small>
+            <div class="key-card">
+              <b>模型密钥状态</b><span>脱敏</span>
+              <p>密钥只显示配置状态，不显示任何明文或尾号。</p>
+              <div class="bar"><i style="--p:0%"></i></div>
+              <small>等待 Mock API 设置数据</small>
+            </div>
           </div>
           <a class="panel-link" href="#">查看全部设置 →</a>
         </article>
@@ -208,13 +182,13 @@
           <article class="panel wide">
             <div class="card-head"><h2>智能体资源池</h2><button class="primary-mini">新增智能体</button></div>
             <div class="agent-board">
-              <div><b>开发智能体-Alpha</b><span>前端/后端实现 · v1.2.3</span><em>运行中</em></div>
-              <div><b>测试智能体-Beta</b><span>接口、回归、性能测试 · v1.1.8</span><em>运行中</em></div>
-              <div><b>文档智能体-Gamma</b><span>人类说明书与 AI 维护手册 · v1.0.5</span><em>空闲中</em></div>
-              <div><b>审查智能体-Delta</b><span>安全、风险、代码审查 · v1.2.1</span><em>运行中</em></div>
+              <div><b>架构师 Agent</b><span>项目拆解、流程设计、任务规划</span><em>Mock API</em></div>
+              <div><b>前端 Agent</b><span>控制台页面、交互和状态渲染</span><em>Mock API</em></div>
+              <div><b>文档 Agent</b><span>人类说明书和 AI 维护手册同步</span><em>Mock API</em></div>
+              <div><b>审查 Agent</b><span>风险检查、审批说明和安全边界</span><em>Mock API</em></div>
             </div>
           </article>
-          <article class="panel"><div class="card-head"><h2>模型分配</h2></div><p class="muted">GPT 负责架构与调度，Claude 负责前端实现，Gemini 负责长文档审查。</p></article>
+          <article class="panel"><div class="card-head"><h2>模型分配</h2></div><p class="muted">当前为 Mock 配置，后续再接入真实多模型调度。</p></article>
         </div>
       </section>
 
@@ -258,14 +232,14 @@
         <div class="subpage-grid">
           <article class="panel"><div class="card-head"><h2>人类说明书</h2></div><p class="muted">面向用户解释项目定位、使用方式、工作流与安全确认。</p></article>
           <article class="panel"><div class="card-head"><h2>AI 开发维护手册</h2></div><p class="muted">面向后续 AI 说明架构约束、代码规范、Runner 权限与文档更新规则。</p></article>
-          <article class="panel wide"><div class="card-head"><h2>最近更新</h2></div><ul class="knowledge-list"><li><span class="doc purple">文</span><b>产品需求文档</b><em>新增 3 个文档片段</em><strong>1 小时前</strong></li><li><span class="doc blue">技</span><b>技术方案文档</b><em>更新 12 个文档片段</em><strong>2 小时前</strong></li></ul></article>
+          <article class="panel wide"><div class="card-head"><h2>最近更新</h2></div><ul class="knowledge-list"><li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>Mock API</em><strong>等待数据</strong></li></ul></article>
         </div>
       </section>
 
       <section class="page-view" id="code">
         <article class="panel wide">
           <div class="card-head"><h2>代码与知识</h2><button class="primary-mini">同步代码索引</button></div>
-          <div class="code-box">src/services/user.service.ts<br>docs/系统设计文档.md<br>tests/integration/api.test.ts</div>
+          <div class="code-box">apps/web/index.html<br>services/api/server.js<br>docs/api-draft.md<br>AI开发维护手册.md</div>
         </article>
       </section>
 

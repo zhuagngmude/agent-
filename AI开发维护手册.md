@@ -706,3 +706,10 @@ docs/api-draft.md
 - 为什么改：减少中文路径和括号对 Node、Python、Git、Runner 和外部工具造成的编码问题。
 - 影响模块：`新窗口交接说明.md`、`services/api/server.js`、`docs/api-draft.md`、`design/index.html`。
 - 是否需要同步人类说明书：暂不需要；这是本地开发路径迁移，不改变产品功能。
+
+## 2026-06-08 变更记录：清理前端旧占位数据
+
+- 改了什么：清理 `apps/web/index.html` 中的旧静态占位数据、通用示例文件、假 API Key 展示和不属于 agent蜂群 的示例文案。
+- 为什么改：减少页面加载前的误导信息，让控制台更像当前项目真实状态。
+- 影响模块：`apps/web/index.html`。
+- 是否需要同步人类说明书：暂不需要；这是前端原型文案收敛。
