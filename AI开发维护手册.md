@@ -676,3 +676,5 @@ docs/api-draft.md
 关键原则：Runner Service 不能自己决定自己是否可以执行。所有本地写文件、删文件、执行命令、网络请求、Git 操作，都必须经过 Approval Service，并在高风险场景中要求二次确认和 Git checkpoint。
 
 应用形态原则：当前阶段是电脑端 Web App，不是安装版桌面软件。先把 Web 控制台、Mock 数据、状态机和 Runner 审批流程做稳；随后接本地 Runner；最后再考虑用 Tauri 或 Electron 封装成 `agent蜂群.exe`。
+
+工程骨架原则：正式前端入口是 `apps/web/`。旧 `frontend/` 只保留兼容跳转入口，后续不要在 `frontend/` 新增业务代码。API 服务放 `services/api/`，本地 Runner 放 `services/runner/`，Agent 调度放 `services/worker/`，共享状态和类型放 `packages/shared/`。

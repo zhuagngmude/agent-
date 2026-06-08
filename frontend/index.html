@@ -3,326 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="agent蜂群多智能体协作与调度系统后台 UI">
-  <title>agent蜂群 · 项目概览</title>
-  <link rel="stylesheet" href="./styles.css">
+  <meta http-equiv="refresh" content="0; url=../apps/web/index.html">
+  <title>agent蜂群 - 前端入口已迁移</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+      background: #f7f7fb;
+      color: #1f2742;
+    }
+    main {
+      width: min(520px, calc(100vw - 32px));
+      padding: 28px;
+      border: 1px solid #e5e7f1;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 6px 24px rgba(38, 43, 67, .08);
+    }
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    p { margin: 0 0 16px; color: #6f768d; line-height: 1.7; }
+    a { color: #6658e8; font-weight: 700; }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">
-          <span></span><span></span><span></span>
-        </div>
-        <div>
-          <strong>agent蜂群</strong>
-          <small>多智能体协作与调度系统</small>
-        </div>
-      </div>
-
-      <nav class="nav">
-        <button class="active" data-page="overview"><span>⌂</span>项目概览</button>
-        <button data-page="agents"><span>⚭</span>智能体管理</button>
-        <button data-page="tasks"><span>☷</span>任务管理</button>
-        <button data-page="workflow"><span>⇄</span>工作流编排</button>
-        <button data-page="knowledge"><span>▣</span>知识库管理</button>
-        <button data-page="code"><span>⌘</span>代码与知识</button>
-        <button data-page="runtime"><span>◇</span>运行与调度</button>
-        <button data-page="approval"><span>✓</span>审批与确认 <em>3</em></button>
-        <button data-page="monitor"><span>▥</span>监控与日志</button>
-        <button data-page="billing"><span>◌</span>费用与用量</button>
-        <button data-page="integrations"><span>✣</span>集成与扩展</button>
-        <button data-page="settings"><span>⚙</span>系统设置</button>
-      </nav>
-
-      <div class="quick-project">
-        <p>项目快速切换</p>
-        <button>agent蜂群 MVP <span>⌄</span></button>
-      </div>
-
-      <div class="user-card">
-        <div class="avatar">管</div>
-        <div>
-          <strong>项目负责人</strong>
-          <small>本地控制台</small>
-        </div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div class="search">⌕ 搜索智能体、任务、知识库...</div>
-        <div class="top-actions">
-          <span>🌐 简体中文</span>
-          <span>☼</span>
-          <span class="bell">🔔<em>8</em></span>
-          <span class="admin-dot">项目负责人 ⌄</span>
-          <button class="settings">⚙ 项目设置</button>
-        </div>
-      </header>
-
-      <section class="page-title">
-        <div>
-          <h1 id="pageTitle">项目概览</h1>
-          <p id="pageCrumb">全局视图 / 项目概览</p>
-        </div>
-      </section>
-
-      <section class="page-view active" id="overview">
-      <section class="hero-grid">
-        <article class="welcome-card">
-          <div>
-            <h2>agent蜂群控制台</h2>
-            <p>跟踪多 Agent 协作、Runner 审批、Git 检查点和知识库同步状态。</p>
-            <div class="project-box">
-              <small>当前项目</small>
-              <strong><span data-project-name>agent蜂群 MVP</span> <span data-project-status>运行中</span></strong>
-              <p data-project-phase>项目阶段：MVP-0.2 前端工程化与 Runner 审批原型</p>
-              <p data-project-description>项目描述：多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。</p>
-            </div>
-          </div>
-        </article>
-        <div id="dashboardMetrics" class="metric-fragment"></div>
-      </section>
-
-      <section class="middle-grid">
-        <article class="workflow-card">
-          <div class="card-head">
-            <h2>蜂群协作工作流总览</h2>
-            <div class="tabs"><button class="active">流程视图</button><button>拓扑视图</button><button>···</button></div>
-          </div>
-          <div class="flow" id="workflowSteps">
-            <div class="agent-step purple"><b>需求分析智能体</b><span>2 个实例运行中</span><i style="--p:100%"></i></div>
-            <div class="line"></div>
-            <div class="agent-step blue"><b>方案设计智能体</b><span>3 个实例运行中</span><i style="--p:78%"></i></div>
-            <div class="line"></div>
-            <div class="agent-step green"><b>开发实现智能体</b><span>5 个实例运行中</span><i style="--p:62%"></i></div>
-            <div class="line"></div>
-            <div class="agent-step orange"><b>测试验证智能体</b><span>4 个实例运行中</span><i style="--p:45%"></i></div>
-            <div class="line"></div>
-            <div class="agent-step cyan"><b>部署运维智能体</b><span>2 个实例运行中</span><i style="--p:20%"></i></div>
-          </div>
-          <div class="workflow-stats" id="workflowStats">
-            <div><span>总智能体数</span><strong>24</strong></div>
-            <div><span>总任务数</span><strong>68</strong></div>
-            <div><span>完成任务</span><strong>36</strong></div>
-            <div><span>协作成功率</span><strong>92.3%</strong></div>
-            <div><span>平均响应时间</span><strong>1.2s</strong></div>
-          </div>
-        </article>
-
-        <article class="approval-card">
-          <div class="card-head">
-            <h2>Runner 待审批 <em>3</em></h2>
-            <a href="#">查看全部</a>
-          </div>
-          <div class="approval-list" id="approvalList">
-            <div>
-              <strong>src/services/user.service.ts</strong>
-              <p>修改类型：更新 · 申请人：开发智能体-Alpha</p>
-              <span class="risk high">高风险</span><small>+320 -120</small>
-            </div>
-            <div>
-              <strong>docs/系统设计文档.md</strong>
-              <p>修改类型：新增 · 申请人：文档智能体-Beta</p>
-              <span class="risk mid">中风险</span><small>+560 -0</small>
-            </div>
-            <div>
-              <strong>tests/integration/api.test.ts</strong>
-              <p>修改类型：新增 · 申请人：测试智能体-Gamma</p>
-              <span class="risk low">低风险</span><small>+210 -10</small>
-            </div>
-          </div>
-          <footer><span id="approvalSummary">共 3 项待审批</span> <button>进入逐项审查</button></footer>
-        </article>
-      </section>
-
-      <section class="bottom-grid">
-        <article class="panel">
-          <div class="card-head"><h2>任务队列</h2></div>
-          <div class="mini-tabs"><b>进行中 32</b><span>排队中 12</span><span>已完成 36</span></div>
-          <ul class="task-list" id="taskQueue">
-            <li><span class="icon purple">♙</span><b>实现用户意图识别优化</b><em>开发实现</em><strong>剩余 25m</strong></li>
-            <li><span class="icon green">▣</span><b>更新知识库索引结构</b><em>知识更新</em><strong>剩余 1h 10m</strong></li>
-            <li><span class="icon red">!</span><b>接口性能测试与优化</b><em>高优先级</em><strong>剩余 45m</strong></li>
-          </ul>
-          <a class="panel-link" href="#">查看全部任务 →</a>
-        </article>
-
-        <article class="panel">
-          <div class="card-head"><h2>智能体状态</h2><a href="#">查看全部</a></div>
-          <ul class="agent-list" id="agentStatusList">
-            <li><span class="avatar small">A</span><b>开发智能体-Alpha</b><em>v1.2.3</em><strong>运行中</strong></li>
-            <li><span class="avatar small">B</span><b>测试智能体-Beta</b><em>v1.1.8</em><strong>运行中</strong></li>
-            <li><span class="avatar small">C</span><b>文档智能体-Gamma</b><em>v1.0.5</em><strong>空闲中</strong></li>
-            <li><span class="avatar small">D</span><b>知识库智能体-Epsilon</b><em>v1.3.0</em><strong>运行中</strong></li>
-          </ul>
-        </article>
-
-        <article class="panel">
-          <div class="card-head"><h2>Git 检查点</h2><a href="#">查看全部</a></div>
-          <ul class="checkpoint-list" id="gitCheckpointList">
-            <li><b>a1b2c3d</b><span>feat: 智能客服分发模型</span><em>5 分钟前 ✓</em></li>
-            <li><b>d4e5f6a</b><span>docs: 更新系统架构图</span><em>18 分钟前 ✓</em></li>
-            <li><b>b7c8d9e</b><span>test: 增加接口集成测试用例</span><em>32 分钟前 ✓</em></li>
-          </ul>
-          <a class="panel-link" href="#">查看全部检查点 →</a>
-        </article>
-
-        <article class="panel">
-          <div class="card-head"><h2>知识库更新</h2><a href="#">查看全部</a></div>
-          <ul class="knowledge-list" id="knowledgeUpdateList">
-            <li><span class="doc purple">文</span><b>产品需求文档</b><em>新增 3 个文档片段</em><strong>1 小时前</strong></li>
-            <li><span class="doc blue">技</span><b>技术方案文档</b><em>更新 12 个文档片段</em><strong>2 小时前</strong></li>
-            <li><span class="doc orange">API</span><b>API 接口文档</b><em>新增 8 个文档片段</em><strong>4 小时前</strong></li>
-          </ul>
-          <a class="panel-link" href="#">查看全部更新 →</a>
-        </article>
-
-        <article class="panel">
-          <div class="card-head"><h2>设置与密钥</h2></div>
-          <div id="apiKeyList">
-          <div class="key-card">
-            <b>OpenAI API</b><span>有效</span>
-            <p>sk-••••••••••••••1234</p>
-            <div class="bar"><i style="--p:60%"></i></div>
-            <small>额度：$120.50 · 60%</small>
-          </div>
-          </div>
-          <div class="key-card">
-            <b>Anthropic API</b><span>有效</span>
-            <p>sk-ant-••••••••••5678</p>
-            <div class="bar"><i style="--p:40%"></i></div>
-            <small>额度：$80.30 · 40%</small>
-          </div>
-          <a class="panel-link" href="#">查看全部设置 →</a>
-        </article>
-      </section>
-
-      <footer class="footer">© 2026 agent蜂群 多智能体协作与调度系统 <span>原型版本 MVP-0.2</span></footer>
-      </section>
-
-      <section class="page-view" id="agents">
-        <div class="subpage-grid">
-          <article class="panel wide">
-            <div class="card-head"><h2>智能体资源池</h2><button class="primary-mini">新增智能体</button></div>
-            <div class="agent-board">
-              <div><b>开发智能体-Alpha</b><span>前端/后端实现 · v1.2.3</span><em>运行中</em></div>
-              <div><b>测试智能体-Beta</b><span>接口、回归、性能测试 · v1.1.8</span><em>运行中</em></div>
-              <div><b>文档智能体-Gamma</b><span>人类说明书与 AI 维护手册 · v1.0.5</span><em>空闲中</em></div>
-              <div><b>审查智能体-Delta</b><span>安全、风险、代码审查 · v1.2.1</span><em>运行中</em></div>
-            </div>
-          </article>
-          <article class="panel"><div class="card-head"><h2>模型分配</h2></div><p class="muted">GPT 负责架构与调度，Claude 负责前端实现，Gemini 负责长文档审查。</p></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="tasks">
-        <article class="panel wide">
-          <div class="card-head"><h2>任务管理</h2><button class="primary-mini">拆解新任务</button></div>
-          <table class="data-table">
-            <thead><tr><th>任务</th><th>负责人</th><th>状态</th><th>风险</th><th>剩余时间</th></tr></thead>
-            <tbody>
-              <tr><td>实现用户意图识别优化</td><td>开发智能体-Alpha</td><td><span class="badge green">进行中</span></td><td>高优先级</td><td>25m</td></tr>
-              <tr><td>更新知识库索引结构</td><td>知识库智能体-Epsilon</td><td><span class="badge orange">排队中</span></td><td>中风险</td><td>1h 10m</td></tr>
-              <tr><td>接口性能测试与优化</td><td>测试智能体-Beta</td><td><span class="badge red">待确认</span></td><td>高风险</td><td>45m</td></tr>
-            </tbody>
-          </table>
-        </article>
-      </section>
-
-      <section class="page-view" id="workflow">
-        <article class="workflow-card">
-          <div class="card-head"><h2>工作流编排</h2><div class="tabs"><button class="active">流程视图</button><button>依赖视图</button></div></div>
-          <div class="flow">
-            <div class="agent-step purple"><b>需求分析</b><span>输入澄清与边界确认</span><i style="--p:100%"></i></div>
-            <div class="agent-step blue"><b>方案设计</b><span>模块拆解与接口设计</span><i style="--p:78%"></i></div>
-            <div class="agent-step green"><b>开发实现</b><span>代码生成与补丁产出</span><i style="--p:62%"></i></div>
-            <div class="agent-step orange"><b>测试验证</b><span>自动化测试与风险检查</span><i style="--p:45%"></i></div>
-            <div class="agent-step cyan"><b>部署归档</b><span>Git 保存点与文档同步</span><i style="--p:20%"></i></div>
-          </div>
-        </article>
-      </section>
-
-      <section class="page-view" id="knowledge">
-        <div class="subpage-grid">
-          <article class="panel"><div class="card-head"><h2>人类说明书</h2></div><p class="muted">面向用户解释项目定位、使用方式、工作流与安全确认。</p></article>
-          <article class="panel"><div class="card-head"><h2>AI 开发维护手册</h2></div><p class="muted">面向后续 AI 说明架构约束、代码规范、Runner 权限与文档更新规则。</p></article>
-          <article class="panel wide"><div class="card-head"><h2>最近更新</h2></div><ul class="knowledge-list"><li><span class="doc purple">文</span><b>产品需求文档</b><em>新增 3 个文档片段</em><strong>1 小时前</strong></li><li><span class="doc blue">技</span><b>技术方案文档</b><em>更新 12 个文档片段</em><strong>2 小时前</strong></li></ul></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="code">
-        <article class="panel wide">
-          <div class="card-head"><h2>代码与知识</h2><button class="primary-mini">同步代码索引</button></div>
-          <div class="code-box">src/services/user.service.ts<br>docs/系统设计文档.md<br>tests/integration/api.test.ts</div>
-        </article>
-      </section>
-
-      <section class="page-view" id="runtime">
-        <div class="subpage-grid">
-          <article class="metric-card blue"><span>⚙</span><p>运行队列</p><strong>12</strong><small>6 个正在执行</small></article>
-          <article class="metric-card green"><span>✓</span><p>调度成功率</p><strong>92.3%</strong><small>近 24 小时</small></article>
-          <article class="metric-card orange"><span>⏱</span><p>平均响应</p><strong>1.2s</strong><small>较昨日 -8%</small></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="approval">
-        <div class="approval-review">
-          <article class="approval-card">
-            <div class="card-head"><h2>Runner 待审批 <em id="approvalPageCount">0</em></h2><a href="#">查看审计日志</a></div>
-            <div class="approval-list selectable" id="approvalPageList"></div>
-          </article>
-
-          <article class="panel approval-detail">
-            <div class="card-head">
-              <h2>安全审查详情</h2>
-              <span class="badge red" id="approvalDetailRisk">高风险</span>
-            </div>
-            <div id="approvalDetail"></div>
-            <div class="approval-actions">
-              <button class="safe-action">查看差异</button>
-              <button class="safe-action">只生成补丁</button>
-              <button class="neutral-action">拒绝</button>
-              <button class="danger-action">二次确认后允许执行</button>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="page-view" id="monitor">
-        <div class="subpage-grid">
-          <article class="metric-card blue"><span>CPU</span><p>CPU 使用率</p><strong>62%</strong><small>16 核 / 32 线程</small></article>
-          <article class="metric-card green"><span>MEM</span><p>内存使用率</p><strong>58%</strong><small>18.6 GB / 32 GB</small></article>
-          <article class="metric-card orange"><span>NET</span><p>网络使用率</p><strong>35%</strong><small>350 Mbps</small></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="billing">
-        <div class="subpage-grid">
-          <article class="metric-card violet"><span>◉</span><p>Token 消耗</p><strong>1.23M</strong><small>≈ ￥245.60</small></article>
-          <article class="metric-card green"><span>￥</span><p>今日成本</p><strong>￥128.40</strong><small>较昨日 +8%</small></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="integrations">
-        <div class="subpage-grid">
-          <article class="panel"><div class="card-head"><h2>GitHub</h2></div><p class="muted">已连接，用于提交、检查点和 PR 记录。</p></article>
-          <article class="panel"><div class="card-head"><h2>本地 Runner</h2></div><p class="muted">已连接，写文件和执行命令需要用户确认。</p></article>
-        </div>
-      </section>
-
-      <section class="page-view" id="settings">
-        <article class="panel wide">
-          <div class="card-head"><h2>设置与密钥</h2></div>
-          <div class="key-card"><b>OpenAI API</b><span>已配置</span><p>密钥已加密保存，界面不显示任何尾号</p><div class="bar"><i style="--p:60%"></i></div><small>预算使用：60%</small></div>
-          <div class="key-card"><b>Anthropic API</b><span>已配置</span><p>密钥仅用于模型调用，日志自动脱敏</p><div class="bar"><i style="--p:40%"></i></div><small>预算使用：40%</small></div>
-        </article>
-      </section>
-
-      <script src="./data.js"></script>
-      <script src="./app.js"></script>
-    </main>
-  </div>
+  <main>
+    <h1>前端入口已迁移</h1>
+    <p>正式工程骨架已建立，电脑端 Web App 现在位于 <code>apps/web/</code>。</p>
+    <p><a href="../apps/web/index.html">打开新的前端入口</a></p>
+  </main>
 </body>
 </html>

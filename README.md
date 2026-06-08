@@ -80,3 +80,34 @@ git commit -m "说明这次改了什么"
 - [[docs/api-draft]]
 
 下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先修复前端中文编码、抽出 mock 数据模型，并重点打磨审批与确认页面。
+
+## 工程骨架
+
+当前已建立正式工程骨架：
+
+```text
+apps/
+  web/          电脑端 Web App，当前主要前端
+  desktop/      后续桌面应用封装
+services/
+  api/          后端 API 服务
+  runner/       本地 Runner
+  worker/       Agent 调度与异步任务
+packages/
+  shared/       共享状态码、类型、工具函数
+  ui/           通用 UI 组件
+  agent-core/   Agent 编排核心逻辑
+data/
+  mock/         mock 数据
+  migrations/   数据库迁移
+scripts/        项目脚本
+docs/           API、架构和决策文档
+```
+
+正式前端入口：
+
+```text
+apps/web/index.html
+```
+
+旧入口 `frontend/index.html` 只保留为兼容跳转页，后续不要在 `frontend/` 继续新增业务代码。
