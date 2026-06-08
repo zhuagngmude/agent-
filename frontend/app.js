@@ -103,6 +103,58 @@ function renderDashboard() {
   }
 }
 
+function renderApprovalPage(selectedIndex = 0) {
+  const approvals = appData.approvalRequests || [];
+  const list = document.querySelector("#approvalPageList");
+  const count = document.querySelector("#approvalPageCount");
+  const detail = document.querySelector("#approvalDetail");
+  const detailRisk = document.querySelector("#approvalDetailRisk");
+
+  if (!list || !detail || approvals.length === 0) return;
+
+  if (count) count.textContent = approvals.length;
+
+  list.innerHTML = approvals.map((item, index) => `
+    <div class="${index === selectedIndex ? "active" : ""}" data-approval-index="${index}">
+      <strong>${escapeHtml(item.file)}</strong>
+      <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)}</p>
+      <span class="risk ${escapeHtml(item.riskTone)}">${escapeHtml(item.risk)}</span>
+      <small>${escapeHtml(item.diff)}</small>
+    </div>
+  `).join("");
+
+  const item = approvals[selectedIndex] || approvals[0];
+  if (detailRisk) {
+    detailRisk.textContent = item.risk;
+    detailRisk.className = `badge ${item.riskTone === "high" ? "red" : item.riskTone === "mid" ? "orange" : "green"}`;
+  }
+
+  detail.innerHTML = `
+    <div class="approval-meta">
+      <div><span>申请 Agent</span><strong>${escapeHtml(item.agent)}</strong></div>
+      <div><span>当前状态</span><strong>${escapeHtml(item.status)}</strong></div>
+      <div><span>操作类型</span><strong>${escapeHtml(item.operationTypes.join(" / "))}</strong></div>
+      <div><span>Git checkpoint</span><strong>${escapeHtml(item.checkpoint)}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>修改原因</span><strong>${escapeHtml(item.reason)}</strong></div>
+      <div><span>执行后果</span><strong>会影响 ${escapeHtml(item.affectedFiles.length)} 个本地文件，执行前必须由用户确认。</strong></div>
+    </div>
+    <div class="approval-files">
+      <h3>影响文件</h3>
+      <ul>${item.affectedFiles.map((file) => `<li>${escapeHtml(file)}</li>`).join("")}</ul>
+    </div>
+    <div class="approval-diff">
+      <h3>差异预览</h3>
+      ${item.diffPreview.map((line) => `<code class="${line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : ""}">${escapeHtml(line)}</code>`).join("")}
+    </div>
+  `;
+
+  list.querySelectorAll("[data-approval-index]").forEach((row) => {
+    row.addEventListener("click", () => renderApprovalPage(Number(row.dataset.approvalIndex)));
+  });
+}
+
 document.querySelectorAll("[data-page]").forEach((button) => {
   button.addEventListener("click", () => {
     const page = button.dataset.page;
@@ -124,3 +176,4 @@ document.querySelectorAll("[data-page]").forEach((button) => {
 });
 
 renderDashboard();
+renderApprovalPage();

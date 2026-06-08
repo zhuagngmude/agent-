@@ -52,6 +52,16 @@ window.AGENT_SWARM_DATA = {
       risk: "高风险",
       riskTone: "high",
       diff: "+120 -36",
+      status: "等待用户确认",
+      reason: "新增 Runner 写入审批状态机，阻止本地执行绕过用户确认。",
+      checkpoint: "a5d3f2c",
+      operationTypes: ["写文件", "Git checkpoint", "更新审计日志"],
+      affectedFiles: ["runner/permissions.py", "server/audit_log.go", "docs/ai-maintenance.md"],
+      diffPreview: [
+        "- return runner.execute(command)",
+        "+ approval = require_user_approval(command, changed_files)",
+        "+ return runner.execute(command) if approval.allowed else PatchOnlyResult()",
+      ],
     },
     {
       file: "docs/ai-maintenance.md",
@@ -60,6 +70,15 @@ window.AGENT_SWARM_DATA = {
       risk: "中风险",
       riskTone: "mid",
       diff: "+56 -0",
+      status: "等待审查",
+      reason: "补充 Runner 审批规则，让后续 AI 接手时知道安全边界。",
+      checkpoint: "a5d3f2c",
+      operationTypes: ["更新文档"],
+      affectedFiles: ["docs/ai-maintenance.md"],
+      diffPreview: [
+        "+ 所有本地写文件、删文件、执行命令都必须经过 Approval Service。",
+        "+ 高风险操作必须二次确认。",
+      ],
     },
     {
       file: "tests/runner-approval.spec.ts",
@@ -68,6 +87,15 @@ window.AGENT_SWARM_DATA = {
       risk: "低风险",
       riskTone: "low",
       diff: "+210 -10",
+      status: "可生成补丁",
+      reason: "为 Runner 审批流程增加回归测试，避免后续绕开确认步骤。",
+      checkpoint: "a5d3f2c",
+      operationTypes: ["新增测试"],
+      affectedFiles: ["tests/runner-approval.spec.ts"],
+      diffPreview: [
+        "+ expect(request.status).toBe('pending')",
+        "+ expect(request.requiresSecondConfirm).toBe(true)",
+      ],
     },
   ],
   taskQueue: [

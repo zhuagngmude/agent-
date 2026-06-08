@@ -268,15 +268,26 @@
       </section>
 
       <section class="page-view" id="approval">
-        <article class="approval-card">
-          <div class="card-head"><h2>Runner 待审批 <em>3</em></h2><a href="#">查看全部</a></div>
-          <div class="approval-list">
-            <div><strong>src/services/user.service.ts</strong><p>修改类型：更新 · 申请人：开发智能体-Alpha</p><span class="risk high">高风险</span><small>+320 -120</small></div>
-            <div><strong>docs/系统设计文档.md</strong><p>修改类型：新增 · 申请人：文档智能体-Beta</p><span class="risk mid">中风险</span><small>+560 -0</small></div>
-            <div><strong>tests/integration/api.test.ts</strong><p>修改类型：新增 · 申请人：测试智能体-Gamma</p><span class="risk low">低风险</span><small>+210 -10</small></div>
-          </div>
-          <footer>共 3 项待审批 <button>批量审批</button></footer>
-        </article>
+        <div class="approval-review">
+          <article class="approval-card">
+            <div class="card-head"><h2>Runner 待审批 <em id="approvalPageCount">0</em></h2><a href="#">查看审计日志</a></div>
+            <div class="approval-list selectable" id="approvalPageList"></div>
+          </article>
+
+          <article class="panel approval-detail">
+            <div class="card-head">
+              <h2>安全审查详情</h2>
+              <span class="badge red" id="approvalDetailRisk">高风险</span>
+            </div>
+            <div id="approvalDetail"></div>
+            <div class="approval-actions">
+              <button class="safe-action">查看差异</button>
+              <button class="safe-action">只生成补丁</button>
+              <button class="neutral-action">拒绝</button>
+              <button class="danger-action">二次确认后允许执行</button>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section class="page-view" id="monitor">
