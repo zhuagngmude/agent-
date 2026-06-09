@@ -675,6 +675,7 @@ dev-docs/AI开发维护手册.md
 dev-docs/前端交互反推架构调整.md
 dev-docs/下一步开发路线.md
 docs/api-draft.md
+docs/data-model-draft.md
 ```
 
 原因：`frontend/index.html` 已经把产品从最初的多 Agent 任务调度原型，扩展成 12 个模块的 AI 项目控制台。后端架构需要按照前端交互重新确认模块边界，尤其是：
@@ -854,6 +855,13 @@ docs/api-draft.md
 - 为什么改：根目录只保留入口/宪法类文件，避免后续几十份计划、复盘和调研草案堆在根目录；同时保留 `docs/` 作为正式 API/Demo 文档目录，`_internal/` 作为不提交的本地内部资料目录。
 - 影响模块：`dev-docs/`、`README.md`、`AGENTS.md`、`apps/web/index.html`、`services/api/mock-data.js`、`docs/api-draft.md`。
 - 是否需要同步人类说明书：暂不需要；这是仓库文档结构整理，不改变产品功能。
+
+## 2026-06-09 变更记录：数据库模型草案
+
+- 改了什么：新增 `docs/data-model-draft.md`，定义真实数据库接入前的核心表、字段、关系、状态约束、迁移顺序和待确认问题。
+- 为什么改：数据库是后续真实后端的地基，先把项目、Agent、任务、审批、Runner job、Agent 配置应用、工作流、知识更新、Git checkpoint 和运行事件的模型固定下来，避免边写边改表。
+- 影响模块：`docs/data-model-draft.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只做数据库设计草案，不改变产品功能或运行逻辑。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 
