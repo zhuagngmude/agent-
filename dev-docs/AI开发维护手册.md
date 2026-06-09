@@ -892,6 +892,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`.gitignore`、`data/migrations/001_initial_sqlite.sql`、`data/seed/project_agent_swarm.seed.json`、`scripts/init-sqlite.ps1`、`scripts/seed-sqlite.ps1`、`scripts/README.md`、`docs/sqlite-seed-plan.md`、`docs/data-model-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前是本地数据库初始化能力，不改变用户可见产品流程。
 
+## 2026-06-09 变更记录：SQLite Dashboard 只读查询
+
+- 改了什么：新增 `services/api/db/sqlite-read.js`，可通过 `AGENT_SWARM_DASHBOARD_SOURCE=sqlite` 让 Dashboard 聚合接口从本地 SQLite 只读查询；默认仍使用 Mock 内存数据，SQLite 查询失败会回退 Mock Dashboard。
+- 为什么改：先验证数据库 row 到现有 Dashboard response shape 的映射，降低后续一次性切换所有 API 的风险。
+- 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前是开发期开关能力，不改变默认用户流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

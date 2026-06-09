@@ -42,3 +42,14 @@ http://127.0.0.1:8787
 ```text
 GET /api/health
 ```
+
+## SQLite Dashboard 读取
+
+当前默认仍从 Mock 内存数据读取 Dashboard。可通过环境变量只读试用 SQLite Dashboard：
+
+```powershell
+$env:AGENT_SWARM_DASHBOARD_SOURCE="sqlite"
+powershell -ExecutionPolicy Bypass -File scripts/start-mock-api.ps1
+```
+
+如果 `data/local/agent-swarm.sqlite` 不存在或查询失败，API 会回退到 Mock Dashboard。

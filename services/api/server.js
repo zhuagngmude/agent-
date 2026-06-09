@@ -3,9 +3,11 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const data = require("./mock-data");
+const { readDashboardFromSqlite } = require("./db/sqlite-read");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
+const dashboardSource = process.env.AGENT_SWARM_DASHBOARD_SOURCE || "mock";
 
 function sendJson(res, statusCode, body) {
   const payload = JSON.stringify(body, null, 2);
@@ -45,6 +47,19 @@ function readBody(req) {
 function withProject(pathname, suffix) {
   const prefix = `/api/projects/${data.projectId}`;
   return pathname === `${prefix}${suffix}`;
+}
+
+function dashboardResponse() {
+  if (dashboardSource !== "sqlite") {
+    return data.dashboard();
+  }
+
+  try {
+    return readDashboardFromSqlite(data.projectId);
+  } catch (error) {
+    console.warn(`[sqlite-dashboard] ${error.message}. Falling back to mock dashboard.`);
+    return data.dashboard();
+  }
 }
 
 function findApproval(id) {
@@ -608,7 +623,7 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/dashboard")) {
-    sendJson(res, 200, data.dashboard());
+    sendJson(res, 200, dashboardResponse());
     return;
   }
 
