@@ -906,6 +906,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
 
+## 2026-06-09 变更记录：SQLite 剩余只读接口
+
+- 改了什么：继续扩展 SQLite 快照读取，让 `GET /agent-config-applications`、`GET /runner/status`、`GET /runner/jobs`、`GET /git/checkpoints` 和 `GET /knowledge/updates` 在 `AGENT_SWARM_DASHBOARD_SOURCE=sqlite` 下读取 SQLite。
+- 为什么改：补齐 MVP-0.2 当前已实现的只读接口，确保后续迁移写入状态机前，读路径已经完整可验证。
+- 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

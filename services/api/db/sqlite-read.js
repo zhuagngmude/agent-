@@ -370,8 +370,11 @@ with sqlite3.connect(db_file) as connection:
         "tasks": tasks,
         "approvals": approvals,
         "workflows": workflows,
+        "runnerStatus": runner_status,
         "runnerJobs": runner_jobs,
         "agentConfigApplications": applications,
+        "gitCheckpoints": git_checkpoints,
+        "knowledgeUpdates": knowledge_updates,
     }
 
     print(json.dumps(snapshot, ensure_ascii=False))

@@ -651,7 +651,8 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/agent-config-applications")) {
-    sendJson(res, 200, { applications: data.agentConfigApplications });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { applications: snapshot?.agentConfigApplications || data.agentConfigApplications });
     return;
   }
 
@@ -726,7 +727,8 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/runner/status")) {
-    sendJson(res, 200, {
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, snapshot?.runnerStatus || {
       ...data.runnerStatus,
       lastHeartbeatAt: new Date().toISOString(),
     });
@@ -734,17 +736,20 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/runner/jobs")) {
-    sendJson(res, 200, { jobs: data.runnerJobs });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { jobs: snapshot?.runnerJobs || data.runnerJobs });
     return;
   }
 
   if (req.method === "GET" && withProject(pathname, "/git/checkpoints")) {
-    sendJson(res, 200, { checkpoints: data.gitCheckpoints });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { checkpoints: snapshot?.gitCheckpoints || data.gitCheckpoints });
     return;
   }
 
   if (req.method === "GET" && withProject(pathname, "/knowledge/updates")) {
-    sendJson(res, 200, { updates: data.knowledgeUpdates });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { updates: snapshot?.knowledgeUpdates || data.knowledgeUpdates });
     return;
   }
 

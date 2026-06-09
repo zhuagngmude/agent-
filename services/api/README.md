@@ -62,6 +62,11 @@ GET /api/projects/:projectId/agents
 GET /api/projects/:projectId/tasks
 GET /api/projects/:projectId/approvals
 GET /api/projects/:projectId/workflows
+GET /api/projects/:projectId/agent-config-applications
+GET /api/projects/:projectId/runner/status
+GET /api/projects/:projectId/runner/jobs
+GET /api/projects/:projectId/git/checkpoints
+GET /api/projects/:projectId/knowledge/updates
 ```
 
 任务、审批和 Agent 配置写操作仍使用 Mock runtime state。
