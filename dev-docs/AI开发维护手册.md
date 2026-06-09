@@ -871,6 +871,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`docs/runner-safety-acceptance.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只做安全验收标准，不实现 Runner 执行代码。
 
+## 2026-06-09 变更记录：数据库模型待确认问题定稿
+
+- 改了什么：更新 `docs/data-model-draft.md`，把数据库第一版决策定为本地 SQLite、单项目优先但保留 `project_id`、Agent 配置采用 `agents` 当前态加 `agent_config_versions`、状态流转写完整 `runtime_events`、工作流节点和连线暂保留 JSON。
+- 为什么改：真实数据库初始化和 seed 方案需要先固定边界，否则后续会在 SQLite/PostgreSQL、多项目、Agent 配置审计和工作流拆表之间反复摇摆。
+- 影响模块：`docs/data-model-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只定稿数据库设计决策，不改变产品功能或运行逻辑。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

@@ -44,6 +44,7 @@ status enum     TEXT + 应用层校验
 projects
   ├─ agents
   │   ├─ agent_relationships
+  │   ├─ agent_config_versions
   │   └─ agent_config_applications
   ├─ tasks
   ├─ approvals
@@ -117,6 +118,31 @@ projects
 
 - `child_agent_id` 应唯一，避免一个子 Agent 同时属于多个父 Agent。
 - 子 Agent 不允许自行扩权，权限变化必须走审批。
+
+### agent_config_versions
+
+用途：记录 Agent 配置真实写入后的版本历史。第一版真实应用配置时，必须在同一事务内更新 `agents` 当前态并写入版本记录。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | TEXT | 是 | 版本记录 ID |
+| project_id | TEXT | 是 | 关联 `projects.id` |
+| agent_id | TEXT | 是 | 关联 `agents.id` |
+| version | INTEGER | 是 | Agent 配置版本号，从 1 递增 |
+| approval_id | TEXT | 是 | 来源审批 |
+| application_id | TEXT | 是 | 来源应用记录 |
+| config_snapshot | JSON | 是 | 应用后的 Agent 配置快照 |
+| changes | JSON | 是 | 本次字段变更 before/after |
+| applied_by | TEXT | 是 | 触发应用的人 |
+| applied_at | TEXT | 是 | 应用时间 |
+| created_at | TEXT | 是 | 创建时间 |
+
+关键约束：
+
+- 只能由 `agent_config_applications.status = applied` 的记录生成。
+- `agent_id + version` 应唯一。
+- `config_snapshot` 不得包含 API Key、模型 Key 明文或本地敏感路径。
+- 回滚不得直接删除版本记录；必须重新创建审批和新的版本。
 
 ### tasks
 
@@ -338,11 +364,13 @@ projects
 
 建议顺序：
 
-1. 先建只读表：`projects`、`agents`、`tasks`、`approvals`、`workflows`。
-2. 把 `services/api/mock-data.js` 的初始数据导入数据库 seed。
-3. Dashboard 聚合接口改为从数据库读取，但保持 response 结构不变。
-4. 再迁移状态流转：任务 action、审批 action、Agent 配置应用/取消。
-5. 最后补 `runtime_events`，记录状态流转历史。
+1. 先建本地 SQLite 数据库和 seed 脚本，schema 保持 PostgreSQL 迁移友好。
+2. 先建只读表：`projects`、`agents`、`agent_relationships`、`tasks`、`approvals`、`workflows`。
+3. 把 `services/api/mock-data.js` 的初始数据导入数据库 seed。
+4. Dashboard 聚合接口改为从数据库读取，但保持 response 结构不变。
+5. 再迁移状态流转：任务 action、审批 action、Agent 配置应用/取消。
+6. 状态流转迁移时同步写入 `runtime_events`，不要把事件审计放到最后补。
+7. 最后再考虑 PostgreSQL / Supabase 迁移脚本，不在第一步接云端数据库。
 
 明确不做：
 
@@ -350,12 +378,12 @@ projects
 - 不在第一步接真实模型 API。
 - 不在第一步设计完整权限系统。
 
-## 7. 待确认问题
+## 7. 已定稿决策
 
-接数据库前需要确认：
+以下决策用于指导第一版数据库初始化和 seed 方案：
 
-1. 第一版使用 SQLite 还是 PostgreSQL。
-2. 是否需要多项目同时存在，还是先单项目。
-3. Agent 配置真实写入时，是更新 `agents` 当前态，还是增加 `agent_config_versions`。
-4. Runtime event 是否必须完整记录 before/after，还是只记录摘要。
-5. 工作流节点和连线是否继续 JSON 保存，还是拆成 `workflow_nodes` / `workflow_edges`。
+1. 第一版使用 SQLite，本地落地 Mock API 的持久化和 seed 流程；字段类型、ID、JSON 字段和索引命名保持 PostgreSQL 迁移友好，后续云端再迁移到 Supabase PostgreSQL。
+2. 第一版运行态先支持单项目 `project_agent_swarm`，但所有核心表继续保留 `project_id`，API 也继续使用 `:projectId`，避免以后补多项目时重改契约。
+3. Agent 配置真实写入时，必须同时更新 `agents` 当前态并新增 `agent_config_versions` 版本记录；`agents` 负责快速读取当前配置，`agent_config_versions` 负责审计、追溯和回滚前审查。
+4. `runtime_events` 对状态机实体必须记录完整 `before_state` / `after_state`，优先覆盖 `tasks`、`approvals`、`runner_jobs`、`agent_config_applications` 和真实 Agent 配置应用；大体积字段如完整 diff 可只保存摘要和产物 ID。
+5. 工作流第一版继续在 `workflows.nodes` / `workflows.edges` 中保存 JSON；暂不拆 `workflow_nodes` / `workflow_edges`。只有当需要节点级查询、权限、运行统计或编辑冲突检测时再拆表。
