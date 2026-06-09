@@ -17,6 +17,8 @@
 start-mock-api.ps1
 start-dev.ps1
 verify-mock-flows.ps1
+init-sqlite.ps1
+seed-sqlite.ps1
 ```
 
 启动 `services/api/server.js`。
@@ -24,6 +26,12 @@ verify-mock-flows.ps1
 `start-dev.ps1` 会启动 mock API 并打开 `apps/web/index.html`。
 
 `verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
+
+`init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
+
+`seed-sqlite.ps1` 会从 `data/seed/project_agent_swarm.seed.json` 重建第一版 SQLite 初始数据。
+
+SQLite 数据库文件位于 `data/local/`，该目录是本地运行态，不提交。
 
 本地 Demo 验收步骤见：
 

@@ -276,6 +276,8 @@ projects
 | name | TEXT | 是 | 工作流名称 |
 | status | TEXT | 是 | `active`、`draft`、`disabled` |
 | description | TEXT | 否 | 说明 |
+| steps | JSON | 否 | 当前前端流程步骤展示数据 |
+| stats | JSON | 否 | 当前前端流程统计展示数据 |
 | nodes | JSON | 否 | 当前 MVP 可先保留节点 JSON |
 | edges | JSON | 否 | 当前 MVP 可先保留连线 JSON |
 | updated_at | TEXT | 是 | 更新时间 |
@@ -312,6 +314,28 @@ projects
 | related_feature | TEXT | 否 | 关联功能 |
 | updated_at | TEXT | 是 | 更新时间 |
 | created_at | TEXT | 是 | 创建时间 |
+
+### runner_status
+
+用途：本地 Runner 连接状态只读展示。当前只展示安全边界，不执行本地能力。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | TEXT | 是 | Runner 状态记录 ID |
+| project_id | TEXT | 是 | 关联 `projects.id` |
+| connected | BOOLEAN | 是 | 是否连接 |
+| runner_id | TEXT | 是 | Runner ID |
+| version | TEXT | 是 | Runner 版本 |
+| workspace_path | TEXT | 否 | 本地工作区路径 |
+| permissions | JSON | 是 | 权限边界，例如写文件/执行命令是否需要审批 |
+| last_heartbeat_at | TEXT | 否 | 最后心跳时间 |
+| created_at | TEXT | 是 | 创建时间 |
+| updated_at | TEXT | 是 | 更新时间 |
+
+关键约束：
+
+- 该表只表示状态，不代表 Runner 可以执行。
+- `workspace_path` 只能用于本地展示，后续云端同步前必须脱敏或改为 alias。
 
 ### git_checkpoints
 

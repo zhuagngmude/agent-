@@ -885,6 +885,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`docs/sqlite-seed-plan.md`、`README.md`、`AGENTS.md`、`data/README.md`、`data/migrations/README.md`、`services/api/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只新增数据库实现前设计文档，不改变产品功能或运行逻辑。
 
+## 2026-06-09 变更记录：SQLite 初始化与 Seed 脚本
+
+- 改了什么：新增 `.gitignore` 本地数据库忽略规则、`data/migrations/001_initial_sqlite.sql`、`data/seed/project_agent_swarm.seed.json`、`scripts/init-sqlite.ps1` 和 `scripts/seed-sqlite.ps1`，可用 Python 标准库创建并重建第一版本地 SQLite 数据库；同步更新脚本 README、数据模型和开发路线。
+- 为什么改：让数据库接入从文档进入可验证的本地初始化阶段，同时仍不改变 Mock API 运行逻辑，避免一次性切换 API 带来状态机回归风险。
+- 影响模块：`.gitignore`、`data/migrations/001_initial_sqlite.sql`、`data/seed/project_agent_swarm.seed.json`、`scripts/init-sqlite.ps1`、`scripts/seed-sqlite.ps1`、`scripts/README.md`、`docs/sqlite-seed-plan.md`、`docs/data-model-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前是本地数据库初始化能力，不改变用户可见产品流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

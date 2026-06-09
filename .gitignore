@@ -30,3 +30,7 @@ logs/tmp/
 logs/
 data/mock/runtime-state.json
 data/mock/runtime-state.json.tmp
+data/local/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
