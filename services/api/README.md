@@ -69,10 +69,16 @@ GET /api/projects/:projectId/git/checkpoints
 GET /api/projects/:projectId/knowledge/updates
 ```
 
-任务、审批和 Agent 配置写操作仍使用 Mock runtime state。
+任务、审批和 Agent 配置申请/应用/取消写操作在 SQLite 模式下会写入 SQLite，并记录 `runtime_events`；默认 Mock 模式仍使用 `data/mock/runtime-state.json`。
 
 在 SQLite 模式下：
 
 - `POST /api/runtime-state/reset` 会重新执行 seed，重建 SQLite 状态。
 - `DELETE /api/runtime-state` 不删除 SQLite 文件，只重置 seed 状态。
 - 默认 Mock 模式仍使用 `data/mock/runtime-state.json`。
+
+SQLite 模式回归验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify-sqlite-flows.ps1
+```

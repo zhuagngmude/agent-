@@ -926,6 +926,12 @@ docs/runner-safety-acceptance.md
 - 为什么改：明确当前 HTML/CSS/JavaScript、Node mock API、PowerShell、Python SQLite bridge、Markdown 和 SQLite 适合 MVP 验证，但不等同于最终商业化最优栈，避免过早迁移框架或数据库。
 - 影响模块：`docs/tech-stack-notes.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是技术决策记录，不改变用户可见产品流程。
+## 2026-06-09 变更记录：SQLite Python 桥接层与回归验证
+
+- 改了什么：新增 `scripts/sqlite/init_sqlite.py`、`scripts/sqlite/seed_sqlite.py` 和 `scripts/sqlite/sqlite_write.py`，让 `init-sqlite.ps1`、`seed-sqlite.ps1` 和 `services/api/db/sqlite-write.js` 不再维护大段内联 Python；新增 `scripts/verify-sqlite-flows.ps1`，在独立端口验证 SQLite 模式 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset。
+- 为什么改：SQLite 已经从只读进入状态流转写入阶段，桥接层必须更可维护、可回归，避免后续改 schema 或状态机时同时修改 PowerShell、Node 内联字符串和 Python 逻辑。
+- 影响模块：`scripts/init-sqlite.ps1`、`scripts/seed-sqlite.ps1`、`scripts/sqlite/`、`scripts/verify-sqlite-flows.ps1`、`services/api/db/sqlite-write.js`、`scripts/README.md`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是开发验证和数据库桥接层整理，不改变用户可见产品流程。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 

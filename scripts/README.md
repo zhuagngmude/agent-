@@ -17,8 +17,10 @@
 start-mock-api.ps1
 start-dev.ps1
 verify-mock-flows.ps1
+verify-sqlite-flows.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
+sqlite/
 ```
 
 启动 `services/api/server.js`。
@@ -27,9 +29,13 @@ seed-sqlite.ps1
 
 `verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
 
+`verify-sqlite-flows.ps1` 会在独立端口启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。
+
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
 `seed-sqlite.ps1` 会从 `data/seed/project_agent_swarm.seed.json` 重建第一版 SQLite 初始数据。
+
+`sqlite/` 存放 SQLite Python 桥接脚本；PowerShell 和 Node.js 只负责传入路径、命令和参数。
 
 SQLite 数据库文件位于 `data/local/`，该目录是本地运行态，不提交。
 

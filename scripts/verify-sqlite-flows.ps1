@@ -1,0 +1,197 @@
+$ErrorActionPreference = "Stop"
+
+$root = Split-Path -Parent $PSScriptRoot
+$apiScript = Join-Path $root "services\api\server.js"
+$seedScript = Join-Path $PSScriptRoot "seed-sqlite.ps1"
+$port = 8788
+$baseUrl = "http://127.0.0.1:$port"
+$projectId = "project_agent_swarm"
+
+function Write-Step {
+  param([string]$Message)
+  Write-Host "[sqlite-flow] $Message"
+}
+
+function Invoke-Json {
+  param(
+    [Parameter(Mandatory = $true)][string]$Method,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [object]$Body = $null
+  )
+
+  $uri = "$baseUrl$Path"
+  if ($null -eq $Body) {
+    return Invoke-RestMethod -Method $Method -Uri $uri
+  }
+
+  return Invoke-RestMethod `
+    -Method $Method `
+    -Uri $uri `
+    -ContentType "application/json" `
+    -Body ($Body | ConvertTo-Json -Depth 10)
+}
+
+function Assert-Equal {
+  param(
+    [object]$Actual,
+    [object]$Expected,
+    [string]$Message
+  )
+
+  if ($Actual -ne $Expected) {
+    throw "$Message Expected '$Expected', got '$Actual'."
+  }
+}
+
+function Assert-True {
+  param(
+    [bool]$Condition,
+    [string]$Message
+  )
+
+  if (-not $Condition) {
+    throw $Message
+  }
+}
+
+function Test-ApiReady {
+  try {
+    $health = Invoke-Json -Method "GET" -Path "/api/health"
+    return $health.ok -eq $true
+  } catch {
+    return $false
+  }
+}
+
+Write-Step "Rebuild SQLite database from seed."
+powershell -ExecutionPolicy Bypass -File $seedScript | Out-Null
+
+$outLog = Join-Path $root "logs\sqlite-api.out.log"
+$errLog = Join-Path $root "logs\sqlite-api.err.log"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outLog) | Out-Null
+
+Write-Step "Start API in SQLite mode on port $port."
+$previousPort = $env:AGENT_SWARM_API_PORT
+$previousSource = $env:AGENT_SWARM_DASHBOARD_SOURCE
+$env:AGENT_SWARM_API_PORT = "$port"
+$env:AGENT_SWARM_DASHBOARD_SOURCE = "sqlite"
+$process = Start-Process `
+  -WindowStyle Hidden `
+  -FilePath "node" `
+  -ArgumentList @($apiScript) `
+  -RedirectStandardOutput $outLog `
+  -RedirectStandardError $errLog `
+  -PassThru
+
+try {
+  $ready = $false
+  for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Milliseconds 250
+    if (Test-ApiReady) {
+      $ready = $true
+      break
+    }
+  }
+
+  if (-not $ready) {
+    throw "SQLite API did not start. Check logs/sqlite-api.out.log and logs/sqlite-api.err.log"
+  }
+
+  Write-Step "Reset SQLite runtime state."
+  $reset = Invoke-Json -Method "POST" -Path "/api/runtime-state/reset"
+  Assert-Equal $reset.mode "sqlite" "Runtime reset should run in SQLite mode."
+
+  Write-Step "Verify dashboard and SQLite runtime state."
+  $dashboard = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/dashboard"
+  Assert-Equal $dashboard.project.id $projectId "Dashboard project id mismatch."
+  Assert-True ($null -ne $dashboard.runnerStatus) "Dashboard should include runnerStatus."
+  $runtimeState = Invoke-Json -Method "GET" -Path "/api/runtime-state"
+  Assert-Equal $runtimeState.mode "sqlite" "Runtime state endpoint should report SQLite mode."
+  Assert-True ($runtimeState.sqliteRuntimeState -eq $true) "Runtime state should be SQLite-backed."
+
+  Write-Step "Verify task start -> complete persists in SQLite."
+  $taskStart = Invoke-Json -Method "POST" -Path "/api/tasks/task_task_state_api/start"
+  Assert-Equal $taskStart.task.status "running" "Task should be running after start."
+  $taskComplete = Invoke-Json -Method "POST" -Path "/api/tasks/task_task_state_api/complete"
+  Assert-Equal $taskComplete.task.status "completed" "Task should be completed after complete."
+  $tasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $completedTask = @($tasks.tasks | Where-Object { $_.id -eq "task_task_state_api" })[0]
+  Assert-Equal $completedTask.status "completed" "Task status should be read back from SQLite."
+
+  Write-Step "Verify Runner approval creates read-only SQLite job."
+  $approval = Invoke-Json -Method "POST" -Path "/api/approvals/approval_docs_safety/approve"
+  Assert-Equal $approval.status "approved" "Runner approval should be approved."
+  Assert-True ($approval.runnerJobId -like "runner_job_*") "Runner approval should create a runner job id."
+  $jobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
+  Assert-True ($matchingJobs.Count -eq 1) "Runner job should be read back from SQLite."
+
+  Write-Step "Verify Agent config apply persists in SQLite."
+  $applyRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -Body @{
+    changeType = "permission"
+    riskLevel = "high"
+    reason = "Verify sqlite agent config apply flow."
+    changes = @(
+      @{
+        field = "permissions"
+        before = "read_project / review_risk / review_diff"
+        after = "read_project / review_risk / review_diff / request_code_execution"
+      }
+    )
+  }
+  Assert-Equal $applyRequest.approval.status "pending" "Agent config approval should start pending."
+  $applyApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($applyRequest.approval.id)/approve" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify sqlite agent config approval."
+  }
+  Assert-Equal $applyApproval.status "approved" "Agent config approval should be approved."
+  Assert-True ($applyApproval.agentConfigApplicationId -like "agent_config_application_*") "Approval should create an application id."
+  $applied = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/apply" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify sqlite apply status transition."
+    appliedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $applied.application.status "applied" "Agent config application should be applied."
+
+  Write-Step "Verify Agent config cancel persists in SQLite."
+  $cancelRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_docs/change-requests" -Body @{
+    changeType = "model"
+    riskLevel = "medium"
+    reason = "Verify sqlite agent config cancel flow."
+    changes = @(
+      @{
+        field = "model"
+        before = "gpt-docs"
+        after = "gpt-docs-next"
+      }
+    )
+  }
+  $cancelApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($cancelRequest.approval.id)/approve"
+  Assert-Equal $cancelApproval.status "approved" "Cancelable Agent config approval should be approved."
+  $cancelled = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($cancelApproval.agentConfigApplicationId)/cancel" -Body @{
+    reason = "Verify sqlite cancel status transition."
+    cancelledBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $cancelled.application.status "cancelled" "Agent config application should be cancelled."
+
+  Write-Step "Verify reset restores seeded SQLite state."
+  Invoke-Json -Method "POST" -Path "/api/runtime-state/reset" | Out-Null
+  $resetTasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $resetTask = @($resetTasks.tasks | Where-Object { $_.id -eq "task_task_state_api" })[0]
+  Assert-Equal $resetTask.status "queued" "Reset should restore seeded task status."
+
+  Write-Step "All SQLite flow checks passed."
+} finally {
+  Write-Step "Stop SQLite API and restore environment."
+  if ($process -and -not $process.HasExited) {
+    Stop-Process -Id $process.Id -Force
+    $process.WaitForExit()
+  }
+  $env:AGENT_SWARM_API_PORT = $previousPort
+  $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
+  try {
+    powershell -ExecutionPolicy Bypass -File $seedScript | Out-Null
+  } catch {
+    Write-Warning "Failed to reseed SQLite after verification: $($_.Exception.Message)"
+  }
+}

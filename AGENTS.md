@@ -71,6 +71,7 @@ node --check apps\web\app.js
 node --check services\api\server.js
 node --check services\api\mock-data.js
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 git status --short
 ```
 
