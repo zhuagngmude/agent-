@@ -20,6 +20,7 @@ dev-docs/下一步开发路线.md
 dev-docs/AI开发维护手册.md
 docs/api-draft.md
 docs/data-model-draft.md
+docs/runner-safety-acceptance.md
 ```
 
 For local demo and regression checks, also read:
@@ -55,6 +56,7 @@ scripts/README.md
   - `dev-docs/AI开发维护手册.md` for AI-facing maintenance notes.
   - `docs/api-draft.md` for API/state shape changes.
   - `docs/data-model-draft.md` for database model changes.
+  - `docs/runner-safety-acceptance.md` for Runner execution safety changes.
 - Put public development plans, research notes, retrospectives, and decision drafts in `dev-docs/`, not in the project root.
 - Commit after completing a verifiable feature, bug fix, or important docs update.
 - Do not commit every tiny edit; commit meaningful checkpoints.

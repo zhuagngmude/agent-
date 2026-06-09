@@ -676,6 +676,7 @@ dev-docs/前端交互反推架构调整.md
 dev-docs/下一步开发路线.md
 docs/api-draft.md
 docs/data-model-draft.md
+docs/runner-safety-acceptance.md
 ```
 
 原因：`frontend/index.html` 已经把产品从最初的多 Agent 任务调度原型，扩展成 12 个模块的 AI 项目控制台。后端架构需要按照前端交互重新确认模块边界，尤其是：
@@ -862,6 +863,13 @@ docs/data-model-draft.md
 - 为什么改：数据库是后续真实后端的地基，先把项目、Agent、任务、审批、Runner job、Agent 配置应用、工作流、知识更新、Git checkpoint 和运行事件的模型固定下来，避免边写边改表。
 - 影响模块：`docs/data-model-draft.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只做数据库设计草案，不改变产品功能或运行逻辑。
+
+## 2026-06-09 变更记录：Runner 安全验收标准
+
+- 改了什么：新增 `docs/runner-safety-acceptance.md`，定义真实 Runner 执行前必须满足的审批、二次确认、Git checkpoint、文件范围锁定、命令白名单、执行审计、失败处理和回滚前置条件。
+- 为什么改：Runner 一旦能真实写文件或执行命令，风险显著高于 Mock 阶段；必须先把放行条件写成可验收标准，避免凭感觉开放本地执行能力。
+- 影响模块：`docs/runner-safety-acceptance.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只做安全验收标准，不实现 Runner 执行代码。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 
