@@ -15,9 +15,9 @@ This file is the short AI/IDE handoff rule sheet for `agent-swarm`.
 Before changing code in a fresh session, read:
 
 ```text
-新窗口交接说明.md
-下一步开发路线.md
-AI开发维护手册.md
+dev-docs/新窗口交接说明.md
+dev-docs/下一步开发路线.md
+dev-docs/AI开发维护手册.md
 docs/api-draft.md
 ```
 
@@ -34,6 +34,7 @@ scripts/README.md
 - Do not commit `data/mock/runtime-state.json` or `data/mock/runtime-state.json.tmp`.
 - Do not read, modify, or commit `_internal/` unless the user explicitly asks.
 - Do not commit logs, secrets, API keys, local credentials, generated builds, or dependency folders.
+- Do not add planning, research, retrospective, or handoff documents to the project root; put them in `dev-docs/`.
 
 ## Runner Safety
 
@@ -49,9 +50,10 @@ scripts/README.md
 - Use `apply_patch` for manual file edits.
 - Keep edits scoped to the requested feature or bug.
 - Update docs when behavior changes:
-  - `下一步开发路线.md` for roadmap/status.
-  - `AI开发维护手册.md` for AI-facing maintenance notes.
+  - `dev-docs/下一步开发路线.md` for roadmap/status.
+  - `dev-docs/AI开发维护手册.md` for AI-facing maintenance notes.
   - `docs/api-draft.md` for API/state shape changes.
+- Put public development plans, research notes, retrospectives, and decision drafts in `dev-docs/`, not in the project root.
 - Commit after completing a verifiable feature, bug fix, or important docs update.
 - Do not commit every tiny edit; commit meaningful checkpoints.
 

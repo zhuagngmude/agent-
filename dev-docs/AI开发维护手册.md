@@ -9,7 +9,7 @@
 继续开发、修 bug、升级功能前，必须先理解：
 
 - 本文件是给 AI 开发工具看的技术规格。
-- [[人类说明书]] 是给用户和产品讨论看的说明。
+- `dev-docs/人类说明书.md` 是给用户和产品讨论看的说明。
 - 修改功能后必须同步更新对应文档。
 
 ## 2. 产品目标
@@ -563,7 +563,7 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 更新：
 
 ```text
-[[人类说明书]]
+dev-docs/人类说明书.md
 ```
 
 插入位置：
@@ -578,7 +578,7 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 更新：
 
 ```text
-[[AI开发维护手册]]
+dev-docs/AI开发维护手册.md
 ```
 
 插入位置：
@@ -672,8 +672,8 @@ Linear / Notion / Raycast / GitHub / Vercel / Cursor / Feishu / IDE
 后续 AI 接手开发前，除了阅读本文档，还必须阅读：
 
 ```text
-前端交互反推架构调整.md
-下一步开发路线.md
+dev-docs/前端交互反推架构调整.md
+dev-docs/下一步开发路线.md
 docs/api-draft.md
 ```
 
@@ -847,6 +847,13 @@ docs/api-draft.md
 - 为什么改：让 Codex、Cursor、Windsurf、Copilot 等 AI/IDE 工具接手时能先读一页高优先级规则，减少漏读长文档导致的误提交或越权执行。
 - 影响模块：`AGENTS.md`、`README.md`、`下一步开发路线.md`、`AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是开发协作规则入口，不改变产品功能。
+
+## 2026-06-09 变更记录：开发过程资料目录整理
+
+- 改了什么：新增 `dev-docs/`，把人类说明书、AI 维护手册、开发路线、新窗口交接说明、前端交互反推和 UI 验收建议从根目录迁入；README、AGENTS、Mock 数据和 API 示例同步新路径。
+- 为什么改：根目录只保留入口/宪法类文件，避免后续几十份计划、复盘和调研草案堆在根目录；同时保留 `docs/` 作为正式 API/Demo 文档目录，`_internal/` 作为不提交的本地内部资料目录。
+- 影响模块：`dev-docs/`、`README.md`、`AGENTS.md`、`apps/web/index.html`、`services/api/mock-data.js`、`docs/api-draft.md`。
+- 是否需要同步人类说明书：暂不需要；这是仓库文档结构整理，不改变产品功能。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 

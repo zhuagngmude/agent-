@@ -716,7 +716,7 @@ operationType
   "updates": [
     {
       "id": "knowledge_update_001",
-      "document": "下一步开发路线.md",
+      "document": "dev-docs/下一步开发路线.md",
       "section": "核心状态机",
       "status": "synced",
       "relatedFeature": "ApprovalStatus",
