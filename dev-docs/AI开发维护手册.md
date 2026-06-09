@@ -920,6 +920,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/db/sqlite-write.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
 
+## 2026-06-09 变更记录：技术栈适配性记录
+
+- 改了什么：新增 `docs/tech-stack-notes.md`，记录当前实际技术栈、SQLite 本地持久化路径、未来生产栈方向，以及暂时不迁移的边界；README、AGENTS 和开发路线同步入口。
+- 为什么改：明确当前 HTML/CSS/JavaScript、Node mock API、PowerShell、Python SQLite bridge、Markdown 和 SQLite 适合 MVP 验证，但不等同于最终商业化最优栈，避免过早迁移框架或数据库。
+- 影响模块：`docs/tech-stack-notes.md`、`README.md`、`AGENTS.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是技术决策记录，不改变用户可见产品流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

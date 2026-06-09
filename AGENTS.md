@@ -21,6 +21,7 @@ dev-docs/AI开发维护手册.md
 docs/api-draft.md
 docs/data-model-draft.md
 docs/sqlite-seed-plan.md
+docs/tech-stack-notes.md
 docs/runner-safety-acceptance.md
 ```
 
@@ -57,6 +58,7 @@ scripts/README.md
   - `dev-docs/AI开发维护手册.md` for AI-facing maintenance notes.
   - `docs/api-draft.md` for API/state shape changes.
   - `docs/data-model-draft.md` for database model changes.
+  - `docs/tech-stack-notes.md` for technology-stack decisions.
   - `docs/runner-safety-acceptance.md` for Runner execution safety changes.
 - Put public development plans, research notes, retrospectives, and decision drafts in `dev-docs/`, not in the project root.
 - Commit after completing a verifiable feature, bug fix, or important docs update.
