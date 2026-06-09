@@ -38,7 +38,7 @@
 
       <div class="quick-project">
         <p>项目快速切换</p>
-        <button>agent蜂群 MVP <span>⌄</span></button>
+        <button type="button" disabled title="本地试用版暂不支持多项目切换">agent蜂群 MVP <span>⌄</span></button>
       </div>
 
       <div class="user-card">
@@ -58,8 +58,8 @@
           <span>🌐 简体中文</span>
           <span>☼</span>
           <span class="bell">🔔<em>8</em></span>
-          <span class="admin-dot">项目负责人 ⌄</span>
-          <button class="settings">⚙ 项目设置</button>
+          <span class="admin-dot">项目负责人</span>
+          <button class="settings" type="button" data-page-link="settings">⚙ 项目设置</button>
         </div>
       </header>
 
@@ -91,7 +91,7 @@
         <article class="workflow-card">
           <div class="card-head">
             <h2>蜂群协作工作流总览</h2>
-            <div class="tabs"><button class="active">流程视图</button><button>拓扑视图</button><button>···</button></div>
+            <div class="tabs"><button class="active" type="button" disabled>流程视图</button><button type="button" disabled title="拓扑视图未接入">拓扑视图</button><button type="button" disabled title="更多视图未接入">···</button></div>
           </div>
           <div class="flow" id="workflowSteps">
             <div class="agent-step purple"><b>需求分析智能体</b><span>2 个实例运行中</span><i style="--p:100%"></i></div>
@@ -116,7 +116,7 @@
         <article class="approval-card">
           <div class="card-head">
             <h2>Runner 待审批 <em>3</em></h2>
-            <a href="#">查看全部</a>
+            <button class="text-link" type="button" data-page-link="approval">查看全部</button>
           </div>
           <div class="approval-list" id="approvalList">
             <div>
@@ -124,7 +124,7 @@
               <p>连接本地 API 后会显示审批申请。</p>
             </div>
           </div>
-          <footer><span id="approvalSummary">等待审批数据</span> <button>进入审批页</button></footer>
+          <footer><span id="approvalSummary">等待审批数据</span> <button type="button" data-page-link="approval">进入审批页</button></footer>
         </article>
       </section>
 
@@ -135,30 +135,30 @@
           <ul class="task-list" id="taskQueue">
             <li><span class="icon purple">T</span><b>正在读取任务队列</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
-          <a class="panel-link" href="#">查看全部任务 →</a>
+          <button class="panel-link" type="button" data-page-link="tasks">查看全部任务 →</button>
         </article>
 
         <article class="panel">
-          <div class="card-head"><h2>智能体状态</h2><a href="#">查看全部</a></div>
+          <div class="card-head"><h2>智能体状态</h2><button class="text-link" type="button" data-page-link="agents">查看全部</button></div>
           <ul class="agent-list" id="agentStatusList">
             <li><span class="avatar small">A</span><b>正在读取智能体状态</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
         </article>
 
         <article class="panel">
-          <div class="card-head"><h2>Git 检查点</h2><a href="#">查看全部</a></div>
+          <div class="card-head"><h2>Git 检查点</h2><button class="text-link" type="button" disabled title="Git 保存点详情页未接入">查看全部</button></div>
           <ul class="checkpoint-list" id="gitCheckpointList">
             <li><b>Git</b><span>正在读取项目保存点</span><em>等待数据</em></li>
           </ul>
-          <a class="panel-link" href="#">查看全部保存点 →</a>
+          <button class="panel-link" type="button" disabled title="Git 保存点详情页未接入">查看全部保存点 →</button>
         </article>
 
         <article class="panel">
-          <div class="card-head"><h2>知识库更新</h2><a href="#">查看全部</a></div>
+          <div class="card-head"><h2>知识库更新</h2><button class="text-link" type="button" data-page-link="knowledge">查看全部</button></div>
           <ul class="knowledge-list" id="knowledgeUpdateList">
             <li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
-          <a class="panel-link" href="#">查看全部更新 →</a>
+          <button class="panel-link" type="button" data-page-link="knowledge">查看全部更新 →</button>
         </article>
 
         <article class="panel">
@@ -171,7 +171,7 @@
               <small>等待本地 API 设置数据</small>
             </div>
           </div>
-          <a class="panel-link" href="#">查看全部设置 →</a>
+          <button class="panel-link" type="button" data-page-link="settings">查看全部设置 →</button>
         </article>
       </section>
 
@@ -225,7 +225,7 @@
       <section class="page-view" id="tasks">
         <div class="task-workspace">
           <article class="panel">
-            <div class="card-head"><h2>任务队列 <em id="taskPageCount">0</em></h2><button class="primary-mini">拆解新任务</button></div>
+            <div class="card-head"><h2>任务队列 <em id="taskPageCount">0</em></h2><button class="primary-mini" type="button" disabled title="任务创建 API 未接入">拆解新任务</button></div>
             <div class="task-table-wrap">
               <table class="data-table selectable" id="taskPageTable">
                 <thead><tr><th>任务</th><th>负责人</th><th>状态</th><th>风险</th></tr></thead>
@@ -253,7 +253,7 @@
 
       <section class="page-view" id="workflow">
         <article class="workflow-card">
-          <div class="card-head"><h2>工作流编排</h2><div class="tabs"><button class="active">流程视图</button><button>依赖视图</button></div></div>
+          <div class="card-head"><h2>工作流编排</h2><div class="tabs"><button class="active" type="button" disabled>流程视图</button><button type="button" disabled title="依赖视图未接入">依赖视图</button></div></div>
           <div id="workflowPage"></div>
         </article>
       </section>
@@ -268,7 +268,7 @@
 
       <section class="page-view" id="code">
         <article class="panel wide">
-          <div class="card-head"><h2>代码与知识</h2><button class="primary-mini">代码索引未接入</button></div>
+          <div class="card-head"><h2>代码与知识</h2><button class="primary-mini" type="button" disabled>代码索引未接入</button></div>
           <div class="code-box">apps/web/index.html<br>services/api/server.js<br>docs/api-draft.md<br>dev-docs/AI开发维护手册.md</div>
         </article>
       </section>
@@ -307,7 +307,7 @@
       <section class="page-view" id="approval">
         <div class="approval-review">
           <article class="approval-card">
-            <div class="card-head"><h2>Runner 待审批 <em id="approvalPageCount">0</em></h2><a href="#">查看审计日志</a></div>
+            <div class="card-head"><h2>Runner 待审批 <em id="approvalPageCount">0</em></h2><button class="text-link" type="button" disabled title="审计日志详情页未接入">查看审计日志</button></div>
             <div class="approval-list selectable" id="approvalPageList"></div>
           </article>
 

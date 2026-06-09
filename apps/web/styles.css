@@ -97,6 +97,11 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   padding: 0 14px;
 }
+.quick-project button:disabled {
+  color: #c7d1ed;
+  cursor: not-allowed;
+  opacity: .72;
+}
 .user-card { display: flex; align-items: center; gap: 12px; padding-top: 20px; }
 .avatar {
   width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
@@ -214,13 +219,24 @@ a { color: inherit; text-decoration: none; }
 .workflow-card, .approval-card, .panel { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .card-head h2 { margin: 0; font-size: 19px; }
-.card-head a { color: var(--purple); font-weight: 800; }
+.card-head a, .text-link { color: var(--purple); font-weight: 800; }
+.text-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.text-link:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
 .card-head em { min-width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--red); color: #fff; font-size: 12px; font-style: normal; }
 .tabs { display: flex; gap: 8px; }
 .tabs button {
   height: 34px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--muted); font-weight: 800; padding: 0 12px;
 }
 .tabs .active { border-color: var(--purple); color: var(--purple); background: #f3f1ff; }
+.tabs button:disabled { cursor: not-allowed; opacity: .72; }
 
 .flow { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); align-items: center; gap: 8px; margin: 28px 0 30px; }
 .agent-step { min-height: 150px; border: 1px solid var(--line); border-radius: 12px; padding: 18px; position: relative; }
@@ -386,7 +402,22 @@ a { color: inherit; text-decoration: none; }
 li b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 li em { color: var(--muted); font-style: normal; font-size: 12px; }
 li strong { color: var(--green); font-size: 13px; }
-.panel-link { display: block; margin-top: 18px; color: var(--purple); font-weight: 800; text-align: right; }
+.panel-link {
+  display: block;
+  margin-top: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--purple);
+  font-weight: 800;
+  text-align: right;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.panel-link:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
 .checkpoint-list li { grid-template-columns: 72px minmax(0, 1fr) auto; }
 .knowledge-list li { grid-template-columns: auto minmax(0, 1fr) auto; }
 
@@ -412,6 +443,11 @@ li strong { color: var(--green); font-size: 13px; }
   color: #fff;
   font-weight: 800;
   padding: 0 14px;
+}
+.primary-mini:disabled {
+  background: #eef0f6;
+  color: var(--muted);
+  cursor: not-allowed;
 }
 .agent-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .agent-board div {
