@@ -973,6 +973,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`新窗口交接说明.md`、`services/api/server.js`、`docs/api-draft.md`、`design/index.html`。
 - 是否需要同步人类说明书：暂不需要；这是本地开发路径迁移，不改变产品功能。
 
+## 2026-06-10 变更记录：Model Gateway 只读状态骨架
+
+- 改了什么：新增 `GET /api/model-gateway/status`，返回 Model Gateway 是否启用、真实模型调用是否允许、OpenAI / Anthropic / Google Gemini 服务端环境变量是否存在，以及当前安全边界；设置页和集成页动态展示该状态。
+- 为什么改：把“以后接大模型”先落成一个统一、可验收、默认禁用的服务边界，避免未来前端、Agent 或 Runner 直接接触 provider SDK 和 API Key。
+- 影响模块：`services/api/server.js`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只显示禁用状态，不调用真实模型、不保存或暴露 API Key、不写数据库、不创建任务/审批/Runner job。
+
 ## 2026-06-08 变更记录：清理前端旧占位数据
 
 - 改了什么：清理 `apps/web/index.html` 中的旧静态占位数据、通用示例文件、假 API Key 展示和不属于 agent蜂群 的示例文案。

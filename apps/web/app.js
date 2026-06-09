@@ -530,6 +530,15 @@ async function requestRuntimeState(method, path = "/api/runtime-state") {
   return result;
 }
 
+async function requestModelGatewayStatus() {
+  const response = await fetch(`${apiBase}/api/model-gateway/status`);
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 function localTrialModeLabel(mode) {
   if (mode === "sqlite") return "SQLite 本地持久化";
   if (mode === "mock") return "Mock 运行态";
@@ -1364,6 +1373,88 @@ async function renderLocalTrialStatus() {
   }
 }
 
+function ensureModelGatewayContainers() {
+  const integrationsGrid = document.querySelector("#integrations .subpage-grid");
+  if (integrationsGrid && !document.querySelector("#modelGatewayIntegrationStatus")) {
+    integrationsGrid.insertAdjacentHTML("beforeend", `
+      <article class="panel wide">
+        <div class="card-head">
+          <h2>Model Gateway</h2>
+          <span class="badge orange" id="modelGatewayIntegrationBadge">disabled</span>
+        </div>
+        <div class="model-gateway-status" id="modelGatewayIntegrationStatus">
+          <p class="muted">Reading model gateway status...</p>
+        </div>
+      </article>
+    `);
+  }
+
+  const settingsPanel = document.querySelector("#settings .panel.wide");
+  if (settingsPanel && !document.querySelector("#modelGatewaySettingsStatus")) {
+    settingsPanel.insertAdjacentHTML("beforeend", `
+      <div class="model-gateway-status" id="modelGatewaySettingsStatus">
+        <p class="muted">Reading model gateway status...</p>
+      </div>
+    `);
+  }
+}
+
+function renderModelGatewayStatusCard(status) {
+  const providers = status.providers || [];
+  const blockedReasons = status.blockedReasons || [];
+  const safety = status.safety || {};
+
+  return `
+    <div class="model-gateway-summary">
+      <div><span>Gateway</span><strong>${escapeHtml(status.gatewayMode || "disabled")}</strong></div>
+      <div><span>Real calls</span><strong>${status.realModelCallsAllowed ? "allowed" : "disabled"}</strong></div>
+      <div><span>Boundary</span><strong>${escapeHtml(status.serviceBoundary || "server_only")}</strong></div>
+    </div>
+    <div class="model-provider-list">
+      ${providers.map((provider) => `
+        <div>
+          <strong>${escapeHtml(provider.label || provider.id)}</strong>
+          <span class="badge ${provider.configured ? "green" : "gray"}">${provider.configured ? "env present" : "env missing"}</span>
+          <small>${escapeHtml(provider.keyEnvVar || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+    <p class="runner-safety-note">API keys stay server-side. This status endpoint does not store keys, expose keys to the frontend, create tasks, create approvals, create Runner jobs, write the database, or make provider network requests.</p>
+    <ul class="model-gateway-reasons">
+      ${blockedReasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}
+      ${safety.makesNetworkRequests === false ? "<li>Provider network requests are disabled.</li>" : ""}
+    </ul>
+  `;
+}
+
+async function renderModelGatewayStatus() {
+  ensureModelGatewayContainers();
+  const containers = [
+    document.querySelector("#modelGatewayIntegrationStatus"),
+    document.querySelector("#modelGatewaySettingsStatus"),
+  ].filter(Boolean);
+  const badge = document.querySelector("#modelGatewayIntegrationBadge");
+  if (containers.length === 0) return;
+
+  try {
+    const status = await requestModelGatewayStatus();
+    const html = renderModelGatewayStatusCard(status);
+    containers.forEach((container) => { container.innerHTML = html; });
+    if (badge) {
+      badge.textContent = status.realModelCallsAllowed ? "enabled" : "disabled";
+      badge.className = `badge ${status.realModelCallsAllowed ? "green" : "orange"}`;
+    }
+  } catch (error) {
+    containers.forEach((container) => {
+      container.innerHTML = `<p class="approval-feedback error">Model Gateway status unavailable: ${escapeHtml(error.message)}</p>`;
+    });
+    if (badge) {
+      badge.textContent = "offline";
+      badge.className = "badge red";
+    }
+  }
+}
+
 async function runApprovalAction(action) {
   const item = pendingApprovalRequests()[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
@@ -1581,6 +1672,7 @@ async function boot() {
   renderApprovalPage();
   renderTaskPage();
   renderLocalTrialStatus();
+  renderModelGatewayStatus();
 }
 
 boot();

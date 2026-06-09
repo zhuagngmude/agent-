@@ -11,6 +11,11 @@ const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "ru
 const dashboardSource = process.env.AGENT_SWARM_DASHBOARD_SOURCE || "mock";
 const projectRoot = path.resolve(__dirname, "..", "..");
 const sqliteDbFile = process.env.AGENT_SWARM_SQLITE_DB || defaultDbFile;
+const modelGatewayProviders = [
+  { id: "openai", label: "OpenAI", envVar: "AGENT_SWARM_OPENAI_API_KEY" },
+  { id: "anthropic", label: "Anthropic", envVar: "AGENT_SWARM_ANTHROPIC_API_KEY" },
+  { id: "google", label: "Google Gemini", envVar: "AGENT_SWARM_GOOGLE_API_KEY" },
+];
 
 function localTrialInfo() {
   return {
@@ -33,6 +38,39 @@ function localTrialInfo() {
       realModelCalls: false,
       cloudSync: false,
     },
+  };
+}
+
+function modelGatewayStatus() {
+  return {
+    enabled: false,
+    realModelCallsAllowed: false,
+    gatewayMode: "disabled",
+    serviceBoundary: "server_only",
+    providers: modelGatewayProviders.map((provider) => ({
+      id: provider.id,
+      label: provider.label,
+      keyEnvVar: provider.envVar,
+      configured: Boolean(process.env[provider.envVar]),
+      keyExposedToFrontend: false,
+      canRunConnectivityTest: false,
+    })),
+    safety: {
+      storesApiKeys: false,
+      exposesApiKeysToFrontend: false,
+      writesDatabase: false,
+      createsTasks: false,
+      createsApprovals: false,
+      createsRunnerJobs: false,
+      runnerExecutesCommands: false,
+      logsPromptsOrResponses: false,
+      makesNetworkRequests: false,
+    },
+    blockedReasons: [
+      "Real model calls are disabled in MVP-0.2.",
+      "Approval, logging, cost tracking, and key-safety rules are not ready.",
+      "This endpoint only reports provider configuration boundaries.",
+    ],
   };
 }
 
@@ -721,6 +759,11 @@ async function handleRequest(req, res) {
       exists: fs.existsSync(runtimeStateFile),
       state: serializeRuntimeState(),
     });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/model-gateway/status") {
+    sendJson(res, 200, modelGatewayStatus());
     return;
   }
 

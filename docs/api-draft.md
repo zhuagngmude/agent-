@@ -857,6 +857,56 @@ operationType
 
 不要跳过 Approval Service 直接让 Runner 执行。
 
+### GET /api/model-gateway/status
+
+Purpose: read the current Model Gateway boundary for the local trial.
+
+Current MVP-0.2 implementation is status-only:
+
+- Real model calls are disabled.
+- Provider SDKs are not loaded.
+- Provider network requests are not made.
+- API keys are never returned to the frontend.
+- The endpoint only checks whether expected server-side environment variables exist.
+- The endpoint does not write SQLite, runtime state, tasks, approvals, Runner jobs, logs, prompts, or responses.
+
+Response example:
+
+```json
+{
+  "enabled": false,
+  "realModelCallsAllowed": false,
+  "gatewayMode": "disabled",
+  "serviceBoundary": "server_only",
+  "providers": [
+    {
+      "id": "openai",
+      "label": "OpenAI",
+      "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
+      "configured": false,
+      "keyExposedToFrontend": false,
+      "canRunConnectivityTest": false
+    }
+  ],
+  "safety": {
+    "storesApiKeys": false,
+    "exposesApiKeysToFrontend": false,
+    "writesDatabase": false,
+    "createsTasks": false,
+    "createsApprovals": false,
+    "createsRunnerJobs": false,
+    "runnerExecutesCommands": false,
+    "logsPromptsOrResponses": false,
+    "makesNetworkRequests": false
+  },
+  "blockedReasons": [
+    "Real model calls are disabled in MVP-0.2.",
+    "Approval, logging, cost tracking, and key-safety rules are not ready.",
+    "This endpoint only reports provider configuration boundaries."
+  ]
+}
+```
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：
