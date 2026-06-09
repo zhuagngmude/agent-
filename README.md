@@ -99,6 +99,7 @@ _internal/
 - `dev-docs/下一步开发路线.md`
 - `docs/api-draft.md`
 - `docs/data-model-draft.md`
+- `docs/sqlite-seed-plan.md`
 - `docs/runner-safety-acceptance.md`
 
 下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先修复前端中文编码、抽出 mock 数据模型，并重点打磨审批与确认页面。

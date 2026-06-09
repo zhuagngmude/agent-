@@ -20,6 +20,7 @@ dev-docs/下一步开发路线.md
 dev-docs/AI开发维护手册.md
 docs/api-draft.md
 docs/data-model-draft.md
+docs/sqlite-seed-plan.md
 docs/runner-safety-acceptance.md
 ```
 

@@ -878,6 +878,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`docs/data-model-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只定稿数据库设计决策，不改变产品功能或运行逻辑。
 
+## 2026-06-09 变更记录：SQLite 初始化与 Seed 方案
+
+- 改了什么：新增 `docs/sqlite-seed-plan.md`，定义第一版本地 SQLite 数据库文件位置、migration/seed 产物、表范围、Mock 数据映射、runtime state 迁移、API 切换顺序和验证标准；README、AGENTS、data、migrations、API README 和开发路线同步入口。
+- 为什么改：在实现真实数据库代码前，先把初始化和 seed 边界写清楚，避免直接从 Mock API 跳到不可重复、不可重建的本地数据库状态。
+- 影响模块：`docs/sqlite-seed-plan.md`、`README.md`、`AGENTS.md`、`data/README.md`、`data/migrations/README.md`、`services/api/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只新增数据库实现前设计文档，不改变产品功能或运行逻辑。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

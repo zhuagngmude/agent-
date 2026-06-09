@@ -10,6 +10,12 @@ API 服务预留目录。
 
 后续可以先实现 mock API，再接 SQLite / PostgreSQL。
 
+SQLite 初始化和 seed 方案见：
+
+```text
+../../docs/sqlite-seed-plan.md
+```
+
 ## 本地 mock API
 
 当前已提供纯 Node.js mock API：
