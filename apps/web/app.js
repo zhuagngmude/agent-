@@ -20,6 +20,18 @@ function pendingApprovalRequests() {
   return (appData.approvalRequests || []).filter((item) => item.status === "pending");
 }
 
+function taskHasEnabledAction(task) {
+  if (!task) return false;
+  if (["queued", "blocked", "waiting_user", "failed", "cancelled"].includes(task.status)) return true;
+  if (task.status === "running") return true;
+  return !["completed", "failed", "cancelled"].includes(task.status);
+}
+
+function defaultTaskIndex(tasks) {
+  const actionableIndex = tasks.findIndex(taskHasEnabledAction);
+  return actionableIndex === -1 ? 0 : actionableIndex;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1222,7 +1234,7 @@ function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   });
 }
 
-function renderTaskPage(selectedIndex = 0) {
+function renderTaskPage(selectedIndex = null) {
   const tasks = appData.taskQueue || [];
   const tableBody = document.querySelector("#taskPageTable tbody");
   const count = document.querySelector("#taskPageCount");
@@ -1240,7 +1252,8 @@ function renderTaskPage(selectedIndex = 0) {
     return;
   }
 
-  selectedTaskIndex = Math.min(Math.max(selectedIndex, 0), tasks.length - 1);
+  const nextIndex = Number.isInteger(selectedIndex) ? selectedIndex : defaultTaskIndex(tasks);
+  selectedTaskIndex = Math.min(Math.max(nextIndex, 0), tasks.length - 1);
   if (count) count.textContent = tasks.length;
 
   tableBody.innerHTML = tasks.map((task, index) => `
@@ -1406,7 +1419,11 @@ async function runTaskAction(action) {
     const body = action === "fail" ? { reason: "用户在控制台标记任务失败" } : {};
     await postTaskAction(task.id, action, body);
     appData = await loadDashboardFromApi();
-    selectedTaskIndex = Math.min(selectedTaskIndex, Math.max((appData.taskQueue || []).length - 1, 0));
+    const tasks = appData.taskQueue || [];
+    selectedTaskIndex = Math.min(selectedTaskIndex, Math.max(tasks.length - 1, 0));
+    if (!taskHasEnabledAction(tasks[selectedTaskIndex])) {
+      selectedTaskIndex = defaultTaskIndex(tasks);
+    }
     renderDashboard();
     renderAgentsPage();
     renderWorkflowPage();
