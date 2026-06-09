@@ -157,21 +157,21 @@ const approvals = [
     status: "pending",
     riskLevel: "high",
     riskTone: "high",
-    requestAgentId: "agent_frontend",
-    requestAgentName: "后端 Agent",
+    requestAgentId: "agent_architect",
+    requestAgentName: "架构师 Agent",
     operationTypes: ["file_write", "git_checkpoint", "audit_log_update"],
-    reason: "新增 Runner 写入审批状态机，阻止本地执行绕过用户确认。",
+    reason: "整理 Runner 安全验收标准，确保真实执行前必须经过审批、二次确认和 Git checkpoint。",
     checkpoint: {
       required: true,
       created: true,
-      commit: "a5d3f2c",
+      commit: "b84cf43",
     },
-    affectedFiles: ["runner/permissions.py", "server/audit_log.go", "docs/ai-maintenance.md"],
-    diffSummary: "+120 -36",
+    affectedFiles: ["docs/runner-safety-acceptance.md", "docs/api-draft.md", "dev-docs/AI开发维护手册.md"],
+    diffSummary: "3 files",
     diffPreview: [
-      "- return runner.execute(command)",
-      "+ approval = require_user_approval(command, changed_files)",
-      "+ return runner.execute(command) if approval.allowed else PatchOnlyResult()",
+      "+ Runner 真实执行前必须满足 Approval Service 放行。",
+      "+ 高风险操作必须二次确认并创建 Git checkpoint。",
+      "+ 当前 Demo 仍不执行本地命令、不写文件。",
     ],
     requiresSecondConfirm: true,
     createdAt: "2026-06-08T12:00:00Z",
@@ -188,10 +188,10 @@ const approvals = [
     checkpoint: {
       required: true,
       created: true,
-      commit: "a5d3f2c",
+      commit: "b84cf43",
     },
-    affectedFiles: ["docs/ai-maintenance.md"],
-    diffSummary: "+56 -0",
+    affectedFiles: ["dev-docs/AI开发维护手册.md"],
+    diffSummary: "1 file",
     diffPreview: [
       "+ 所有本地写文件、删文件、执行命令都必须经过 Approval Service。",
       "+ 高风险操作必须二次确认。",
@@ -205,47 +205,32 @@ const approvals = [
     riskLevel: "low",
     riskTone: "low",
     requestAgentId: "agent_reviewer",
-    requestAgentName: "测试 Agent",
+    requestAgentName: "审查 Agent",
     operationTypes: ["file_write"],
-    reason: "为 Runner 审批流程增加回归测试，避免后续绕开确认步骤。",
+    reason: "为 Mock API 状态流转增加回归验证，避免后续破坏任务、审批和 Agent 配置流程。",
     checkpoint: {
       required: true,
       created: true,
-      commit: "a5d3f2c",
+      commit: "2670959",
     },
-    affectedFiles: ["tests/runner-approval.spec.ts"],
-    diffSummary: "+210 -10",
+    affectedFiles: ["scripts/verify-mock-flows.ps1"],
+    diffSummary: "1 script",
     diffPreview: [
-      "+ expect(request.status).toBe('pending')",
-      "+ expect(request.requiresSecondConfirm).toBe(true)",
+      "+ 验证任务 start -> complete 状态流转。",
+      "+ 验证审批批准后只生成只读 Runner job。",
+      "+ 验证 Agent 配置应用/取消 Mock 状态流转。",
     ],
     requiresSecondConfirm: false,
     createdAt: "2026-06-08T12:10:00Z",
   },
 ];
 
-const initialApprovalState = approvals.map((approval) => ({
-  id: approval.id,
-  status: approval.status,
-  rejectReason: approval.rejectReason || "",
-  runnerJobId: approval.runnerJobId || "",
-  patchArtifactId: approval.patchArtifactId || "",
-  approvedAt: approval.approvedAt || "",
-  rejectedAt: approval.rejectedAt || "",
-  patchOnlyAt: approval.patchOnlyAt || "",
-  updatedAt: approval.updatedAt || "",
-}));
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
-const initialTaskState = tasks.map((task) => ({
-  id: task.id,
-  status: task.status,
-  startedAt: task.startedAt || "",
-  completedAt: task.completedAt || "",
-  failedAt: task.failedAt || "",
-  cancelledAt: task.cancelledAt || "",
-  failureReason: task.failureReason || "",
-  updatedAt: task.updatedAt || "",
-}));
+const initialApprovalState = approvals.map((approval) => cloneValue(approval));
+const initialTaskState = tasks.map((task) => cloneValue(task));
 
 const workflows = [
   {
@@ -339,19 +324,15 @@ const knowledgeUpdates = [
 
 const usage = {
   tokenUsage: {
-    total: 1230000,
-    today: 82000,
+    total: 0,
+    today: 0,
   },
   estimatedCost: {
     currency: "CNY",
-    today: 128.4,
-    month: 245.6,
+    today: 0,
+    month: 0,
   },
-  byModel: [
-    { provider: "openai", model: "gpt", tokens: 500000 },
-    { provider: "anthropic", model: "claude", tokens: 400000 },
-    { provider: "google", model: "gemini", tokens: 330000 },
-  ],
+  byModel: [],
 };
 
 const integrations = [
@@ -367,8 +348,8 @@ const settings = {
     { role: "reviewer", provider: "google", model: "gemini-long-context" },
   ],
   apiKeys: [
-    { provider: "openai", configured: true, display: "已加密保存" },
-    { provider: "anthropic", configured: true, display: "已加密保存" },
+    { provider: "openai", configured: false, display: "未接入真实模型密钥" },
+    { provider: "anthropic", configured: false, display: "未接入真实模型密钥" },
   ],
   security: {
     logRedaction: true,
@@ -378,22 +359,26 @@ const settings = {
 };
 
 function dashboard() {
+  const activeAgents = agents.filter((item) => item.status === "running").length;
+  const activeTasks = tasks.filter((item) => item.status === "running" || item.status === "queued").length;
+  const completedTasks = tasks.filter((item) => item.status === "completed").length;
+
   return {
     project,
     metrics: {
-      activeAgents: 18,
+      activeAgents,
       pendingApprovals: approvals.filter((item) => item.status === "pending").length,
-      activeTasks: tasks.filter((item) => item.status === "running" || item.status === "queued").length,
+      activeTasks,
       gitCheckpoints: gitCheckpoints.length,
-      tokenUsage: "1.23M",
+      tokenUsage: "-",
       modelCount: settings.models.length,
     },
     workflowSummary: {
-      totalAgents: 24,
-      totalTasks: 68,
-      completedTasks: 36,
-      successRate: 0.923,
-      averageResponseMs: 1200,
+      totalAgents: agents.length,
+      totalTasks: tasks.length,
+      completedTasks,
+      successRate: tasks.length ? completedTasks / tasks.length : 0,
+      averageResponseMs: 0,
     },
     workflows,
     runnerStatus: {
@@ -413,54 +398,13 @@ function dashboard() {
 }
 
 function resetRuntimeData() {
-  initialApprovalState.forEach((initial) => {
-    const approval = approvals.find((item) => item.id === initial.id);
-    if (!approval) return;
-
-    approval.status = initial.status;
-    [
-      "rejectReason",
-      "runnerJobId",
-      "patchArtifactId",
-      "approvedAt",
-      "rejectedAt",
-      "patchOnlyAt",
-      "updatedAt",
-    ].forEach((key) => {
-      if (initial[key]) {
-        approval[key] = initial[key];
-      } else {
-        delete approval[key];
-      }
-    });
-  });
-
-  initialTaskState.forEach((initial) => {
-    const task = tasks.find((item) => item.id === initial.id);
-    if (!task) return;
-
-    task.status = initial.status;
-    [
-      "startedAt",
-      "completedAt",
-      "failedAt",
-      "cancelledAt",
-      "failureReason",
-      "updatedAt",
-    ].forEach((key) => {
-      if (initial[key]) {
-        task[key] = initial[key];
-      } else {
-        delete task[key];
-      }
-    });
-  });
-
-  runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => ({ ...job })));
+  approvals.splice(0, approvals.length, ...initialApprovalState.map((approval) => cloneValue(approval)));
+  tasks.splice(0, tasks.length, ...initialTaskState.map((task) => cloneValue(task)));
+  runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => cloneValue(job)));
   agentConfigApplications.splice(
     0,
     agentConfigApplications.length,
-    ...initialAgentConfigApplicationState.map((item) => ({ ...item }))
+    ...initialAgentConfigApplicationState.map((item) => cloneValue(item))
   );
 }
 

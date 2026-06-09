@@ -945,6 +945,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`apps/web/index.html`、`apps/web/data.js`、`apps/web/app.js`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是前端原型文案和兜底数据收敛，不改变核心用户流程。
 
+## 2026-06-09 变更记录：前端 Demo 数据对齐与页面验收
+
+- 改了什么：将 Mock/SQLite seed 中的审批示例对齐到当前项目文件，移除旧 Runner 文件、旧 commit、假 diff 数字、假 Token、假费用和假密钥状态；修复浏览器 favicon 404；前端待审批列表只展示 `pending` 审批，避免把 `patch_only` 历史项误算为待审批。
+- 为什么改：Demo 验收必须反映当前 MVP-0.2 的真实边界，不能让页面看起来像已经接入真实 Runner、真实模型调用、真实费用统计或真实密钥配置。
+- 影响模块：`apps/web/index.html`、`apps/web/app.js`、`services/api/mock-data.js`、`services/api/server.js`、`data/seed/project_agent_swarm.seed.json`、`scripts/sqlite/sqlite_read.py`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是 Demo 数据和验收展示修正，不改变核心用户流程，也不开放真实 Runner 执行。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

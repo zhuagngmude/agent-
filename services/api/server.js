@@ -153,13 +153,24 @@ function applyRuntimeState(state) {
   if (Array.isArray(state.approvals)) {
     state.approvals.forEach((storedApproval) => {
       let approval = findApproval(storedApproval.id);
+      const isExistingApproval = Boolean(approval);
       if (!approval) {
         approval = { id: storedApproval.id };
         data.approvals.push(approval);
       }
 
-      [
+      const mutableApprovalKeys = [
         "status",
+        "rejectReason",
+        "runnerJobId",
+        "patchArtifactId",
+        "approvedAt",
+        "rejectedAt",
+        "patchOnlyAt",
+        "updatedAt",
+      ];
+      const dynamicApprovalKeys = [
+        ...mutableApprovalKeys,
         "riskLevel",
         "riskTone",
         "requestAgentId",
@@ -173,15 +184,10 @@ function applyRuntimeState(state) {
         "requiresSecondConfirm",
         "targetService",
         "changeRequest",
-        "rejectReason",
-        "runnerJobId",
-        "patchArtifactId",
-        "approvedAt",
-        "rejectedAt",
-        "patchOnlyAt",
-        "updatedAt",
         "createdAt",
-      ].forEach((key) => {
+      ];
+
+      (isExistingApproval ? mutableApprovalKeys : dynamicApprovalKeys).forEach((key) => {
         if (storedApproval[key] !== undefined) {
           approval[key] = storedApproval[key];
         }

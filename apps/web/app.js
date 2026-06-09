@@ -16,6 +16,10 @@ let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
 
+function pendingApprovalRequests() {
+  return (appData.approvalRequests || []).filter((item) => item.status === "pending");
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -67,13 +71,14 @@ function renderDashboard() {
 
   const approvalList = document.querySelector("#approvalList");
   if (approvalList && appData.approvalRequests) {
-    const pendingApprovalCount = appData.approvalRequests.filter((item) => item.status === "pending").length;
-    approvalList.innerHTML = appData.approvalRequests.length === 0 ? `
+    const pendingApprovals = pendingApprovalRequests();
+    const pendingApprovalCount = pendingApprovals.length;
+    approvalList.innerHTML = pendingApprovals.length === 0 ? `
       <div>
         <strong>暂无待审批项</strong>
         <p>连接 Mock API 后会显示 Runner 或 Agent 配置审批申请。</p>
       </div>
-    ` : appData.approvalRequests.map((item) => `
+    ` : pendingApprovals.map((item) => `
       <div>
         <strong>${escapeHtml(item.file)}</strong>
         <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)}</p>
@@ -937,7 +942,7 @@ function setRuntimeStateButtons(disabled) {
 }
 
 function renderApprovalPage(selectedIndex = 0) {
-  const approvals = appData.approvalRequests || [];
+  const approvals = pendingApprovalRequests();
   const list = document.querySelector("#approvalPageList");
   const count = document.querySelector("#approvalPageCount");
   const detail = document.querySelector("#approvalDetail");
@@ -1277,7 +1282,7 @@ function renderTaskPage(selectedIndex = 0) {
 }
 
 async function runApprovalAction(action) {
-  const item = appData.approvalRequests?.[selectedApprovalIndex];
+  const item = pendingApprovalRequests()[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
 
   const actionLabels = {
@@ -1299,7 +1304,7 @@ async function runApprovalAction(action) {
 
     await postApprovalAction(item.id, action, body);
     appData = await loadDashboardFromApi();
-    selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max((appData.approvalRequests || []).length - 1, 0));
+    selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max(pendingApprovalRequests().length - 1, 0));
     renderDashboard();
     renderAgentsPage();
     renderWorkflowPage();
