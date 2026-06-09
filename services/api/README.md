@@ -45,7 +45,7 @@ GET /api/health
 
 ## SQLite Dashboard 读取
 
-当前默认仍从 Mock 内存数据读取 Dashboard。可通过环境变量只读试用 SQLite Dashboard：
+当前默认仍从 Mock 内存数据读取。可通过环境变量只读试用 SQLite Dashboard 和第一批列表接口：
 
 ```powershell
 $env:AGENT_SWARM_DASHBOARD_SOURCE="sqlite"
@@ -53,3 +53,15 @@ powershell -ExecutionPolicy Bypass -File scripts/start-mock-api.ps1
 ```
 
 如果 `data/local/agent-swarm.sqlite` 不存在或查询失败，API 会回退到 Mock Dashboard。
+
+当前 SQLite 只读开关覆盖：
+
+```text
+GET /api/projects/:projectId/dashboard
+GET /api/projects/:projectId/agents
+GET /api/projects/:projectId/tasks
+GET /api/projects/:projectId/approvals
+GET /api/projects/:projectId/workflows
+```
+
+任务、审批和 Agent 配置写操作仍使用 Mock runtime state。

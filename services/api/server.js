@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const data = require("./mock-data");
-const { readDashboardFromSqlite } = require("./db/sqlite-read");
+const { readDashboardFromSqlite, readProjectSnapshotFromSqlite } = require("./db/sqlite-read");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -59,6 +59,23 @@ function dashboardResponse() {
   } catch (error) {
     console.warn(`[sqlite-dashboard] ${error.message}. Falling back to mock dashboard.`);
     return data.dashboard();
+  }
+}
+
+function sqliteReadEnabled() {
+  return dashboardSource === "sqlite";
+}
+
+function projectSnapshotResponse(fallback) {
+  if (!sqliteReadEnabled()) {
+    return fallback();
+  }
+
+  try {
+    return readProjectSnapshotFromSqlite(data.projectId);
+  } catch (error) {
+    console.warn(`[sqlite-read] ${error.message}. Falling back to mock response.`);
+    return null;
   }
 }
 
@@ -628,7 +645,8 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/agents")) {
-    sendJson(res, 200, { agents: data.agents });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { agents: snapshot?.agents || data.agents });
     return;
   }
 
@@ -656,12 +674,14 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && withProject(pathname, "/tasks")) {
-    sendJson(res, 200, { tasks: data.tasks });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { tasks: snapshot?.tasks || data.tasks });
     return;
   }
 
   if (req.method === "GET" && withProject(pathname, "/workflows")) {
-    sendJson(res, 200, { workflows: data.workflows });
+    const snapshot = projectSnapshotResponse(() => null);
+    sendJson(res, 200, { workflows: snapshot?.workflows || data.workflows });
     return;
   }
 
@@ -681,7 +701,9 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && withProject(pathname, "/approvals")) {
     const status = url.searchParams.get("status");
     const riskLevel = url.searchParams.get("riskLevel");
-    const approvals = data.approvals.filter((item) => {
+    const snapshot = projectSnapshotResponse(() => null);
+    const sourceApprovals = snapshot?.approvals || data.approvals;
+    const approvals = sourceApprovals.filter((item) => {
       if (status && item.status !== status) return false;
       if (riskLevel && item.riskLevel !== riskLevel) return false;
       return true;

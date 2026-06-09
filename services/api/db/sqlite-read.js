@@ -5,16 +5,20 @@ const path = require("path");
 const defaultDbFile = path.resolve(__dirname, "..", "..", "..", "data", "local", "agent-swarm.sqlite");
 
 function readDashboardFromSqlite(projectId, options = {}) {
+  return readProjectSnapshotFromSqlite(projectId, options).dashboard;
+}
+
+function readProjectSnapshotFromSqlite(projectId, options = {}) {
   const dbFile = options.dbFile || process.env.AGENT_SWARM_SQLITE_DB || defaultDbFile;
   if (!fs.existsSync(dbFile)) {
     throw new Error(`SQLite database not found: ${dbFile}`);
   }
 
-  const payload = runPythonDashboardQuery(dbFile, projectId);
+  const payload = runPythonSnapshotQuery(dbFile, projectId);
   return JSON.parse(payload);
 }
 
-function runPythonDashboardQuery(dbFile, projectId) {
+function runPythonSnapshotQuery(dbFile, projectId) {
   const script = String.raw`
 import json
 import sqlite3
@@ -360,7 +364,17 @@ with sqlite3.connect(db_file) as connection:
         ],
     }
 
-    print(json.dumps(dashboard, ensure_ascii=False))
+    snapshot = {
+        "dashboard": dashboard,
+        "agents": agents,
+        "tasks": tasks,
+        "approvals": approvals,
+        "workflows": workflows,
+        "runnerJobs": runner_jobs,
+        "agentConfigApplications": applications,
+    }
+
+    print(json.dumps(snapshot, ensure_ascii=False))
 `;
 
   return execFileSync("python", ["-X", "utf8", "-c", script, dbFile, projectId], {
@@ -372,4 +386,5 @@ with sqlite3.connect(db_file) as connection:
 
 module.exports = {
   readDashboardFromSqlite,
+  readProjectSnapshotFromSqlite,
 };

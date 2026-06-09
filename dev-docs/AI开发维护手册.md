@@ -899,6 +899,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前是开发期开关能力，不改变默认用户流程。
 
+## 2026-06-09 变更记录：SQLite 第一批只读接口
+
+- 改了什么：扩展 `services/api/db/sqlite-read.js`，将 SQLite 查询结果拆为项目快照，并让 `GET /agents`、`GET /tasks`、`GET /approvals`、`GET /workflows` 在 `AGENT_SWARM_DASHBOARD_SOURCE=sqlite` 下读取 SQLite；默认仍使用 Mock 数据，写操作仍走 Mock runtime state。
+- 为什么改：让第一批核心只读页面可以共享同一套 SQLite row mapper，同时避免过早迁移任务和审批写入状态机。
+- 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
