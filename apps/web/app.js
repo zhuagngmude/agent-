@@ -1015,7 +1015,7 @@ function renderApprovalPage(selectedIndex = 0) {
     </div>
   `;
 
-  const allowButton = document.querySelector(".danger-action");
+  const allowButton = document.querySelector("#approveApprovalAction");
   const patchOnlyButton = document.querySelector("#patchOnlyAction");
   const rejectButton = document.querySelector("#rejectApprovalAction");
   const viewDiffButton = document.querySelector("#viewDiffAction");
