@@ -54,7 +54,7 @@
       <header class="topbar">
         <div class="search">⌕ 搜索智能体、任务、知识库...</div>
         <div class="top-actions">
-          <span class="api-status connecting" id="apiStatus">Mock API：连接中</span>
+          <span class="api-status connecting" id="apiStatus">本地 API：连接中</span>
           <span>🌐 简体中文</span>
           <span>☼</span>
           <span class="bell">🔔<em>8</em></span>
@@ -121,7 +121,7 @@
           <div class="approval-list" id="approvalList">
             <div>
               <strong>正在读取 Runner 审批数据</strong>
-              <p>连接 Mock API 后会显示真实审批申请。</p>
+              <p>连接本地 API 后会显示审批申请。</p>
             </div>
           </div>
           <footer><span id="approvalSummary">等待审批数据</span> <button>进入审批页</button></footer>
@@ -133,7 +133,7 @@
           <div class="card-head"><h2>任务队列</h2></div>
           <div class="mini-tabs"><b>进行中 -</b><span>排队中 -</span><span>已完成 -</span></div>
           <ul class="task-list" id="taskQueue">
-            <li><span class="icon purple">T</span><b>正在读取任务队列</b><em>Mock API</em><strong>等待数据</strong></li>
+            <li><span class="icon purple">T</span><b>正在读取任务队列</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
           <a class="panel-link" href="#">查看全部任务 →</a>
         </article>
@@ -141,7 +141,7 @@
         <article class="panel">
           <div class="card-head"><h2>智能体状态</h2><a href="#">查看全部</a></div>
           <ul class="agent-list" id="agentStatusList">
-            <li><span class="avatar small">A</span><b>正在读取智能体状态</b><em>Mock API</em><strong>等待数据</strong></li>
+            <li><span class="avatar small">A</span><b>正在读取智能体状态</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
         </article>
 
@@ -156,7 +156,7 @@
         <article class="panel">
           <div class="card-head"><h2>知识库更新</h2><a href="#">查看全部</a></div>
           <ul class="knowledge-list" id="knowledgeUpdateList">
-            <li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>Mock API</em><strong>等待数据</strong></li>
+            <li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>本地 API</em><strong>等待数据</strong></li>
           </ul>
           <a class="panel-link" href="#">查看全部更新 →</a>
         </article>
@@ -168,7 +168,7 @@
               <b>模型密钥状态</b><span>脱敏</span>
               <p>密钥只显示配置状态，不显示任何明文或尾号。</p>
               <div class="bar"><i style="--p:0%"></i></div>
-              <small>等待 Mock API 设置数据</small>
+              <small>等待本地 API 设置数据</small>
             </div>
           </div>
           <a class="panel-link" href="#">查看全部设置 →</a>
@@ -183,11 +183,11 @@
           <article class="panel wide">
             <div class="card-head"><h2>智能体资源池</h2><span class="badge orange">只读</span></div>
             <div class="agent-board" id="agentBoard">
-              <div><b>正在读取智能体数据</b><span>连接 Mock API 后会显示 Agent 角色、模型、权限和子 Agent 规则。</span><em>Mock API</em></div>
+              <div><b>正在读取智能体数据</b><span>连接本地 API 后会显示 Agent 角色、模型、权限和子 Agent 规则。</span><em>本地 API</em></div>
             </div>
           </article>
           <article class="panel wide">
-            <div class="card-head"><h2>模型分配</h2><span class="badge orange">Mock API</span></div>
+            <div class="card-head"><h2>模型分配</h2><span class="badge orange">本地 API</span></div>
             <div class="model-list" id="agentModelList"></div>
           </article>
           <article class="panel wide">
@@ -262,7 +262,7 @@
         <div class="subpage-grid">
           <article class="panel"><div class="card-head"><h2>人类说明书</h2></div><p class="muted">面向用户解释项目定位、使用方式、工作流与安全确认。</p></article>
           <article class="panel"><div class="card-head"><h2>AI 开发维护手册</h2></div><p class="muted">面向后续 AI 说明架构约束、代码规范、Runner 权限与文档更新规则。</p></article>
-          <article class="panel wide"><div class="card-head"><h2>最近更新</h2></div><ul class="knowledge-list"><li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>Mock API</em><strong>等待数据</strong></li></ul></article>
+          <article class="panel wide"><div class="card-head"><h2>最近更新</h2></div><ul class="knowledge-list"><li><span class="doc blue">文</span><b>正在读取知识库更新</b><em>本地 API</em><strong>等待数据</strong></li></ul></article>
         </div>
       </section>
 
@@ -357,11 +357,17 @@
           <div class="key-card"><b>Anthropic API</b><span>未接入</span><p>当前不保存真实模型密钥，日志脱敏规则仍是后续能力。</p><div class="bar"><i style="--p:0%"></i></div><small>真实模型调用未接入</small></div>
         </article>
         <article class="panel wide">
-          <div class="card-head"><h2>本地状态管理</h2><span class="badge orange">Mock API</span></div>
+          <div class="card-head"><h2>本地试用状态</h2><span class="badge gray" id="localTrialModeBadge">检测中</span></div>
+          <div class="local-trial-status" id="localTrialStatus">
+            <p class="muted">正在读取本地试用状态...</p>
+          </div>
+        </article>
+        <article class="panel wide">
+          <div class="card-head"><h2>本地状态管理</h2><span class="badge orange" id="runtimeStateModeBadge">本地状态</span></div>
           <div class="state-tools">
             <button class="safe-action" id="exportRuntimeState">导出状态</button>
-            <button class="neutral-action" id="resetRuntimeState">重置 Mock 数据</button>
-            <button class="danger-action" id="clearRuntimeState">清理状态文件</button>
+            <button class="neutral-action" id="resetRuntimeState">重置本地数据</button>
+            <button class="danger-action" id="clearRuntimeState">清理/重置状态</button>
           </div>
           <p class="approval-feedback" id="runtimeStateFeedback" role="status"></p>
         </article>

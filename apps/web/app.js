@@ -76,7 +76,7 @@ function renderDashboard() {
     approvalList.innerHTML = pendingApprovals.length === 0 ? `
       <div>
         <strong>暂无待审批项</strong>
-        <p>连接 Mock API 后会显示 Runner 或 Agent 配置审批申请。</p>
+        <p>连接本地 API 后会显示 Runner 或 Agent 配置审批申请。</p>
       </div>
     ` : pendingApprovals.map((item) => `
       <div>
@@ -93,7 +93,7 @@ function renderDashboard() {
   const taskQueue = document.querySelector("#taskQueue");
   if (taskQueue && appData.taskQueue) {
     taskQueue.innerHTML = appData.taskQueue.length === 0 ? `
-      <li><span class="icon purple">T</span><b>暂无任务队列数据</b><em>等待 Mock API</em><strong>未加载</strong></li>
+      <li><span class="icon purple">T</span><b>暂无任务队列数据</b><em>等待本地 API</em><strong>未加载</strong></li>
     ` : appData.taskQueue.map((item) => `
       <li><span class="icon ${escapeHtml(item.tone)}">${escapeHtml(item.icon)}</span><b>${escapeHtml(item.title)}</b><em>${escapeHtml(item.type)} · ${escapeHtml(statusLabel("task", item.status))}</em><strong>${escapeHtml(item.eta)}</strong></li>
     `).join("");
@@ -109,7 +109,7 @@ function renderDashboard() {
   const gitCheckpointList = document.querySelector("#gitCheckpointList");
   if (gitCheckpointList && appData.gitCheckpoints) {
     gitCheckpointList.innerHTML = appData.gitCheckpoints.length === 0 ? `
-      <li><b>Git</b><span>暂无保存点数据</span><em>等待 Mock API</em></li>
+      <li><b>Git</b><span>暂无保存点数据</span><em>等待本地 API</em></li>
     ` : appData.gitCheckpoints.map((item) => `
       <li><b>${escapeHtml(item.hash)}</b><span>${escapeHtml(item.message)}</span><em>${escapeHtml(item.time)}</em></li>
     `).join("");
@@ -150,7 +150,7 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   if (!board || !modelList || !relationList || !configRules || !changePreview || !detail) return;
 
   if (agents.length === 0) {
-    board.innerHTML = `<div><b>暂无智能体</b><span>Mock API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
+    board.innerHTML = `<div><b>暂无智能体</b><span>本地 API 当前没有返回 Agent 数据。</span><em>只读</em></div>`;
     modelList.innerHTML = `<p class="muted">暂无模型分配数据。</p>`;
     relationList.innerHTML = `<p class="muted">暂无子 Agent 关系数据。</p>`;
     configRules.innerHTML = `<p class="muted">暂无配置规则数据。</p>`;
@@ -304,7 +304,7 @@ function normalizeDashboard(apiData) {
       description: apiData.project?.description || fallback.project?.description || "",
     },
     dashboardMetrics: [
-      { label: "活跃智能体", value: apiData.metrics?.activeAgents ?? "-", note: "来自 mock API", tone: "purple", icon: "A" },
+      { label: "活跃智能体", value: apiData.metrics?.activeAgents ?? "-", note: "来自本地 API", tone: "purple", icon: "A" },
       { label: "待确认事项", value: apiData.metrics?.pendingApprovals ?? "-", note: "Runner 审批优先", tone: "orange", icon: "!" },
       { label: "活跃任务", value: apiData.metrics?.activeTasks ?? "-", note: "运行中与排队中", tone: "blue", icon: "T" },
       { label: "Git 检查点", value: apiData.metrics?.gitCheckpoints ?? "-", note: "项目保存点", tone: "green", icon: "G" },
@@ -516,6 +516,18 @@ async function requestRuntimeState(method, path = "/api/runtime-state") {
     throw new Error(result.message || result.error || `API returned ${response.status}`);
   }
   return result;
+}
+
+function localTrialModeLabel(mode) {
+  if (mode === "sqlite") return "SQLite 本地持久化";
+  if (mode === "mock") return "Mock 运行态";
+  return "未知模式";
+}
+
+function localTrialBadgeClass(mode) {
+  if (mode === "sqlite") return "badge green";
+  if (mode === "mock") return "badge orange";
+  return "badge gray";
 }
 
 function statusLabel(group, status) {
@@ -1281,6 +1293,62 @@ function renderTaskPage(selectedIndex = 0) {
   });
 }
 
+async function renderLocalTrialStatus() {
+  const container = document.querySelector("#localTrialStatus");
+  const modeBadge = document.querySelector("#localTrialModeBadge");
+  const runtimeBadge = document.querySelector("#runtimeStateModeBadge");
+  if (!container) return;
+
+  try {
+    const result = await requestRuntimeState("GET");
+    const info = result.localTrial || {};
+    const mode = result.mode || info.mode || "unknown";
+    const persistence = info.persistence === "sqlite" ? "SQLite 数据库" : "Mock runtime-state 文件";
+    const storagePath = mode === "sqlite" ? info.sqliteDbFile : info.runtimeStateFile;
+
+    if (modeBadge) {
+      modeBadge.textContent = localTrialModeLabel(mode);
+      modeBadge.className = localTrialBadgeClass(mode);
+    }
+    if (runtimeBadge) {
+      runtimeBadge.textContent = persistence;
+      runtimeBadge.className = localTrialBadgeClass(mode);
+    }
+
+    container.innerHTML = `
+      <div class="local-trial-grid">
+        <div><span>当前模式</span><strong>${escapeHtml(localTrialModeLabel(mode))}</strong></div>
+        <div><span>状态保存</span><strong>${escapeHtml(persistence)}</strong></div>
+        <div><span>API 地址</span><strong>${escapeHtml(info.apiUrl || apiBase)}</strong></div>
+        <div><span>Web 地址</span><strong>${escapeHtml(info.webUrl || window.location.href)}</strong></div>
+        <div class="wide-row"><span>状态文件</span><strong>${escapeHtml(storagePath || "未返回")}</strong></div>
+      </div>
+      <div class="local-command-list">
+        <div><span>查看状态</span><code>${escapeHtml(info.commands?.status || "powershell -ExecutionPolicy Bypass -File scripts\\status-local.ps1")}</code></div>
+        <div><span>停止试用</span><code>${escapeHtml(info.commands?.stop || "powershell -ExecutionPolicy Bypass -File scripts\\stop-local.ps1")}</code></div>
+        <div><span>重置数据</span><code>${escapeHtml(info.commands?.reset || "Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset")}</code></div>
+      </div>
+      <p class="runner-safety-note">当前仍不会执行本地命令、不会写文件、不会调用真实模型、不会云同步。网页只展示命令，不会替你停止本地进程。</p>
+    `;
+  } catch (error) {
+    if (modeBadge) {
+      modeBadge.textContent = "离线";
+      modeBadge.className = "badge red";
+    }
+    if (runtimeBadge) {
+      runtimeBadge.textContent = "不可确认";
+      runtimeBadge.className = "badge red";
+    }
+    container.innerHTML = `
+      <div class="local-trial-grid">
+        <div><span>当前状态</span><strong>无法连接本地 API</strong></div>
+        <div><span>建议操作</span><strong>运行 scripts\\start-local.ps1</strong></div>
+      </div>
+      <p class="approval-feedback error">读取本地试用状态失败：${escapeHtml(error.message)}</p>
+    `;
+  }
+}
+
 async function runApprovalAction(action) {
   const item = pendingApprovalRequests()[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
@@ -1390,8 +1458,8 @@ async function runRuntimeStateAction(action) {
 
   const actionText = {
     export: "导出状态",
-    reset: "重置 Mock 数据",
-    clear: "清理状态文件",
+    reset: "重置本地数据",
+    clear: "清理/重置状态",
   }[action];
 
   runtimeStateRunning = true;
@@ -1416,6 +1484,7 @@ async function runRuntimeStateAction(action) {
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
+      await renderLocalTrialStatus();
     } else if (action === "clear") {
       await requestRuntimeState("DELETE");
       appData = await loadDashboardFromApi();
@@ -1425,6 +1494,7 @@ async function runRuntimeStateAction(action) {
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
+      await renderLocalTrialStatus();
     }
 
     setRuntimeStateFeedback(`已完成：${actionText}`, "success");
@@ -1469,13 +1539,13 @@ document.querySelectorAll("[data-page]").forEach((button) => {
 });
 
 async function boot() {
-  setApiStatus("connecting", "Mock API：连接中");
+  setApiStatus("connecting", "本地 API：连接中");
   try {
     appData = await loadDashboardFromApi();
-    setApiStatus("connected", "Mock API：已连接");
+    setApiStatus("connected", "本地 API：已连接");
   } catch (error) {
     console.info("Using local fallback data:", error.message);
-    setApiStatus("offline", "Mock API：离线模式");
+    setApiStatus("offline", "本地 API：离线模式");
   }
 
   renderDashboard();
@@ -1484,6 +1554,7 @@ async function boot() {
   renderRuntimePage();
   renderApprovalPage();
   renderTaskPage();
+  renderLocalTrialStatus();
 }
 
 boot();

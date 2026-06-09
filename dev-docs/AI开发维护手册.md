@@ -959,6 +959,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`scripts/start-local.ps1`、`scripts/status-local.ps1`、`scripts/stop-local.ps1`、`README.md`、`AGENTS.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是本地试用入口和文档说明，不开放真实 Runner 执行、真实模型调用或云同步。
 
+## 2026-06-09 变更记录：设置页本地试用状态面板
+
+- 改了什么：`GET /api/runtime-state` 新增 `localTrial` 元信息，设置页新增本地试用状态面板，展示 SQLite/Mock 模式、状态保存位置、API/Web 地址、查看/停止/重置命令和安全边界。
+- 为什么改：用户需要在界面内确认当前连的是本地 SQLite 试用版还是 Mock 状态，知道数据存在哪里，以及如何停止或重置，避免把本地试用状态和真实 Runner/真实模型能力混淆。
+- 影响模块：`services/api/server.js`、`services/api/db/sqlite-read.js`、`apps/web/index.html`、`apps/web/app.js`、`apps/web/styles.css`、`docs/api-draft.md`、`docs/demo-checklist.md`、`services/api/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是本地试用可见性增强，不开放真实 Runner 执行、真实模型调用或云同步。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

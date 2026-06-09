@@ -768,6 +768,47 @@ operationType
 
 ## Settings
 
+### GET /api/runtime-state
+
+用途：设置页本地状态管理和本地试用状态面板。
+
+当前实现状态：
+
+- Mock 模式返回 `mode=mock`，状态保存到 `data/mock/runtime-state.json`。
+- SQLite 本地试用模式返回 `mode=sqlite`，状态保存到 `data/local/agent-swarm.sqlite`。
+- 返回值包含 `localTrial` 元信息，供前端展示 API 地址、Web 地址、状态文件位置、启动/停止/查看状态命令和安全边界。
+
+返回示例：
+
+```json
+{
+  "mode": "sqlite",
+  "localTrial": {
+    "mode": "sqlite",
+    "persistence": "sqlite",
+    "apiUrl": "http://127.0.0.1:8787",
+    "webUrl": "http://127.0.0.1:5175/index.html",
+    "projectRoot": "F:/projects/agent-swarm",
+    "sqliteDbFile": "F:/projects/agent-swarm/data/local/agent-swarm.sqlite",
+    "runtimeStateFile": "F:/projects/agent-swarm/data/mock/runtime-state.json",
+    "commands": {
+      "start": "powershell -ExecutionPolicy Bypass -File scripts\\start-local.ps1",
+      "status": "powershell -ExecutionPolicy Bypass -File scripts\\status-local.ps1",
+      "stop": "powershell -ExecutionPolicy Bypass -File scripts\\stop-local.ps1",
+      "reset": "Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset"
+    },
+    "safety": {
+      "runnerExecutesCommands": false,
+      "runnerWritesFiles": false,
+      "realModelCalls": false,
+      "cloudSync": false
+    }
+  }
+}
+```
+
+注意：网页只展示停止命令，不提供停止本地进程按钮；停止必须由用户在终端执行 `scripts\stop-local.ps1`。
+
 ### GET /api/projects/:projectId/settings
 
 用途：系统设置页。

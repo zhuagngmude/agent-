@@ -324,6 +324,53 @@ a { color: inherit; text-decoration: none; }
 .state-tools .neutral-action { border-color: #d8dce8; color: #4e5670; }
 .state-tools .danger-action { border-color: #f4c8c8; color: var(--red); background: #fff2f2; }
 .state-tools button:disabled { opacity: .45; cursor: not-allowed; }
+.local-trial-status {
+  display: grid;
+  gap: 14px;
+}
+.local-trial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.local-trial-grid div,
+.local-command-list div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 12px;
+}
+.local-trial-grid .wide-row {
+  grid-column: 1 / -1;
+}
+.local-trial-grid span,
+.local-command-list span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.local-trial-grid strong {
+  display: block;
+  color: var(--text);
+  word-break: break-all;
+}
+.local-command-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.local-command-list code {
+  display: block;
+  color: #3f475f;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 
 .bottom-grid { display: grid; grid-template-columns: 1.08fr 1fr 1fr 1fr 1fr; gap: 16px; }
 .mini-tabs { display: flex; gap: 22px; margin-bottom: 12px; color: var(--muted); }

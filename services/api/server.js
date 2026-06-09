@@ -3,12 +3,38 @@ const fs = require("fs");
 const path = require("path");
 const { URL } = require("url");
 const data = require("./mock-data");
-const { readDashboardFromSqlite, readProjectSnapshotFromSqlite } = require("./db/sqlite-read");
+const { defaultDbFile, readDashboardFromSqlite, readProjectSnapshotFromSqlite } = require("./db/sqlite-read");
 const { resetSqliteState, runSqliteWrite } = require("./db/sqlite-write");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
 const dashboardSource = process.env.AGENT_SWARM_DASHBOARD_SOURCE || "mock";
+const projectRoot = path.resolve(__dirname, "..", "..");
+const sqliteDbFile = process.env.AGENT_SWARM_SQLITE_DB || defaultDbFile;
+
+function localTrialInfo() {
+  return {
+    mode: sqliteReadEnabled() ? "sqlite" : "mock",
+    persistence: sqliteReadEnabled() ? "sqlite" : "runtime_state_file",
+    apiUrl: `http://127.0.0.1:${port}`,
+    webUrl: "http://127.0.0.1:5175/index.html",
+    projectRoot,
+    sqliteDbFile,
+    runtimeStateFile,
+    commands: {
+      start: "powershell -ExecutionPolicy Bypass -File scripts\\start-local.ps1",
+      status: "powershell -ExecutionPolicy Bypass -File scripts\\status-local.ps1",
+      stop: "powershell -ExecutionPolicy Bypass -File scripts\\stop-local.ps1",
+      reset: "Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset",
+    },
+    safety: {
+      runnerExecutesCommands: false,
+      runnerWritesFiles: false,
+      realModelCalls: false,
+      cloudSync: false,
+    },
+  };
+}
 
 function sendJson(res, statusCode, body) {
   const payload = JSON.stringify(body, null, 2);
@@ -674,6 +700,7 @@ async function handleRequest(req, res) {
       sendJson(res, 200, {
         mode: "sqlite",
         stateFile: runtimeStateFile,
+        localTrial: localTrialInfo(),
         sqliteRuntimeState: true,
         state: {
           version: 1,
@@ -688,7 +715,9 @@ async function handleRequest(req, res) {
     }
 
     sendJson(res, 200, {
+      mode: "mock",
       stateFile: runtimeStateFile,
+      localTrial: localTrialInfo(),
       exists: fs.existsSync(runtimeStateFile),
       state: serializeRuntimeState(),
     });

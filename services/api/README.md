@@ -73,6 +73,7 @@ GET /api/projects/:projectId/knowledge/updates
 
 在 SQLite 模式下：
 
+- `GET /api/runtime-state` 会返回 `localTrial` 元信息，供设置页显示当前模式、API/Web 地址、状态文件位置、启动/停止/查看状态命令和安全边界。
 - `POST /api/runtime-state/reset` 会重新执行 seed，重建 SQLite 状态。
 - `DELETE /api/runtime-state` 不删除 SQLite 文件，只重置 seed 状态。
 - 默认 Mock 模式仍使用 `data/mock/runtime-state.json`。

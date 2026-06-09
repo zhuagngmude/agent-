@@ -26,6 +26,7 @@ function readProjectSnapshotFromSqlite(projectId, options = {}) {
 }
 
 module.exports = {
+  defaultDbFile,
   readDashboardFromSqlite,
   readProjectSnapshotFromSqlite,
 };

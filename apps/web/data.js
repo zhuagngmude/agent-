@@ -49,7 +49,7 @@ window.AGENT_SWARM_DATA = {
     description: "多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。",
   },
   dashboardMetrics: [
-    { label: "活跃智能体", value: "-", note: "等待 Mock API 数据", tone: "purple", icon: "A" },
+    { label: "活跃智能体", value: "-", note: "等待本地 API 数据", tone: "purple", icon: "A" },
     { label: "待确认事项", value: "-", note: "Runner 审批优先", tone: "orange", icon: "!" },
     { label: "活跃任务", value: "-", note: "等待任务状态", tone: "blue", icon: "T" },
     { label: "Git 检查点", value: "-", note: "等待项目保存点", tone: "green", icon: "G" },

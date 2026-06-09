@@ -75,7 +75,7 @@ Invoke-RestMethod http://127.0.0.1:8787/api/projects/project_agent_swarm/dashboa
 
 - `/api/health` 返回 `ok=true`。
 - Dashboard 返回 `project`、`metrics`、`pendingApprovals`、`taskQueue`、`agentStatus`、`runnerStatus`。
-- Web App 顶部显示 Mock API 已连接；本地试用版的数据实际由 SQLite 持久化。
+- Web App 顶部显示本地 API 已连接；本地试用版的数据实际由 SQLite 持久化。
 - 如果 API 不可用，前端会回退到本地 `data.js`。
 
 ## 4. 页面验收点
@@ -88,7 +88,7 @@ Invoke-RestMethod http://127.0.0.1:8787/api/projects/project_agent_swarm/dashboa
 4. 工作流页：只读展示工作流步骤、节点和依赖，不支持编辑或运行。
 5. 运行与调度页：能查看 Runner job 队列、Runner 状态、权限边界和“不会执行本地命令”的安全说明。
 6. 智能体页：能查看 Agent 详情、子 Agent 关系、配置变更预览、审批申请、待应用记录、Mock 应用/取消、应用审计和回滚前审查。
-7. 设置页：能导出、重置、清理本地 Mock 运行态。
+7. 设置页：能看到本地试用状态、SQLite/Mock 模式、状态文件位置、查看/停止命令；能导出、重置、清理本地状态。
 
 ## 5. 状态重置
 
