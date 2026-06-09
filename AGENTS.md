@@ -77,6 +77,16 @@ git status --short
 
 ## Local Run
 
+SQLite local trial:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-local.ps1
+powershell -ExecutionPolicy Bypass -File scripts\status-local.ps1
+powershell -ExecutionPolicy Bypass -File scripts\stop-local.ps1
+```
+
+Development Mock mode:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-dev.ps1
 ```

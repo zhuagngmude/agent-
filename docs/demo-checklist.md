@@ -2,9 +2,39 @@
 
 日期：2026-06-09
 
-用途：给人类用户和后续 AI 一个可重复的本地验收入口。当前仍是 MVP-0.2 Mock 阶段，不接真实数据库、不调用真实模型、不让 Runner 执行本地命令。
+用途：给人类用户和后续 AI 一个可重复的本地验收入口。当前仍是 MVP-0.2 本地试用阶段，不调用真实模型、不让 Runner 执行本地命令。
 
-## 1. 启动
+## 1. 本地试用启动
+
+推荐先用本地 SQLite 试用版：
+
+```powershell
+cd F:\projects\agent-swarm
+powershell -ExecutionPolicy Bypass -File scripts\start-local.ps1
+```
+
+脚本会做四件事：
+
+1. 如果 `data/local/agent-swarm.sqlite` 不存在，则从 seed 创建本地 SQLite 数据库。
+2. 以 SQLite 模式启动 API：`http://127.0.0.1:8787`。
+3. 启动 Web 静态服务：`http://127.0.0.1:5175/index.html`。
+4. 打开浏览器访问本地 Web App。
+
+查看状态：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\status-local.ps1
+```
+
+停止试用版：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\stop-local.ps1
+```
+
+如果后续要删除试用数据，删除 `data/local/` 即可；该目录不会进入 Git。
+
+## 2. 开发 Mock 启动
 
 在项目根目录执行：
 
@@ -26,9 +56,9 @@ logs/mock-api.out.log
 logs/mock-api.err.log
 ```
 
-## 2. 快速健康检查
+## 3. 快速健康检查
 
-Mock API 默认地址：
+本地 API 默认地址：
 
 ```text
 http://127.0.0.1:8787
@@ -45,9 +75,10 @@ Invoke-RestMethod http://127.0.0.1:8787/api/projects/project_agent_swarm/dashboa
 
 - `/api/health` 返回 `ok=true`。
 - Dashboard 返回 `project`、`metrics`、`pendingApprovals`、`taskQueue`、`agentStatus`、`runnerStatus`。
-- Web App 顶部显示 Mock API 已连接；如果 API 不可用，前端会回退到本地 `data.js`。
+- Web App 顶部显示 Mock API 已连接；本地试用版的数据实际由 SQLite 持久化。
+- 如果 API 不可用，前端会回退到本地 `data.js`。
 
-## 3. 页面验收点
+## 4. 页面验收点
 
 推荐按这个顺序点一遍：
 
@@ -59,7 +90,19 @@ Invoke-RestMethod http://127.0.0.1:8787/api/projects/project_agent_swarm/dashboa
 6. 智能体页：能查看 Agent 详情、子 Agent 关系、配置变更预览、审批申请、待应用记录、Mock 应用/取消、应用审计和回滚前审查。
 7. 设置页：能导出、重置、清理本地 Mock 运行态。
 
-## 4. Mock 状态重置
+## 5. 状态重置
+
+本地 SQLite 试用版状态文件：
+
+```text
+data/local/agent-swarm.sqlite
+```
+
+注意：
+
+- 这个文件是本地运行文件，不进入 Git。
+- 试用时的任务、审批、Agent 配置应用/取消状态会保存在这里。
+- 可以调用 reset 接口恢复 seed 初始状态。
 
 运行态文件：
 
@@ -79,12 +122,13 @@ data/mock/runtime-state.json
 Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 ```
 
-## 5. 自动验证 Mock 状态流转
+## 6. 自动验证状态流转
 
 可以运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 ```
 
 脚本会验证：
@@ -95,14 +139,14 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
 
-脚本结束时会重置本地 runtime state，避免留下测试状态。
+脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
 
-## 6. 当前安全边界
+## 7. 当前安全边界
 
 当前 Demo 允许：
 
 - 读取 Mock API 数据。
-- 把审批、任务、Agent 配置应用记录的状态写入本地 runtime state。
+- 把审批、任务、Agent 配置应用记录的状态写入本地 runtime state 或 SQLite。
 - 展示 Runner job、Runner 状态和 Agent 配置审查信息。
 
 当前 Demo 不允许：

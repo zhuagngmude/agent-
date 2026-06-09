@@ -137,13 +137,41 @@ apps/web/index.html
 
 旧入口 `frontend/index.html` 只保留为兼容跳转页，后续不要在 `frontend/` 继续新增业务代码。
 
-## 一键启动
+## 本地试用版
+
+推荐先用 SQLite 本地试用版，它会启动本地 API 和 Web 服务，状态保存在 `data/local/agent-swarm.sqlite`，关闭后再打开仍会保留。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1
+```
+
+启动后访问：
+
+```text
+http://127.0.0.1:5175/index.html
+```
+
+查看状态：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/status-local.ps1
+```
+
+停止本地试用版：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/stop-local.ps1
+```
+
+如果后续不想用了，可以删除 `data/local/` 里的本地 SQLite 数据库；该目录不会提交进 Git。
+
+## 开发启动
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```
 
-这个脚本会启动本地 mock API，并打开电脑端 Web App。
+这个脚本会启动本地 Mock API，并打开电脑端 Web App，主要用于开发和 Mock 回归。
 
 本地验收步骤见：
 

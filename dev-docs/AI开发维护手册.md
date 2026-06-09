@@ -952,6 +952,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`apps/web/index.html`、`apps/web/app.js`、`services/api/mock-data.js`、`services/api/server.js`、`data/seed/project_agent_swarm.seed.json`、`scripts/sqlite/sqlite_read.py`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是 Demo 数据和验收展示修正，不改变核心用户流程，也不开放真实 Runner 执行。
 
+## 2026-06-09 变更记录：本地 SQLite 试用版启停入口
+
+- 改了什么：新增 `scripts/start-local.ps1`、`scripts/status-local.ps1` 和 `scripts/stop-local.ps1`，用于启动 SQLite 模式 API、本地 Web 静态服务、查看状态和停止本项目本地试用进程；README、AGENTS、scripts README、Demo checklist 和开发路线同步入口。
+- 为什么改：让用户可以先试用“本地端”形态，状态持久化到 `data/local/agent-swarm.sqlite`，并且能明确停止和删除本地状态，降低试用成本。
+- 影响模块：`scripts/start-local.ps1`、`scripts/status-local.ps1`、`scripts/stop-local.ps1`、`README.md`、`AGENTS.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是本地试用入口和文档说明，不开放真实 Runner 执行、真实模型调用或云同步。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。

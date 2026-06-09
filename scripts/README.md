@@ -16,6 +16,9 @@
 ```text
 start-mock-api.ps1
 start-dev.ps1
+start-local.ps1
+status-local.ps1
+stop-local.ps1
 verify-mock-flows.ps1
 verify-sqlite-flows.ps1
 init-sqlite.ps1
@@ -26,6 +29,12 @@ sqlite/
 启动 `services/api/server.js`。
 
 `start-dev.ps1` 会启动 mock API 并打开 `apps/web/index.html`。
+
+`start-local.ps1` 会启动 SQLite 模式 API 和本地 Web 静态服务，用于人类本地试用。
+
+`status-local.ps1` 会检查本地试用版 API、Web、SQLite 数据库和 pid 状态。
+
+`stop-local.ps1` 会停止 `start-local.ps1` 启动的本地试用进程，并清理对应 pid 文件。
 
 `verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
 
