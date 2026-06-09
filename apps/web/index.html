@@ -330,23 +330,26 @@
 
       <section class="page-view" id="monitor">
         <div class="subpage-grid">
-          <article class="metric-card blue"><span>CPU</span><p>CPU 使用率</p><strong>-</strong><small>监控采集未接入</small></article>
-          <article class="metric-card green"><span>MEM</span><p>内存使用率</p><strong>-</strong><small>监控采集未接入</small></article>
-          <article class="metric-card orange"><span>NET</span><p>网络使用率</p><strong>-</strong><small>网络监控未接入</small></article>
+          <article class="metric-card blue"><span>CPU</span><p>CPU 使用率</p><strong>-</strong><small>未采集本机指标</small></article>
+          <article class="metric-card green"><span>MEM</span><p>内存使用率</p><strong>-</strong><small>未采集本机指标</small></article>
+          <article class="metric-card orange"><span>NET</span><p>网络使用率</p><strong>-</strong><small>未采集网络指标</small></article>
+          <article class="panel wide"><div class="card-head"><h2>日志采集</h2><span class="badge orange">未接入</span></div><p class="muted">当前页面不读取系统日志、进程日志或 Runner 执行日志；只保留后续监控入口占位。</p></article>
         </div>
       </section>
 
       <section class="page-view" id="billing">
         <div class="subpage-grid">
           <article class="metric-card violet"><span>◉</span><p>Token 消耗</p><strong>-</strong><small>真实模型调用未接入</small></article>
-          <article class="metric-card green"><span>￥</span><p>今日成本</p><strong>-</strong><small>计费统计未接入</small></article>
+          <article class="metric-card green"><span>￥</span><p>今日成本</p><strong>-</strong><small>不会产生真实账单</small></article>
+          <article class="panel wide"><div class="card-head"><h2>费用边界</h2><span class="badge orange">占位</span></div><p class="muted">当前未调用真实模型 API，未记录真实 token 明细，也没有连接任何计费服务；这里的费用页只用于后续数据结构占位。</p></article>
         </div>
       </section>
 
       <section class="page-view" id="integrations">
         <div class="subpage-grid">
-          <article class="panel"><div class="card-head"><h2>GitHub</h2></div><p class="muted">暂未接入真实 GitHub，同步和 PR 记录仍是后续能力。</p></article>
-          <article class="panel"><div class="card-head"><h2>本地 Runner</h2></div><p class="muted">当前只显示只读状态，不执行本地命令、不写文件。</p></article>
+          <article class="panel"><div class="card-head"><h2>GitHub</h2><span class="badge orange">未连接</span></div><p class="muted">暂未接入真实 GitHub；不会同步仓库、创建 PR、读取私有仓库或发起网络请求。</p></article>
+          <article class="panel"><div class="card-head"><h2>本地 Runner</h2><span class="badge orange">只读</span></div><p class="muted">当前只显示只读状态和审批生成的队列记录，不执行本地命令、不写文件、不修改 Git。</p></article>
+          <article class="panel"><div class="card-head"><h2>模型 Provider</h2><span class="badge orange">未接入</span></div><p class="muted">OpenAI、Anthropic、Gemini 等真实模型调用尚未接入；页面不会保存或发送真实 API Key。</p></article>
         </div>
       </section>
 
