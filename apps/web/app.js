@@ -1015,7 +1015,7 @@ function renderApprovalPage(selectedIndex = 0) {
     </div>
     <div class="approval-meta">
       <div><span>修改原因</span><strong>${escapeHtml(item.reason)}</strong></div>
-      <div><span>执行后果</span><strong>${item.targetService === "agent_config" ? "只创建 Agent 配置审批申请，当前不会修改 Agent 配置，也不会进入 Runner 队列。" : `会影响 ${escapeHtml(item.affectedFiles.length)} 个本地文件，执行前必须由用户确认。`}</strong></div>
+      <div><span>审批后果</span><strong>${item.targetService === "agent_config" ? "只创建 Agent 配置审批申请，当前不会修改 Agent 配置，也不会进入 Runner 队列。" : `只生成只读 Runner job 记录，展示 ${escapeHtml(item.affectedFiles.length)} 个影响文件；当前不会执行命令、写文件或修改 Git。`}</strong></div>
     </div>
     <div class="approval-files">
       <h3>影响文件</h3>
@@ -1035,7 +1035,9 @@ function renderApprovalPage(selectedIndex = 0) {
 
   if (allowButton) {
     allowButton.disabled = !isPending || approvalActionRunning;
-    allowButton.textContent = item.requiresSecondConfirm || item.riskTone === "high" ? "二次确认后允许执行" : "允许执行";
+    allowButton.textContent = item.targetService === "agent_config"
+      ? "批准 Agent 配置申请"
+      : "批准并生成只读 Runner job";
   }
   if (patchOnlyButton) patchOnlyButton.disabled = !isPending || approvalActionRunning;
   if (rejectButton) rejectButton.disabled = !isPending || approvalActionRunning;
@@ -1109,8 +1111,8 @@ function renderWorkflowPage() {
 
 function runnerJobStatusLabel(status) {
   const labels = {
-    queued: "等待执行",
-    running: "执行中",
+    queued: "只读排队",
+    running: "Mock 流转中",
     succeeded: "已成功",
     failed: "已失败",
     cancelled: "已取消",
@@ -1158,7 +1160,7 @@ function renderRunnerStatus() {
       <span>执行命令：${escapeHtml(runnerPermissionLabel(permissions.executeCommands))}</span>
       <span>网络请求：${escapeHtml(runnerPermissionLabel(permissions.networkRequests))}</span>
     </div>
-    <p class="runner-safety-note">当前为 Mock 只读状态页：不会执行本地命令、不会写文件、不会发起网络请求，也不会修改 Git。</p>
+    <p class="runner-safety-note">当前为 Mock 只读状态页：Runner job 只是审批后的排队记录，不会执行本地命令、不会写文件、不会发起网络请求，也不会修改 Git。</p>
   `;
 }
 
@@ -1178,11 +1180,11 @@ function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   if (!tableBody || !detail) return;
 
   if (jobs.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="5">暂无 Runner job。审批通过后会出现在这里。</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="5">暂无 Runner job。审批通过后只会生成只读记录。</td></tr>`;
     detail.innerHTML = `
       <div class="approval-meta">
         <div><span>当前状态</span><strong>暂无 Runner job</strong></div>
-        <div><span>安全说明</span><strong>当前只读，不会执行本地命令。</strong></div>
+        <div><span>安全说明</span><strong>当前只读，不会执行本地命令、写文件或修改 Git。</strong></div>
       </div>
     `;
     if (detailStatus) {
@@ -1221,7 +1223,7 @@ function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
       <div><span>操作类型</span><strong>${escapeHtml((job.operationTypes || []).join(" / ") || "未记录")}</strong></div>
       <div><span>创建时间</span><strong>${escapeHtml(job.createdAt || "未记录")}</strong></div>
       <div><span>更新时间</span><strong>${escapeHtml(job.updatedAt || "未记录")}</strong></div>
-      <div><span>安全说明</span><strong>当前只读，不会执行本地命令。</strong></div>
+      <div><span>安全说明</span><strong>当前只读，只表示已批准记录；不会执行本地命令、写文件或修改 Git。</strong></div>
     </div>
     <div class="task-files">
       <h3>影响文件</h3>
@@ -1367,7 +1369,7 @@ async function runApprovalAction(action) {
   if (!item?.id || approvalActionRunning) return;
 
   const actionLabels = {
-    approve: "允许执行",
+    approve: item.targetService === "agent_config" ? "批准 Agent 配置申请" : "生成只读 Runner job",
     reject: "拒绝",
     "patch-only": "只生成补丁",
   };
@@ -1475,8 +1477,8 @@ async function runRuntimeStateAction(action) {
 
   const actionText = {
     export: "导出状态",
-    reset: "重置本地数据",
-    clear: "清理/重置状态",
+    reset: "恢复 Seed 数据",
+    clear: "清理运行态并恢复 Seed",
   }[action];
 
   runtimeStateRunning = true;
@@ -1514,7 +1516,10 @@ async function runRuntimeStateAction(action) {
       await renderLocalTrialStatus();
     }
 
-    setRuntimeStateFeedback(`已完成：${actionText}`, "success");
+    const completionText = action === "export"
+      ? "已导出当前本地试用状态快照"
+      : `${actionText}已完成；不会删除 SQLite 数据库文件，也不会停止本地服务或执行 Runner。`;
+    setRuntimeStateFeedback(completionText, "success");
   } catch (error) {
     setRuntimeStateFeedback(`处理失败：${error.message}`, "error");
   } finally {
