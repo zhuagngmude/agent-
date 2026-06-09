@@ -28,7 +28,7 @@
         <button data-page="knowledge"><span>▣</span>知识库管理</button>
         <button data-page="code"><span>⌘</span>代码与知识</button>
         <button data-page="runtime"><span>◇</span>运行与调度</button>
-        <button data-page="approval"><span>✓</span>审批与确认 <em>3</em></button>
+        <button data-page="approval"><span>✓</span>审批与确认 <em>0</em></button>
         <button data-page="monitor"><span>▥</span>监控与日志</button>
         <button data-page="billing"><span>◌</span>费用与用量</button>
         <button data-page="integrations"><span>✣</span>集成与扩展</button>
@@ -104,11 +104,11 @@
             <div class="agent-step cyan"><b>部署运维智能体</b><span>2 个实例运行中</span><i style="--p:20%"></i></div>
           </div>
           <div class="workflow-stats" id="workflowStats">
-            <div><span>总智能体数</span><strong>24</strong></div>
-            <div><span>总任务数</span><strong>68</strong></div>
-            <div><span>完成任务</span><strong>36</strong></div>
-            <div><span>协作成功率</span><strong>92.3%</strong></div>
-            <div><span>平均响应时间</span><strong>1.2s</strong></div>
+            <div><span>总智能体数</span><strong>-</strong></div>
+            <div><span>总任务数</span><strong>-</strong></div>
+            <div><span>完成任务</span><strong>-</strong></div>
+            <div><span>协作成功率</span><strong>-</strong></div>
+            <div><span>平均响应时间</span><strong>-</strong></div>
           </div>
         </article>
 
@@ -123,14 +123,14 @@
               <p>连接 Mock API 后会显示真实审批申请。</p>
             </div>
           </div>
-          <footer><span id="approvalSummary">共 3 项待审批</span> <button>进入审批页</button></footer>
+          <footer><span id="approvalSummary">等待审批数据</span> <button>进入审批页</button></footer>
         </article>
       </section>
 
       <section class="bottom-grid">
         <article class="panel">
           <div class="card-head"><h2>任务队列</h2></div>
-          <div class="mini-tabs"><b>进行中 32</b><span>排队中 12</span><span>已完成 36</span></div>
+          <div class="mini-tabs"><b>进行中 -</b><span>排队中 -</span><span>已完成 -</span></div>
           <ul class="task-list" id="taskQueue">
             <li><span class="icon purple">T</span><b>正在读取任务队列</b><em>Mock API</em><strong>等待数据</strong></li>
           </ul>
@@ -267,7 +267,7 @@
 
       <section class="page-view" id="code">
         <article class="panel wide">
-          <div class="card-head"><h2>代码与知识</h2><button class="primary-mini">同步代码索引</button></div>
+          <div class="card-head"><h2>代码与知识</h2><button class="primary-mini">代码索引未接入</button></div>
           <div class="code-box">apps/web/index.html<br>services/api/server.js<br>docs/api-draft.md<br>dev-docs/AI开发维护手册.md</div>
         </article>
       </section>
@@ -329,31 +329,31 @@
 
       <section class="page-view" id="monitor">
         <div class="subpage-grid">
-          <article class="metric-card blue"><span>CPU</span><p>CPU 使用率</p><strong>62%</strong><small>16 核 / 32 线程</small></article>
-          <article class="metric-card green"><span>MEM</span><p>内存使用率</p><strong>58%</strong><small>18.6 GB / 32 GB</small></article>
-          <article class="metric-card orange"><span>NET</span><p>网络使用率</p><strong>35%</strong><small>350 Mbps</small></article>
+          <article class="metric-card blue"><span>CPU</span><p>CPU 使用率</p><strong>-</strong><small>监控采集未接入</small></article>
+          <article class="metric-card green"><span>MEM</span><p>内存使用率</p><strong>-</strong><small>监控采集未接入</small></article>
+          <article class="metric-card orange"><span>NET</span><p>网络使用率</p><strong>-</strong><small>网络监控未接入</small></article>
         </div>
       </section>
 
       <section class="page-view" id="billing">
         <div class="subpage-grid">
-          <article class="metric-card violet"><span>◉</span><p>Token 消耗</p><strong>1.23M</strong><small>≈ ￥245.60</small></article>
-          <article class="metric-card green"><span>￥</span><p>今日成本</p><strong>￥128.40</strong><small>较昨日 +8%</small></article>
+          <article class="metric-card violet"><span>◉</span><p>Token 消耗</p><strong>-</strong><small>真实模型调用未接入</small></article>
+          <article class="metric-card green"><span>￥</span><p>今日成本</p><strong>-</strong><small>计费统计未接入</small></article>
         </div>
       </section>
 
       <section class="page-view" id="integrations">
         <div class="subpage-grid">
-          <article class="panel"><div class="card-head"><h2>GitHub</h2></div><p class="muted">已连接，用于提交、检查点和 PR 记录。</p></article>
-          <article class="panel"><div class="card-head"><h2>本地 Runner</h2></div><p class="muted">已连接，写文件和执行命令需要用户确认。</p></article>
+          <article class="panel"><div class="card-head"><h2>GitHub</h2></div><p class="muted">暂未接入真实 GitHub，同步和 PR 记录仍是后续能力。</p></article>
+          <article class="panel"><div class="card-head"><h2>本地 Runner</h2></div><p class="muted">当前只显示只读状态，不执行本地命令、不写文件。</p></article>
         </div>
       </section>
 
       <section class="page-view" id="settings">
         <article class="panel wide">
           <div class="card-head"><h2>设置与密钥</h2></div>
-          <div class="key-card"><b>OpenAI API</b><span>已配置</span><p>密钥已加密保存，界面不显示任何尾号</p><div class="bar"><i style="--p:60%"></i></div><small>预算使用：60%</small></div>
-          <div class="key-card"><b>Anthropic API</b><span>已配置</span><p>密钥仅用于模型调用，日志自动脱敏</p><div class="bar"><i style="--p:40%"></i></div><small>预算使用：40%</small></div>
+          <div class="key-card"><b>OpenAI API</b><span>未接入</span><p>当前不保存真实模型密钥，界面只保留配置入口占位。</p><div class="bar"><i style="--p:0%"></i></div><small>真实模型调用未接入</small></div>
+          <div class="key-card"><b>Anthropic API</b><span>未接入</span><p>当前不保存真实模型密钥，日志脱敏规则仍是后续能力。</p><div class="bar"><i style="--p:0%"></i></div><small>真实模型调用未接入</small></div>
         </article>
         <article class="panel wide">
           <div class="card-head"><h2>本地状态管理</h2><span class="badge orange">Mock API</span></div>

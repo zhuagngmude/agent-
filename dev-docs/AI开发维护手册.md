@@ -938,6 +938,12 @@ docs/runner-safety-acceptance.md
 - 为什么改：数据库使用 snake_case，API/前端使用 camelCase，字段转换必须保留但应集中管理，避免转换逻辑散在查询流程中，后续改 schema 或 response shape 时难以维护。
 - 影响模块：`scripts/sqlite/sqlite_read.py`、`services/api/db/sqlite-read.js`、`scripts/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是数据库读取层内部整理，不改变用户可见产品流程。
+## 2026-06-09 变更记录：前端旧占位文案收敛
+
+- 改了什么：清理 `apps/web/index.html` 和 `apps/web/data.js` 中加载前静态固定数值、离线兜底旧审批/任务/commit 示例、真实模型密钥“已配置”、真实集成“已连接”、假监控和假费用文案；`apps/web/app.js` 补充首页空态并停止显示假 Token 消耗。
+- 为什么改：数据库和 API 链路已经稳定，前端加载前或离线兜底不能继续展示容易误导验收的旧 demo 数据，否则后续会误判真实能力已经接入。
+- 影响模块：`apps/web/index.html`、`apps/web/data.js`、`apps/web/app.js`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是前端原型文案和兜底数据收敛，不改变核心用户流程。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 

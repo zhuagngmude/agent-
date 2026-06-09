@@ -68,7 +68,12 @@ function renderDashboard() {
   const approvalList = document.querySelector("#approvalList");
   if (approvalList && appData.approvalRequests) {
     const pendingApprovalCount = appData.approvalRequests.filter((item) => item.status === "pending").length;
-    approvalList.innerHTML = appData.approvalRequests.map((item) => `
+    approvalList.innerHTML = appData.approvalRequests.length === 0 ? `
+      <div>
+        <strong>暂无待审批项</strong>
+        <p>连接 Mock API 后会显示 Runner 或 Agent 配置审批申请。</p>
+      </div>
+    ` : appData.approvalRequests.map((item) => `
       <div>
         <strong>${escapeHtml(item.file)}</strong>
         <p>修改类型：${escapeHtml(item.type)} · 申请人：${escapeHtml(item.agent)}</p>
@@ -82,7 +87,9 @@ function renderDashboard() {
 
   const taskQueue = document.querySelector("#taskQueue");
   if (taskQueue && appData.taskQueue) {
-    taskQueue.innerHTML = appData.taskQueue.map((item) => `
+    taskQueue.innerHTML = appData.taskQueue.length === 0 ? `
+      <li><span class="icon purple">T</span><b>暂无任务队列数据</b><em>等待 Mock API</em><strong>未加载</strong></li>
+    ` : appData.taskQueue.map((item) => `
       <li><span class="icon ${escapeHtml(item.tone)}">${escapeHtml(item.icon)}</span><b>${escapeHtml(item.title)}</b><em>${escapeHtml(item.type)} · ${escapeHtml(statusLabel("task", item.status))}</em><strong>${escapeHtml(item.eta)}</strong></li>
     `).join("");
   }
@@ -96,7 +103,9 @@ function renderDashboard() {
 
   const gitCheckpointList = document.querySelector("#gitCheckpointList");
   if (gitCheckpointList && appData.gitCheckpoints) {
-    gitCheckpointList.innerHTML = appData.gitCheckpoints.map((item) => `
+    gitCheckpointList.innerHTML = appData.gitCheckpoints.length === 0 ? `
+      <li><b>Git</b><span>暂无保存点数据</span><em>等待 Mock API</em></li>
+    ` : appData.gitCheckpoints.map((item) => `
       <li><b>${escapeHtml(item.hash)}</b><span>${escapeHtml(item.message)}</span><em>${escapeHtml(item.time)}</em></li>
     `).join("");
   }
@@ -294,8 +303,8 @@ function normalizeDashboard(apiData) {
       { label: "待确认事项", value: apiData.metrics?.pendingApprovals ?? "-", note: "Runner 审批优先", tone: "orange", icon: "!" },
       { label: "活跃任务", value: apiData.metrics?.activeTasks ?? "-", note: "运行中与排队中", tone: "blue", icon: "T" },
       { label: "Git 检查点", value: apiData.metrics?.gitCheckpoints ?? "-", note: "项目保存点", tone: "green", icon: "G" },
-      { label: "Token 消耗", value: apiData.metrics?.tokenUsage ?? "-", note: "预算追踪", tone: "violet", icon: "K" },
-      { label: "模型使用", value: apiData.metrics?.modelCount ?? "-", note: "模型配置数", tone: "cyan", icon: "M" },
+      { label: "Token 消耗", value: "-", note: "真实模型调用未接入", tone: "violet", icon: "K" },
+      { label: "模型使用", value: apiData.metrics?.modelCount ?? "-", note: "模型配置草案", tone: "cyan", icon: "M" },
     ],
     workflow: primaryWorkflow ? {
       id: primaryWorkflow.id,
