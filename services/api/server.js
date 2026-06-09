@@ -4,6 +4,7 @@ const path = require("path");
 const { URL } = require("url");
 const data = require("./mock-data");
 const { readDashboardFromSqlite, readProjectSnapshotFromSqlite } = require("./db/sqlite-read");
+const { resetSqliteState, runSqliteWrite } = require("./db/sqlite-write");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -77,6 +78,10 @@ function projectSnapshotResponse(fallback) {
     console.warn(`[sqlite-read] ${error.message}. Falling back to mock response.`);
     return null;
   }
+}
+
+function sendSqliteWriteResult(res, result) {
+  sendJson(res, result.statusCode || 200, result.body || {});
 }
 
 function findApproval(id) {
@@ -355,13 +360,22 @@ function createAgentChangeApproval(agent, body) {
 }
 
 async function handleApprovalAction(req, res, approvalId, action) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("approvalAction", {
+      projectId: data.projectId,
+      approvalId,
+      action,
+      body,
+    }));
+    return;
+  }
+
   const approval = findApproval(approvalId);
   if (!approval) {
     sendJson(res, 404, { error: "approval_not_found" });
     return;
   }
-
-  const body = await readBody(req);
 
   if (action === "approve") {
     if (approval.requiresSecondConfirm && body.secondConfirm !== true) {
@@ -420,13 +434,22 @@ async function handleApprovalAction(req, res, approvalId, action) {
 }
 
 async function handleAgentChangeRequest(req, res, agentId) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("createAgentChangeRequest", {
+      projectId: data.projectId,
+      agentId,
+      body,
+    }));
+    return;
+  }
+
   const agent = findAgent(agentId);
   if (!agent) {
     sendJson(res, 404, { error: "agent_not_found" });
     return;
   }
 
-  const body = await readBody(req);
   const approval = createAgentChangeApproval(agent, body);
   saveRuntimeState();
   sendJson(res, 201, {
@@ -436,6 +459,17 @@ async function handleAgentChangeRequest(req, res, agentId) {
 }
 
 async function handleAgentConfigApplicationApply(req, res, applicationId) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("agentConfigApplicationAction", {
+      projectId: data.projectId,
+      applicationId,
+      action: "apply",
+      body,
+    }));
+    return;
+  }
+
   const application = findAgentConfigApplication(applicationId);
   if (!application) {
     sendJson(res, 404, { error: "agent_config_application_not_found" });
@@ -451,7 +485,6 @@ async function handleAgentConfigApplicationApply(req, res, applicationId) {
     return;
   }
 
-  const body = await readBody(req);
   if (body.secondConfirm !== true) {
     sendJson(res, 409, {
       error: "second_confirm_required",
@@ -499,13 +532,23 @@ async function handleAgentConfigApplicationApply(req, res, applicationId) {
 }
 
 async function handleAgentConfigApplicationCancel(req, res, applicationId) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("agentConfigApplicationAction", {
+      projectId: data.projectId,
+      applicationId,
+      action: "cancel",
+      body,
+    }));
+    return;
+  }
+
   const application = findAgentConfigApplication(applicationId);
   if (!application) {
     sendJson(res, 404, { error: "agent_config_application_not_found" });
     return;
   }
 
-  const body = await readBody(req);
   if (application.status !== "pending_apply") {
     sendJson(res, 409, {
       error: "application_not_pending_apply",
@@ -578,13 +621,23 @@ function transitionTask(task, action, body) {
 }
 
 async function handleTaskAction(req, res, taskId, action) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("transitionTask", {
+      projectId: data.projectId,
+      taskId,
+      action,
+      body,
+    }));
+    return;
+  }
+
   const task = findTask(taskId);
   if (!task) {
     sendJson(res, 404, { error: "task_not_found" });
     return;
   }
 
-  const body = await readBody(req);
   const transitionError = transitionTask(task, action, body);
   if (transitionError) {
     sendJson(res, 409, transitionError);
@@ -610,6 +663,24 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "GET" && pathname === "/api/runtime-state") {
+    if (sqliteReadEnabled()) {
+      const snapshot = projectSnapshotResponse(() => null);
+      sendJson(res, 200, {
+        mode: "sqlite",
+        stateFile: runtimeStateFile,
+        sqliteRuntimeState: true,
+        state: {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          approvals: snapshot?.approvals || [],
+          tasks: snapshot?.tasks || [],
+          runnerJobs: snapshot?.runnerJobs || [],
+          agentConfigApplications: snapshot?.agentConfigApplications || [],
+        },
+      });
+      return;
+    }
+
     sendJson(res, 200, {
       stateFile: runtimeStateFile,
       exists: fs.existsSync(runtimeStateFile),
@@ -619,6 +690,25 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "POST" && pathname === "/api/runtime-state/reset") {
+    if (sqliteReadEnabled()) {
+      resetSqliteState();
+      const snapshot = projectSnapshotResponse(() => null);
+      sendJson(res, 200, {
+        ok: true,
+        mode: "sqlite",
+        message: "SQLite state reset from seed.",
+        state: {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          approvals: snapshot?.approvals || [],
+          tasks: snapshot?.tasks || [],
+          runnerJobs: snapshot?.runnerJobs || [],
+          agentConfigApplications: snapshot?.agentConfigApplications || [],
+        },
+      });
+      return;
+    }
+
     resetRuntimeState();
     sendJson(res, 200, {
       ok: true,
@@ -629,6 +719,16 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === "DELETE" && pathname === "/api/runtime-state") {
+    if (sqliteReadEnabled()) {
+      resetSqliteState();
+      sendJson(res, 200, {
+        ok: true,
+        mode: "sqlite",
+        message: "SQLite state reset from seed. Database file was kept.",
+      });
+      return;
+    }
+
     clearRuntimeState();
     sendJson(res, 200, {
       ok: true,

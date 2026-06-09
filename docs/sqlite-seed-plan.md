@@ -171,13 +171,14 @@ data/mock/runtime-state.json
 - Runner job 队列写入 `runner_jobs`，但仍只读，不执行。
 - Agent 配置应用/取消写入 `agent_config_applications`，并新增 `runtime_events`。
 
-`POST /api/runtime-state/reset` 后续应改为：
+`POST /api/runtime-state/reset` 在 SQLite 模式下已经改为：
 
-1. 停止使用当前 SQLite 连接的写事务。
+1. 调用 `scripts/seed-sqlite.ps1`。
 2. 清空第一版业务表。
-3. 重新执行 seed。
-4. 写入 `runtime_events(seed_reset)`。
-5. 返回与当前 Mock reset 相同语义的结果。
+3. 重新写入 seed。
+4. 返回当前 SQLite 状态摘要。
+
+`DELETE /api/runtime-state` 在 SQLite 模式下不删除数据库文件，只重置 seed 状态。
 
 ## 9. API 切换策略
 

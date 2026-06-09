@@ -913,6 +913,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/db/sqlite-read.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
 
+## 2026-06-09 变更记录：SQLite 状态流转写入
+
+- 改了什么：新增 `services/api/db/sqlite-write.js`，在 `AGENT_SWARM_DASHBOARD_SOURCE=sqlite` 下支持任务状态流转、审批 approve/reject/patch-only、Agent 配置变更申请、Agent 配置应用/取消写入 SQLite，并为状态变化写入 `runtime_events`；SQLite 模式下 `/api/runtime-state/reset` 通过 seed 重建状态。
+- 为什么改：让 SQLite 模式从只读展示进入可验证状态机，同时保持默认 Mock runtime-state 路径不变，避免影响现有演示。
+- 影响模块：`services/api/db/sqlite-write.js`、`services/api/server.js`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍是开发期开关能力，不改变默认用户流程。
+
 ## 2026-06-08 变更记录：迁移到英文路径
 
 - 改了什么：复制项目到 `F:\projects\agent-swarm`，并更新交接说明、API 草案、Mock API `workspacePath` 和设计参考页中的旧中文路径。
