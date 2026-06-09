@@ -932,6 +932,12 @@ docs/runner-safety-acceptance.md
 - 为什么改：SQLite 已经从只读进入状态流转写入阶段，桥接层必须更可维护、可回归，避免后续改 schema 或状态机时同时修改 PowerShell、Node 内联字符串和 Python 逻辑。
 - 影响模块：`scripts/init-sqlite.ps1`、`scripts/seed-sqlite.ps1`、`scripts/sqlite/`、`scripts/verify-sqlite-flows.ps1`、`services/api/db/sqlite-write.js`、`scripts/README.md`、`services/api/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是开发验证和数据库桥接层整理，不改变用户可见产品流程。
+## 2026-06-09 变更记录：SQLite 读取 mapper 整理
+
+- 改了什么：新增 `scripts/sqlite/sqlite_read.py`，将 SQLite 读取查询、Dashboard 快照组装和 row-to-API 字段转换集中到独立 Python mapper；`services/api/db/sqlite-read.js` 改为只负责调用脚本并解析 JSON。
+- 为什么改：数据库使用 snake_case，API/前端使用 camelCase，字段转换必须保留但应集中管理，避免转换逻辑散在查询流程中，后续改 schema 或 response shape 时难以维护。
+- 影响模块：`scripts/sqlite/sqlite_read.py`、`services/api/db/sqlite-read.js`、`scripts/README.md`、`docs/sqlite-seed-plan.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是数据库读取层内部整理，不改变用户可见产品流程。
 
 ## 2026-06-08 变更记录：迁移到英文路径
 

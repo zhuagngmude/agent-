@@ -35,7 +35,7 @@ sqlite/
 
 `seed-sqlite.ps1` 会从 `data/seed/project_agent_swarm.seed.json` 重建第一版 SQLite 初始数据。
 
-`sqlite/` 存放 SQLite Python 桥接脚本；PowerShell 和 Node.js 只负责传入路径、命令和参数。
+`sqlite/` 存放 SQLite Python 桥接脚本和 row mapper；PowerShell 和 Node.js 只负责传入路径、命令和参数。
 
 SQLite 数据库文件位于 `data/local/`，该目录是本地运行态，不提交。
 
