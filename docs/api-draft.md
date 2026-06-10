@@ -878,6 +878,12 @@ Response example:
   "realModelCallsAllowed": false,
   "gatewayMode": "disabled",
   "serviceBoundary": "server_only",
+  "featureFlags": {
+    "manualConnectivityTestEnvVar": "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST",
+    "manualConnectivityTestRequested": false,
+    "manualConnectivityTestActive": false,
+    "realProviderRequestsAllowed": false
+  },
   "providers": [
     {
       "id": "openai",
@@ -939,6 +945,12 @@ Response draft:
   "providerSupported": true,
   "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
   "keyConfigured": false,
+  "featureFlags": {
+    "manualConnectivityTestEnvVar": "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST",
+    "manualConnectivityTestRequested": false,
+    "manualConnectivityTestActive": false,
+    "realProviderRequestsAllowed": false
+  },
   "realModelCallsAllowed": false,
   "wouldCallProvider": false,
   "blockedReasons": [
@@ -1012,6 +1024,12 @@ Planned response draft:
   "providerSupported": true,
   "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
   "keyConfigured": false,
+  "featureFlags": {
+    "manualConnectivityTestEnvVar": "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST",
+    "manualConnectivityTestRequested": false,
+    "manualConnectivityTestActive": false,
+    "realProviderRequestsAllowed": false
+  },
   "realProviderRequestAttempted": false,
   "result": "blocked",
   "errorCategory": "missing_key",
@@ -1043,12 +1061,13 @@ Manual connectivity acceptance rules:
 - It may return only coarse result fields such as `ok`, `provider`, `model`, `result`, `errorCategory`, and timestamp metadata.
 - It must have a timeout and a small response/body limit before any real provider request is allowed.
 - It must stay disabled by default until verification covers blocked, missing-key, unsupported-provider, timeout, and provider-error cases.
+- MVP-0.2 may report `featureFlags.manualConnectivityTestRequested=true` when `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST=true` is present on the API process, but `manualConnectivityTestActive` and `realProviderRequestsAllowed` must still remain `false`.
 
 Implementation order before enabling real provider requests:
 
 1. Keep the disabled backend stub returning `not_implemented` and all side effects false.
 2. Keep regression checks proving the stub cannot call providers.
-3. Add a manual feature flag that is disabled by default.
+3. Keep the manual feature flag boundary visible while forcing it inactive in MVP-0.2.
 4. Only then consider adding isolated provider adapters, one provider at a time, with no SDK leakage into UI, Agent, or Runner code.
 
 ## 2026-06-08 实现备注：工作流只读接口

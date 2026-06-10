@@ -1034,3 +1034,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：先把 Model Gateway 边界从通用 API server 中拆出，避免后续 feature flag 或 provider adapter 设计散落在路由层，同时保持当前所有接口行为不变。
 - 影响模块：`services/api/model-gateway.js`、`services/api/server.js`、`services/api/README.md`、`docs/api-draft.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是后端结构整理，不新增真实 provider SDK、真实模型请求、API Key 输入/保存、Agent 触发或 Runner job 创建。
+
+## 2026-06-10 变更记录：Model Gateway feature flag 边界
+
+- 改了什么：`services/api/model-gateway.js` 在 status、dry-run 和 connectivity-test 响应中返回 `featureFlags`，公开 `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` 的请求状态；`scripts/verify-local-ui.ps1` 抽出 feature flag 验收 helper，并覆盖所有 Model Gateway 正反用例。
+- 为什么改：在进入 provider adapter 设计前，先把“手动连通性测试即使被请求开启也不能真实生效”的边界固化成 API 字段和回归断言。
+- 影响模块：`services/api/model-gateway.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。

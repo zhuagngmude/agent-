@@ -67,12 +67,25 @@ function Assert-TextContains {
   }
 }
 
+function Assert-ModelGatewayFeatureFlags {
+  param(
+    [Parameter(Mandatory = $true)][object]$FeatureFlags,
+    [string]$Prefix = "Model Gateway feature flags"
+  )
+
+  Assert-Equal $FeatureFlags.manualConnectivityTestEnvVar "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST" "$Prefix should expose the manual connectivity env var name."
+  Assert-True (($FeatureFlags.manualConnectivityTestRequested -eq $true) -or ($FeatureFlags.manualConnectivityTestRequested -eq $false)) "$Prefix should report the requested flag as a boolean."
+  Assert-Equal $FeatureFlags.manualConnectivityTestActive $false "$Prefix should not be active in MVP-0.2."
+  Assert-Equal $FeatureFlags.realProviderRequestsAllowed $false "$Prefix should not allow provider requests in MVP-0.2."
+}
+
 function Assert-DryRunNoSideEffects {
   param(
     [Parameter(Mandatory = $true)][object]$DryRun,
     [string]$Prefix = "Model Gateway dry-run"
   )
 
+  Assert-ModelGatewayFeatureFlags -FeatureFlags $DryRun.featureFlags -Prefix "$Prefix feature flags"
   Assert-Equal $DryRun.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
   Assert-Equal $DryRun.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
   Assert-Equal $DryRun.sideEffects.createsTasks $false "$Prefix should not create tasks."
@@ -89,6 +102,7 @@ function Assert-ConnectivityTestNoSideEffects {
     [string]$Prefix = "Model Gateway connectivity test"
   )
 
+  Assert-ModelGatewayFeatureFlags -FeatureFlags $ConnectivityTest.featureFlags -Prefix "$Prefix feature flags"
   Assert-Equal $ConnectivityTest.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
   Assert-Equal $ConnectivityTest.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
   Assert-Equal $ConnectivityTest.sideEffects.createsTasks $false "$Prefix should not create tasks."
@@ -210,6 +224,7 @@ Assert-Equal $gateway.safety.exposesApiKeysToFrontend $false "API keys should no
 Assert-Equal $gateway.safety.writesDatabase $false "Model Gateway status should not write the database."
 Assert-Equal $gateway.safety.createsRunnerJobs $false "Model Gateway status should not create Runner jobs."
 Assert-Equal $gateway.safety.makesNetworkRequests $false "Model Gateway status should not make provider network requests."
+Assert-ModelGatewayFeatureFlags -FeatureFlags $gateway.featureFlags -Prefix "Model Gateway status feature flags"
 
 $dryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
   provider = "openai"
@@ -308,6 +323,18 @@ $invalidPurposeConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-g
 Assert-Equal $invalidPurposeConnectivityTest.requestValid $false "Invalid purpose connectivity-test should be invalid."
 Assert-TextContains (@($invalidPurposeConnectivityTest.validationErrors) -join "`n") "purpose must be manual_connectivity_test." "Invalid purpose connectivity-test should report validation error."
 Assert-ConnectivityTestNoSideEffects -ConnectivityTest $invalidPurposeConnectivityTest -Prefix "Invalid purpose connectivity-test"
+
+$previousManualConnectivityEnv = $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST
+try {
+  $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST = "true"
+  $flagBoundaryJson = node -e "const gateway = require('./services/api/model-gateway'); process.stdout.write(JSON.stringify(gateway.modelGatewayConnectivityTest({provider:'openai',model:'gpt-4.1-mini',purpose:'manual_connectivity_test',secondConfirm:true,confirmText:'local feature flag boundary'}).featureFlags));"
+  $flagBoundary = $flagBoundaryJson | ConvertFrom-Json
+  Assert-Equal $flagBoundary.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
+  Assert-Equal $flagBoundary.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.2."
+  Assert-Equal $flagBoundary.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.2."
+} finally {
+  $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST = $previousManualConnectivityEnv
+}
 
 $missingConfirmConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
   provider = "openai"

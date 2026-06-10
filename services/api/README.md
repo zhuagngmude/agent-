@@ -26,7 +26,9 @@ mock-data.js
 model-gateway.js
 ```
 
-`model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, and the disabled connectivity-test stub. It must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
+`model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. It must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
+
+`AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is currently a visible request flag only. Even when that environment variable is `true`, MVP-0.2 must keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
 
 启动：
 

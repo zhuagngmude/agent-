@@ -3,6 +3,7 @@ const modelGatewayProviders = [
   { id: "anthropic", label: "Anthropic", envVar: "AGENT_SWARM_ANTHROPIC_API_KEY" },
   { id: "google", label: "Google Gemini", envVar: "AGENT_SWARM_GOOGLE_API_KEY" },
 ];
+const manualConnectivityTestFlagEnvVar = "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST";
 
 function providerById(providerId) {
   return modelGatewayProviders.find((item) => item.id === providerId);
@@ -16,12 +17,22 @@ function parseString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function modelGatewayFeatureFlags() {
+  return {
+    manualConnectivityTestEnvVar: manualConnectivityTestFlagEnvVar,
+    manualConnectivityTestRequested: process.env[manualConnectivityTestFlagEnvVar] === "true",
+    manualConnectivityTestActive: false,
+    realProviderRequestsAllowed: false,
+  };
+}
+
 function modelGatewayStatus() {
   return {
     enabled: false,
     realModelCallsAllowed: false,
     gatewayMode: "disabled",
     serviceBoundary: "server_only",
+    featureFlags: modelGatewayFeatureFlags(),
     providers: modelGatewayProviders.map((provider) => ({
       id: provider.id,
       label: provider.label,
@@ -79,6 +90,7 @@ function modelGatewayDryRun(request) {
     providerSupported: Boolean(provider),
     keyEnvVar: provider?.envVar || "",
     keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
     wouldCallProvider: false,
     blockedReasons: [
@@ -139,6 +151,7 @@ function modelGatewayConnectivityTest(request) {
     providerSupported: Boolean(provider),
     keyEnvVar: provider?.envVar || "",
     keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
     realProviderRequestAttempted: false,
     result: "not_implemented",
