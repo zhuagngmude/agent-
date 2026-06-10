@@ -34,6 +34,27 @@ Any documented timeout guidance:
 Any documented response size guidance:
 ```
 
+## Operator-Provided Relay Facts
+
+Source: relay administrator response provided by the local operator on 2026-06-10.
+
+These are non-secret connection facts only. No API key, account id, dashboard data, prompt, model output, provider body, usage, cost, or raw error was provided or recorded.
+
+```text
+Relay platform name: cheng.pink OpenAI-compatible relay
+Base URL shape: https://api.cheng.pink/v1
+Base URL note: /v1 may be included or omitted
+Recommended endpoint family: Chat Completions API
+Primary endpoint path: /v1/chat/completions
+Optional endpoint path: /v1/responses
+Available model ids: gpt-5.5, gpt-5.4, gpt-5.4-mini
+Minimal test model id: gpt-5.4-mini
+Authentication scheme: Authorization: Bearer <API_KEY>
+Streaming: supports stream=false and stream=true
+```
+
+Implementation note: the future adapter must normalize the base URL and endpoint path so it never builds a duplicated path such as `/v1/v1/chat/completions`.
+
 ## Endpoint Family
 
 Choose one documented endpoint family before implementation:
@@ -79,7 +100,7 @@ Allowed local API request shape:
 ```json
 {
   "provider": "openai_compat",
-  "model": "relay-documented-model-id",
+  "model": "gpt-5.4-mini",
   "purpose": "manual_connectivity_test",
   "secondConfirm": true,
   "confirmText": "I understand this will make one real provider connectivity request.",

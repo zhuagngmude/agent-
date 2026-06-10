@@ -1118,3 +1118,10 @@ docs/runner-safety-acceptance.md
 - Why: the unknown relay candidate lacks public endpoint and model details, while DeepSeek has public docs for OpenAI-compatible Chat Completions. Recording only non-secret facts lets the project compare provider candidates without handling API keys or making real requests.
 - Impacted modules: `docs/deepseek-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a development checklist and does not enable real DeepSeek calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway cheng.pink relay facts captured
+
+- What changed: updated `docs/relay-provider-info-checklist.md` with operator-provided cheng.pink OpenAI-compatible relay facts, including base URL shape, endpoint paths, available model ids, minimal test model, Bearer auth, and streaming support.
+- Why: the relay administrator provided enough non-secret information to draft a fixed minimal ping later, while still keeping API keys and account data outside Git, logs, SQLite, and frontend code.
+- Impacted modules: `docs/relay-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a documentation checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
