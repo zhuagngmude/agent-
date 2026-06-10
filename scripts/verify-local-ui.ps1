@@ -83,6 +83,24 @@ function Assert-DryRunNoSideEffects {
   Assert-Equal $DryRun.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
 }
 
+function Assert-ConnectivityTestNoSideEffects {
+  param(
+    [Parameter(Mandatory = $true)][object]$ConnectivityTest,
+    [string]$Prefix = "Model Gateway connectivity test"
+  )
+
+  Assert-Equal $ConnectivityTest.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
+  Assert-Equal $ConnectivityTest.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
+  Assert-Equal $ConnectivityTest.sideEffects.createsTasks $false "$Prefix should not create tasks."
+  Assert-Equal $ConnectivityTest.sideEffects.createsApprovals $false "$Prefix should not create approvals."
+  Assert-Equal $ConnectivityTest.sideEffects.createsRunnerJobs $false "$Prefix should not create Runner jobs."
+  Assert-Equal $ConnectivityTest.sideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+  Assert-Equal $ConnectivityTest.sideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $ConnectivityTest.sideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $ConnectivityTest.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
+  Assert-Equal $ConnectivityTest.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
+}
+
 function Test-Command {
   param([string]$Name)
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -237,6 +255,70 @@ $invalidPurposeDryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry
 Assert-Equal $invalidPurposeDryRun.requestValid $false "Invalid purpose dry-run should be invalid."
 Assert-TextContains (@($invalidPurposeDryRun.validationErrors) -join "`n") "purpose must be connectivity_check." "Invalid purpose dry-run should report validation error."
 Assert-DryRunNoSideEffects -DryRun $invalidPurposeDryRun -Prefix "Invalid purpose dry-run"
+
+$connectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+  provider = "openai"
+  model = "gpt-4.1-mini"
+  purpose = "manual_connectivity_test"
+  secondConfirm = $true
+  confirmText = "I understand this will make one real provider connectivity request."
+  requestedBy = "local_user"
+}
+Assert-Equal $connectivityTest.ok $false "Model Gateway connectivity-test stub should remain blocked."
+Assert-Equal $connectivityTest.requestValid $true "Model Gateway connectivity-test stub request should be valid."
+Assert-Equal $connectivityTest.providerSupported $true "OpenAI provider should be recognized by connectivity-test stub."
+Assert-Equal $connectivityTest.realModelCallsAllowed $false "Model Gateway connectivity-test stub should not allow real calls."
+Assert-Equal $connectivityTest.realProviderRequestAttempted $false "Model Gateway connectivity-test stub should not attempt provider requests."
+Assert-Equal $connectivityTest.result "not_implemented" "Model Gateway connectivity-test stub should stay not implemented."
+Assert-Equal $connectivityTest.providerResponseStored $false "Model Gateway connectivity-test stub should not store provider responses."
+Assert-ConnectivityTestNoSideEffects -ConnectivityTest $connectivityTest
+
+$unknownProviderConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+  provider = "unknown"
+  model = "gpt-4.1-mini"
+  purpose = "manual_connectivity_test"
+  secondConfirm = $true
+  confirmText = "I understand this will make one real provider connectivity request."
+  requestedBy = "local_user"
+}
+Assert-Equal $unknownProviderConnectivityTest.requestValid $false "Unknown provider connectivity-test should be invalid."
+Assert-Equal $unknownProviderConnectivityTest.providerSupported $false "Unknown provider should not be supported by connectivity-test."
+Assert-Equal $unknownProviderConnectivityTest.realProviderRequestAttempted $false "Unknown provider connectivity-test should not attempt provider requests."
+Assert-ConnectivityTestNoSideEffects -ConnectivityTest $unknownProviderConnectivityTest -Prefix "Unknown provider connectivity-test"
+
+$missingModelConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+  provider = "openai"
+  purpose = "manual_connectivity_test"
+  secondConfirm = $true
+  confirmText = "I understand this will make one real provider connectivity request."
+  requestedBy = "local_user"
+}
+Assert-Equal $missingModelConnectivityTest.requestValid $false "Missing model connectivity-test should be invalid."
+Assert-TextContains (@($missingModelConnectivityTest.validationErrors) -join "`n") "model is required." "Missing model connectivity-test should report validation error."
+Assert-ConnectivityTestNoSideEffects -ConnectivityTest $missingModelConnectivityTest -Prefix "Missing model connectivity-test"
+
+$invalidPurposeConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+  provider = "openai"
+  model = "gpt-4.1-mini"
+  purpose = "connectivity_check"
+  secondConfirm = $true
+  confirmText = "I understand this will make one real provider connectivity request."
+  requestedBy = "local_user"
+}
+Assert-Equal $invalidPurposeConnectivityTest.requestValid $false "Invalid purpose connectivity-test should be invalid."
+Assert-TextContains (@($invalidPurposeConnectivityTest.validationErrors) -join "`n") "purpose must be manual_connectivity_test." "Invalid purpose connectivity-test should report validation error."
+Assert-ConnectivityTestNoSideEffects -ConnectivityTest $invalidPurposeConnectivityTest -Prefix "Invalid purpose connectivity-test"
+
+$missingConfirmConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+  provider = "openai"
+  model = "gpt-4.1-mini"
+  purpose = "manual_connectivity_test"
+  requestedBy = "local_user"
+}
+Assert-Equal $missingConfirmConnectivityTest.requestValid $false "Missing confirmation connectivity-test should be invalid."
+Assert-TextContains (@($missingConfirmConnectivityTest.validationErrors) -join "`n") "secondConfirm must be true." "Missing confirmation connectivity-test should require secondConfirm."
+Assert-TextContains (@($missingConfirmConnectivityTest.validationErrors) -join "`n") "confirmText is required." "Missing confirmation connectivity-test should require confirmText."
+Assert-ConnectivityTestNoSideEffects -ConnectivityTest $missingConfirmConnectivityTest -Prefix "Missing confirmation connectivity-test"
 
 $runner = Invoke-Json -Path "/api/projects/$projectId/runner/status"
 Assert-Equal $runner.permissions.writeFiles "approval_required" "Runner writes should remain approval-gated."

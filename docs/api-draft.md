@@ -981,7 +981,7 @@ Later phases, intentionally not part of dry-run:
 
 Purpose: planned manual real-provider connectivity test after dry-run is stable.
 
-Current status: specification only. This endpoint is not implemented in MVP-0.2. Do not add provider SDKs, do not make OpenAI/Anthropic/Gemini requests, and do not expose this as an active frontend control until the acceptance rules below are satisfied.
+Current MVP-0.2 implementation is a disabled backend stub. It validates the request shape and returns `not_implemented` with all side effects set to false. It does not add provider SDKs, does not make OpenAI/Anthropic/Gemini requests, and is not exposed as an active frontend control.
 
 This phase is narrower than general model calling. It only proves that a server-side provider key can reach the provider with a minimal, fixed connectivity check. It is not an Agent run, not a chat/completion feature, not a Runner capability, and not a logged model-call pipeline.
 
@@ -1042,10 +1042,10 @@ Manual connectivity acceptance rules:
 - It must have a timeout and a small response/body limit before any real provider request is allowed.
 - It must stay disabled by default until verification covers blocked, missing-key, unsupported-provider, timeout, and provider-error cases.
 
-Implementation order before enabling:
+Implementation order before enabling real provider requests:
 
-1. Add a disabled backend stub that returns `not_implemented` and all side effects false.
-2. Add regression checks proving the stub cannot call providers.
+1. Keep the disabled backend stub returning `not_implemented` and all side effects false.
+2. Keep regression checks proving the stub cannot call providers.
 3. Add a manual feature flag that is disabled by default.
 4. Only then consider adding isolated provider adapters, one provider at a time, with no SDK leakage into UI, Agent, or Runner code.
 

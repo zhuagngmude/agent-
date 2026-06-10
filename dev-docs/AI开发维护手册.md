@@ -1020,3 +1020,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：dry-run 已经能验证请求形状和安全边界，下一阶段需要先把“人工真实连通性测试”写成可验收规格，避免直接接 SDK、发真实请求或把它误当成 Agent/Runner 能力。
 - 影响模块：`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是后续实现前的技术规格，不改变当前本地试用能力。当前仍禁止接真实 provider SDK、发真实 OpenAI/Anthropic/Gemini 请求、保存 prompt/result、创建任务/审批/Runner job 或触发 Agent。
+
+## 2026-06-10 变更记录：Model Gateway connectivity-test 禁用态 stub
+
+- 改了什么：`services/api/server.js` 新增 `POST /api/model-gateway/connectivity-test` 禁用态后端 stub，只校验 provider、model、purpose、secondConfirm 和 confirmText，始终返回 `not_implemented`、`realProviderRequestAttempted=false` 和全 false sideEffects；`scripts/verify-local-ui.ps1` 增加正向 blocked 和反向用例验收。
+- 为什么改：把上一轮规格落成可回归的安全边界，先证明“接口存在但不会真实连通”，再考虑后续 provider adapter 和 feature flag。
+- 影响模块：`services/api/server.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。

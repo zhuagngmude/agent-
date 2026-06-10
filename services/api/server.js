@@ -124,6 +124,71 @@ function modelGatewayDryRun(request) {
   };
 }
 
+function modelGatewayConnectivityTest(request) {
+  const providerId = typeof request.provider === "string" ? request.provider.trim().toLowerCase() : "";
+  const model = typeof request.model === "string" ? request.model.trim() : "";
+  const purpose = typeof request.purpose === "string" ? request.purpose.trim() : "";
+  const confirmText = typeof request.confirmText === "string" ? request.confirmText.trim() : "";
+  const provider = modelGatewayProviders.find((item) => item.id === providerId);
+  const validationErrors = [];
+
+  if (!providerId) {
+    validationErrors.push("provider is required.");
+  } else if (!provider) {
+    validationErrors.push("provider is not supported.");
+  }
+
+  if (!model) {
+    validationErrors.push("model is required.");
+  }
+
+  if (purpose !== "manual_connectivity_test") {
+    validationErrors.push("purpose must be manual_connectivity_test.");
+  }
+
+  if (request.secondConfirm !== true) {
+    validationErrors.push("secondConfirm must be true.");
+  }
+
+  if (!confirmText) {
+    validationErrors.push("confirmText is required.");
+  }
+
+  return {
+    ok: false,
+    provider: providerId,
+    model,
+    purpose,
+    requestValid: validationErrors.length === 0,
+    validationErrors,
+    providerSupported: Boolean(provider),
+    keyEnvVar: provider?.envVar || "",
+    keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    realModelCallsAllowed: false,
+    realProviderRequestAttempted: false,
+    result: "not_implemented",
+    errorCategory: "not_implemented",
+    providerResponseStored: false,
+    blockedReasons: [
+      "Manual connectivity test is specification-only in MVP-0.2.",
+      "Provider SDKs are not loaded and provider network requests are disabled.",
+      "Approval, logging, cost tracking, and key-safety rules are not ready.",
+    ],
+    sideEffects: {
+      writesSqlite: false,
+      writesRuntimeState: false,
+      createsTasks: false,
+      createsApprovals: false,
+      createsRunnerJobs: false,
+      triggersAgents: false,
+      callsRealModel: false,
+      executesRunner: false,
+      logsPromptOrResult: false,
+      storesProviderResponse: false,
+    },
+  };
+}
+
 function sendJson(res, statusCode, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(statusCode, {
@@ -820,6 +885,12 @@ async function handleRequest(req, res) {
   if (req.method === "POST" && pathname === "/api/model-gateway/dry-run") {
     const body = await readBody(req);
     sendJson(res, 200, modelGatewayDryRun(body));
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/model-gateway/connectivity-test") {
+    const body = await readBody(req);
+    sendJson(res, 200, modelGatewayConnectivityTest(body));
     return;
   }
 
