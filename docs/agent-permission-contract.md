@@ -4,6 +4,8 @@ Date: 2026-06-10
 
 Stage: MVP-0.2 permission design contract. This document is a specification only. It does not enable real Runner execution, real model calls, cloud sync, full RBAC/ABAC, or secret access.
 
+Current code support is limited to `services/api/agent-permissions.js` and `scripts/verify-agent-permissions.ps1`. They validate mock profile expansion and forbidden capability checks only; they do not enforce runtime authorization or grant any execution capability.
+
 ## Purpose
 
 The product may later support an architect Agent or all Agents with broad management permissions. To avoid ambiguity, "full permission" must be split into explicit capability groups.
@@ -305,11 +307,14 @@ If the product stores these as one boolean, later code may accidentally treat an
 
 Current implementation status:
 
-- This document is a contract only.
+- This document is a contract plus a local mock validation helper.
+- `services/api/agent-permissions.js` defines profile expansion and validation helpers only.
+- `scripts/verify-agent-permissions.ps1` verifies safe profile expansion, `all=true` rejection, forbidden capability rejection, unknown capability rejection, and all-false side effects.
 - Existing Agent `permissions` arrays remain simple mock/display data.
 - Agent config changes still go through approval/application mock state only.
 - Runner execution remains disabled.
 - Real model calls remain disabled.
 - Secret access remains disabled.
+- No API route, UI flow, Agent runtime, Runner runtime, Model Gateway path, SQLite mapper, or secret service consumes this helper yet.
 
 Future implementation must add tests before any permission profile can change runtime behavior.

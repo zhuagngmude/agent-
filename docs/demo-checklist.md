@@ -140,6 +140,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-permissions.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 ```
 
@@ -152,6 +153,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Agent 配置审批后可以走 Mock 取消状态流转。
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
 - `verify-model-gateway.ps1` 会独立覆盖 Model Gateway status、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。
+- `verify-agent-permissions.ps1` 会独立覆盖 Agent permission profile 展开、`all=true` 拒绝、未知能力拒绝、禁止 Agent 能力拒绝和全 false sideEffects。
 - 设置页和集成页必须展示 Model Gateway dry-run 只读预览，且浏览器控制台保持 0 errors / 0 warnings。
 
 脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
@@ -202,6 +204,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - “全权限”只能表示广义规划、编排和申请权限；不得表示自批、自执行、写文件、跑命令、改 Git、发网络请求或访问原始密钥。
 - `architect_admin` 可以作为未来最高管理型 Agent profile，但仍必须通过 Approval Service、Runner job、Model Gateway feature flag contract 和密钥服务边界。
 - Demo 验证不应把权限 profile 当成真实执行授权；当前仍停留在 Mock / disabled / read-only 阶段。
+- `services/api/agent-permissions.js` and `scripts/verify-agent-permissions.ps1` are mock/profile validation only. They do not change runtime authorization, Agent config, Runner execution, Model Gateway behavior, SQLite state, or secret access.
 
 ## Model Gateway Relay Interface Checkpoint
 

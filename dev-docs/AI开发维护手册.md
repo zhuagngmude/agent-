@@ -1161,6 +1161,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `docs/agent-permission-contract.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/runner-safety-acceptance.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`, `dev-docs/新窗口交接说明.md`.
 - Human docs sync: not required; this is a technical permission contract and does not enable real permissions, Runner execution, real provider calls, cloud sync, or secret access.
 
+## 2026-06-10 Change log: Agent permission profile checks
+
+- What changed: added `services/api/agent-permissions.js` and `scripts/verify-agent-permissions.ps1` to validate mock Agent permission profile expansion, forbidden capabilities, unknown capabilities, `all=true` rejection, and all-false side effects.
+- Why: after documenting the Agent permission contract, the project needs a small executable check so future "full permission" profile changes cannot accidentally include self-approval, direct Runner execution, direct local operations, network requests, or raw-secret access.
+- Impacted modules: `services/api/agent-permissions.js`, `scripts/verify-agent-permissions.ps1`, `docs/agent-permission-contract.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/demo-checklist.md`, `docs/module-stability-map.md`, `scripts/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is mock/profile validation only and does not enable runtime authorization, Agent config writes, Runner execution, real model calls, cloud sync, or secret access.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

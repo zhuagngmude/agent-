@@ -75,6 +75,12 @@ execution
 secret_access
 ```
 
+MVP-0.2 code status:
+
+- `services/api/agent-permissions.js` can expand and validate mock Agent permission profiles.
+- `scripts/verify-agent-permissions.ps1` checks supported profiles, forbidden capability rejection, unknown capability rejection, `all=true` rejection, and all-false side effects.
+- This is not runtime enforcement. No API route may treat the helper as permission authorization until a later explicit implementation adds route-level checks, Approval Service integration, persistence rules, and regression coverage.
+
 后续即使支持 `architect_admin` 或 `all_agents_full_management`，也只能表示广义的规划、编排和申请权限。它不得自动包含：
 
 ```text

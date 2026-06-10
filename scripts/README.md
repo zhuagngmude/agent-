@@ -22,6 +22,7 @@ stop-local.ps1
 verify-mock-flows.ps1
 verify-sqlite-flows.ps1
 verify-model-gateway.ps1
+verify-agent-permissions.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -43,6 +44,8 @@ sqlite/
 `verify-sqlite-flows.ps1` 会在独立端口启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。
 
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
+
+`verify-agent-permissions.ps1` validates the local Agent permission profile helper. It expands mock profiles, rejects `all=true`, rejects unknown capabilities, rejects forbidden Agent capabilities, and checks all validation side effects stay false. It does not start local services, change Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -87,3 +90,13 @@ Model Gateway backend logic lives in `../services/api/model-gateway.js`; `server
 - Setting `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST=true` in the script process must still keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
 
 This script is acceptance verification, not a real connectivity test. It must not require API keys, import provider SDKs, call OpenAI/Anthropic/Gemini/DeepSeek/cheng.pink, read `data/local/` directly, write runtime state, create tasks/approvals/Runner jobs, or log prompt/result/provider body content.
+
+## verify-agent-permissions.ps1
+
+`verify-agent-permissions.ps1` is the dedicated Agent permission profile contract check.
+
+- `services/api/agent-permissions.js` remains a local helper only; it is not wired into API routes or runtime authorization.
+- Built-in profiles must expand to explicit capabilities and avoid all forbidden Agent capabilities.
+- `architect_admin` and `all_agents_full_management` may include broad planning/orchestration/request authority, but must not include self-approval, high-risk approval, direct Runner execution, direct file/command/Git/network operations, or raw secret access.
+- Invalid contracts such as unsupported profiles, `all=true`, unknown capabilities, direct execution capabilities, and raw-secret capabilities must be rejected.
+- Every validation result must keep side effects false: no SQLite/runtime-state writes, no tasks, no approvals, no Runner jobs, no Agent triggers, no Runner execution, no real model calls, and no raw-secret reads.

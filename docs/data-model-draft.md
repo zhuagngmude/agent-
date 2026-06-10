@@ -106,6 +106,7 @@ projects
 - `architect_admin` 只能代表最高规划、编排和申请权限，不能隐含 `canApproveHighRisk`、`canApproveOwnRequest`、`canExecuteRunnerJob`、`canAccessRawSecrets`。
 - 如果后续新增 `all_agents_full_management`，它也只能表示广义管理权限，不能代表自批、自执行、写文件、跑命令、改 Git、发网络请求或读取原始密钥。
 - 任何包含审批、执行或密钥相关能力的变更都必须走 Approval Service，并写入 `approvals` / `agent_config_applications` / `runtime_events`。
+- 当前 `services/api/agent-permissions.js` 只做 Mock profile 展开和禁止能力校验；它不是数据库约束、路由授权层、真实 RBAC/ABAC 系统或运行时权限执行路径。
 
 ### agent_relationships
 

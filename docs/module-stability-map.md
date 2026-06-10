@@ -37,9 +37,11 @@ docs/module-stability-map.md
 services/api/server.js
 services/api/model-gateway.js
 services/api/model-gateway-adapters.js
+services/api/agent-permissions.js
 services/api/mock-data.js
 services/api/db/
 scripts/verify-model-gateway.ps1
+scripts/verify-agent-permissions.ps1
 scripts/verify-local-ui.ps1
 scripts/verify-sqlite-flows.ps1
 scripts/start-local.ps1
@@ -101,6 +103,7 @@ Rules:
 - Preserve current API response shapes unless the API draft is updated.
 - Preserve current UI smoke coverage unless `verify-local-ui.ps1` is updated.
 - Preserve Model Gateway blocked/no-side-effect coverage unless `verify-model-gateway.ps1` is updated.
+- Preserve Agent permission profile boundary coverage unless `verify-agent-permissions.ps1` is updated.
 - Empty placeholder folders such as `apps/desktop/`, `services/runner/`, `services/worker/`, and `packages/` can remain as architecture markers. Delete them only after updating the project skeleton docs.
 
 ## P3 Runtime And Generated State
@@ -222,6 +225,14 @@ git diff --check
 powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
 ```
 
+For Agent permission profile helper changes:
+
+```powershell
+node --check services\api\agent-permissions.js
+git diff --check
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-permissions.ps1
+```
+
 For UI changes:
 
 ```powershell
@@ -244,9 +255,11 @@ For broad cross-boundary changes:
 node --check apps\web\app.js
 node --check services\api\model-gateway-adapters.js
 node --check services\api\model-gateway.js
+node --check services\api\agent-permissions.js
 node --check services\api\server.js
 git diff --check
 powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-permissions.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 ```
