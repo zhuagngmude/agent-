@@ -993,7 +993,7 @@ Later phases, intentionally not part of dry-run:
 
 Purpose: planned manual real-provider connectivity test after dry-run is stable.
 
-Current MVP-0.2 implementation is a disabled backend stub. It validates the request shape and returns `not_implemented` with all side effects set to false. It does not add provider SDKs, does not make OpenAI/Anthropic/Gemini requests, and is not exposed as an active frontend control.
+Current MVP-0.2 implementation is a disabled backend stub. It validates the request shape and routes through the disabled provider adapter stub, which returns `result=blocked`, `errorCategory=feature_disabled`, and all side effects false. It does not add provider SDKs, does not make OpenAI/Anthropic/Gemini requests, and is not exposed as an active frontend control.
 
 Implementation boundary: `services/api/model-gateway.js` owns provider metadata, env var presence checks, dry-run validation, and the disabled connectivity-test stub. `services/api/server.js` should only wire HTTP routes to that module.
 
@@ -1030,10 +1030,13 @@ Planned response draft:
     "manualConnectivityTestActive": false,
     "realProviderRequestsAllowed": false
   },
+  "adapter": "disabled_provider_connectivity_adapter",
   "realProviderRequestAttempted": false,
   "result": "blocked",
-  "errorCategory": "missing_key",
+  "errorCategory": "feature_disabled",
   "providerResponseStored": false,
+  "durationMs": 0,
+  "redactionApplied": true,
   "sideEffects": {
     "writesSqlite": false,
     "writesRuntimeState": false,
@@ -1065,7 +1068,7 @@ Manual connectivity acceptance rules:
 
 Implementation order before enabling real provider requests:
 
-1. Keep the disabled backend stub returning `not_implemented` and all side effects false.
+1. Keep the disabled backend stub returning `blocked / feature_disabled` through the disabled provider adapter, with all side effects false.
 2. Keep regression checks proving the stub cannot call providers.
 3. Keep the manual feature flag boundary visible while forcing it inactive in MVP-0.2.
 4. Only then consider adding isolated provider adapters, one provider at a time, with no SDK leakage into UI, Agent, or Runner code.
@@ -1074,7 +1077,7 @@ Implementation order before enabling real provider requests:
 
 Purpose: define the future backend-only adapter boundary before any real provider SDK or network request is added.
 
-Current MVP-0.2 status: specification only. No adapter file should import OpenAI, Anthropic, Google Gemini, or other provider SDKs yet. No code path should send real provider requests yet.
+Current MVP-0.2 status: disabled stub only. `services/api/model-gateway-adapters.js` provides a disabled provider connectivity adapter; it must not import OpenAI, Anthropic, Google Gemini, or other provider SDKs. No code path should send real provider requests yet.
 
 Adapter ownership:
 
@@ -1163,6 +1166,7 @@ Adapter acceptance before any implementation:
 - Regression checks must prove no adapter path creates tasks, approvals, Runner jobs, Agent runs, runtime events, model-call records, billing records, or prompt/result logs.
 - Each provider must be implemented and verified one at a time.
 - Adding a provider SDK must be a separate commit from this draft and must not happen until the feature flag boundary is changed intentionally and reviewed.
+- The disabled stub response may still include `provider`, `model`, `adapter`, `durationMs`, and redaction booleans, but it must never expose raw keys, provider responses, or prompt/result bodies.
 
 ## 2026-06-08 实现备注：工作流只读接口
 

@@ -68,6 +68,6 @@ The script expects `scripts/start-local.ps1` to already be running. It does not 
 
 Future real Model Gateway manual connectivity testing must remain behind an explicit disabled-by-default gate. The current `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` env var may only be reported as requested; it must not make real provider requests active. No script in this directory should require real provider API keys, install provider SDKs, call OpenAI/Anthropic/Gemini, store provider responses, or turn disabled stub checks into real connectivity checks.
 
-Provider adapter acceptance is still documentation-only. Verification scripts may check disabled adapter boundaries, request/response shapes, redaction rules, and no-side-effect guarantees, but they must not perform real connectivity tests or depend on real provider credentials.
+Provider adapter acceptance currently checks only the disabled adapter stub. Verification scripts may check disabled adapter boundaries, request/response shapes, redaction rules, and no-side-effect guarantees, but they must not perform real connectivity tests or depend on real provider credentials.
 
 Model Gateway backend logic lives in `../services/api/model-gateway.js`; `server.js` should only wire routes to that module.

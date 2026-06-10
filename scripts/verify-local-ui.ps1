@@ -283,9 +283,13 @@ Assert-Equal $connectivityTest.ok $false "Model Gateway connectivity-test stub s
 Assert-Equal $connectivityTest.requestValid $true "Model Gateway connectivity-test stub request should be valid."
 Assert-Equal $connectivityTest.providerSupported $true "OpenAI provider should be recognized by connectivity-test stub."
 Assert-Equal $connectivityTest.realModelCallsAllowed $false "Model Gateway connectivity-test stub should not allow real calls."
+Assert-Equal $connectivityTest.adapter "disabled_provider_connectivity_adapter" "Model Gateway connectivity-test should use the disabled adapter stub."
 Assert-Equal $connectivityTest.realProviderRequestAttempted $false "Model Gateway connectivity-test stub should not attempt provider requests."
-Assert-Equal $connectivityTest.result "not_implemented" "Model Gateway connectivity-test stub should stay not implemented."
+Assert-Equal $connectivityTest.result "blocked" "Model Gateway connectivity-test stub should stay blocked."
+Assert-Equal $connectivityTest.errorCategory "feature_disabled" "Model Gateway connectivity-test stub should report feature disabled."
 Assert-Equal $connectivityTest.providerResponseStored $false "Model Gateway connectivity-test stub should not store provider responses."
+Assert-Equal $connectivityTest.durationMs 0 "Model Gateway connectivity-test stub should not spend time in provider calls."
+Assert-Equal $connectivityTest.redactionApplied $true "Model Gateway connectivity-test stub should report redaction applied."
 Assert-ConnectivityTestNoSideEffects -ConnectivityTest $connectivityTest
 
 $unknownProviderConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
@@ -327,11 +331,14 @@ Assert-ConnectivityTestNoSideEffects -ConnectivityTest $invalidPurposeConnectivi
 $previousManualConnectivityEnv = $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST
 try {
   $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST = "true"
-  $flagBoundaryJson = node -e "const gateway = require('./services/api/model-gateway'); process.stdout.write(JSON.stringify(gateway.modelGatewayConnectivityTest({provider:'openai',model:'gpt-4.1-mini',purpose:'manual_connectivity_test',secondConfirm:true,confirmText:'local feature flag boundary'}).featureFlags));"
+  $flagBoundaryJson = node -e "const gateway = require('./services/api/model-gateway'); process.stdout.write(JSON.stringify(gateway.modelGatewayConnectivityTest({provider:'openai',model:'gpt-4.1-mini',purpose:'manual_connectivity_test',secondConfirm:true,confirmText:'local feature flag boundary'})));"
   $flagBoundary = $flagBoundaryJson | ConvertFrom-Json
-  Assert-Equal $flagBoundary.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
-  Assert-Equal $flagBoundary.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.2."
-  Assert-Equal $flagBoundary.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.2."
+  Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
+  Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.2."
+  Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.2."
+  Assert-Equal $flagBoundary.adapter "disabled_provider_connectivity_adapter" "Manual connectivity env var should still use the disabled adapter stub."
+  Assert-Equal $flagBoundary.realProviderRequestAttempted $false "Manual connectivity env var should not attempt provider requests in MVP-0.2."
+  Assert-Equal $flagBoundary.errorCategory "feature_disabled" "Manual connectivity env var should still report feature disabled."
 } finally {
   $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST = $previousManualConnectivityEnv
 }

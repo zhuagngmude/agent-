@@ -1,3 +1,5 @@
+const { disabledProviderConnectivityAdapter } = require("./model-gateway-adapters");
+
 const modelGatewayProviders = [
   { id: "openai", label: "OpenAI", envVar: "AGENT_SWARM_OPENAI_API_KEY" },
   { id: "anthropic", label: "Anthropic", envVar: "AGENT_SWARM_ANTHROPIC_API_KEY" },
@@ -141,6 +143,12 @@ function modelGatewayConnectivityTest(request) {
     validationErrors.push("confirmText is required.");
   }
 
+  const adapterResult = disabledProviderConnectivityAdapter({
+    provider: providerId,
+    model,
+    purpose,
+  });
+
   return {
     ok: false,
     provider: providerId,
@@ -153,10 +161,13 @@ function modelGatewayConnectivityTest(request) {
     keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
     featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
-    realProviderRequestAttempted: false,
-    result: "not_implemented",
-    errorCategory: "not_implemented",
-    providerResponseStored: false,
+    adapter: adapterResult.adapter,
+    realProviderRequestAttempted: adapterResult.realProviderRequestAttempted,
+    result: adapterResult.result,
+    errorCategory: adapterResult.errorCategory,
+    providerResponseStored: adapterResult.providerResponseStored,
+    durationMs: adapterResult.durationMs,
+    redactionApplied: adapterResult.redactionApplied,
     blockedReasons: [
       "Manual connectivity test is specification-only in MVP-0.2.",
       "Provider SDKs are not loaded and provider network requests are disabled.",

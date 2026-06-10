@@ -1023,7 +1023,7 @@ docs/runner-safety-acceptance.md
 
 ## 2026-06-10 变更记录：Model Gateway connectivity-test 禁用态 stub
 
-- 改了什么：`services/api/server.js` 新增 `POST /api/model-gateway/connectivity-test` 禁用态后端 stub，只校验 provider、model、purpose、secondConfirm 和 confirmText，始终返回 `not_implemented`、`realProviderRequestAttempted=false` 和全 false sideEffects；`scripts/verify-local-ui.ps1` 增加正向 blocked 和反向用例验收。
+- 改了什么：`POST /api/model-gateway/connectivity-test` 禁用态后端 stub 只校验 provider、model、purpose、secondConfirm 和 confirmText，经由 disabled provider adapter stub 返回 `blocked / feature_disabled`、`realProviderRequestAttempted=false` 和全 false sideEffects；`scripts/verify-local-ui.ps1` 增加正向 blocked 和反向用例验收。
 - 为什么改：把上一轮规格落成可回归的安全边界，先证明“接口存在但不会真实连通”，再考虑后续 provider adapter 和 feature flag。
 - 影响模块：`services/api/server.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。
@@ -1048,3 +1048,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：在任何真实 SDK 或网络请求进入仓库前，先固定 adapter 的安全契约，避免 UI、Agent、Runner 或通用路由层直接接触 provider SDK、API Key、prompt 或 provider response。
 - 影响模块：`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是技术草案，不新增真实 provider SDK、真实模型请求、API Key 输入/保存、Agent 触发、Runner job 创建、prompt/result/provider response 存储。
+
+## 2026-06-10 变更记录：Model Gateway disabled adapter stub
+
+- 改了什么：新增 `services/api/model-gateway-adapters.js`，提供 `disabled_provider_connectivity_adapter`；`POST /api/model-gateway/connectivity-test` 改为经由该 disabled adapter 返回 `blocked / feature_disabled`、`realProviderRequestAttempted=false`、`providerResponseStored=false` 和 `redactionApplied=true`；`scripts/verify-local-ui.ps1` 增加对应断言。
+- 为什么改：把上一轮 provider adapter 草案落成可回归的禁用态服务边界，先证明 adapter 插槽存在但仍不会真实连通 provider。
+- 影响模块：`services/api/model-gateway-adapters.js`、`services/api/model-gateway.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不读取或保存 API Key、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。
