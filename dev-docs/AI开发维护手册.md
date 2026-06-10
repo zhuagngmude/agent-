@@ -1139,3 +1139,10 @@ docs/runner-safety-acceptance.md
 - Why: the project needs deterministic request-shape checks before any real relay adapter can exist. This catches duplicated `/v1` paths and client-controlled prompt/header/base URL mistakes while still making zero provider network requests.
 - Impacted modules: `services/api/model-gateway-adapters.js`, `scripts/verify-local-ui.ps1`, `docs/api-draft.md`, `docs/demo-checklist.md`, `scripts/README.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a backend verification checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway dedicated verification script
+
+- What changed: added `scripts/verify-model-gateway.ps1` as a dedicated non-browser Model Gateway acceptance script and documented it in `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, and `dev-docs/下一步开发路线.md`.
+- Why: Model Gateway deep checks had grown inside the browser UI smoke script. A dedicated entry keeps backend/API/helper acceptance easy to run without opening a browser or mixing it with UI smoke coverage.
+- Impacted modules: `scripts/verify-model-gateway.ps1`, `scripts/README.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is an acceptance-script split and does not enable real relay calls, real model calls, provider SDKs, Runner execution, cloud sync, or permission changes.

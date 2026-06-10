@@ -1251,7 +1251,8 @@ OpenAI-compatible relay disabled preflight implementation:
 - `modelGatewayConnectivityPreflight(...)` checks relay base URL presence and safe shape without returning the URL value.
 - A relay base URL is considered unsafe when it is missing, not parseable, not `https:`, points to localhost, or points to common private IPv4 ranges.
 - The HTTP API must not accept relay base URL overrides. Test-only base URL injection is limited to direct backend helper calls from regression scripts.
-- `scripts/verify-local-ui.ps1` must cover `missing_base_url`, `invalid_base_url`, safe-shape-but-feature-disabled, and all-false side effects for `openai_compat`.
+- `scripts/verify-model-gateway.ps1` must cover `missing_base_url`, `invalid_base_url`, safe-shape-but-feature-disabled, and all-false side effects for `openai_compat`.
+- `scripts/verify-local-ui.ps1` remains the browser smoke entry and may keep overlapping assertions until the UI script is narrowed in a later cleanup batch.
 
 OpenAI-compatible relay adapter interface checkpoint:
 
@@ -1263,7 +1264,7 @@ OpenAI-compatible relay adapter interface checkpoint:
 - The interface only accepts backend-shaped manual connectivity inputs: provider id, fixed relay model id, purpose, preflight result, timeout limit, and response body limit.
 - The future adapter must read the relay key and base URL only from server env. It must not accept API keys, base URLs, free-form prompts, Agent context, files, tool calls, Runner jobs, arbitrary headers, arbitrary URLs, or arbitrary HTTP options from the request body.
 - The interface returns only coarse blocked status, coarse `errorCategory`, redaction booleans, duration metadata, and a request-shape contract. It must not return key values, base URL values, request headers, provider bodies, model text, token usage, cost, or raw errors.
-- `scripts/verify-local-ui.ps1` directly calls the backend helper and verifies relay interface failure paths for missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, and feature disabled.
+- `scripts/verify-model-gateway.ps1` directly calls the backend helper and verifies relay interface failure paths for missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, and feature disabled.
 - All relay interface cases must keep `realProviderRequestAttempted=false`, `providerResponseStored=false`, and all side effects false.
 
 DeepSeek provider information checkpoint:
@@ -1288,7 +1289,13 @@ Cheng relay request builder checkpoint:
 - `services/api/model-gateway-adapters.js` now exports pure local helpers for the cheng.pink relay manual ping request shape and URL normalization.
 - `buildChengRelayManualPingRequest(...)` only builds a deterministic endpoint/body preview. It does not read API keys, does not read env vars, does not make HTTP requests, and reports `realProviderRequestAttempted=false`.
 - The builder accepts only base URL and fixed model inputs for local verification, normalizes `https://api.cheng.pink`, `https://api.cheng.pink/v1`, and `https://api.cheng.pink/v1/` to `https://api.cheng.pink/v1/chat/completions`, and rejects unsafe URLs or unsupported models.
-- `scripts/verify-local-ui.ps1` verifies the builder through direct backend helper calls without real credentials or provider network calls.
+- `scripts/verify-model-gateway.ps1` verifies the builder through direct backend helper calls without real credentials or provider network calls.
+
+Model Gateway verification script checkpoint:
+
+- `scripts/verify-model-gateway.ps1` is the dedicated non-browser acceptance entry for Model Gateway.
+- The script verifies status, dry-run, connectivity-test disabled stub, preflight failure paths, disabled adapter registry metadata, `openai_compat` interface-disabled relay metadata, cheng.pink request builder shape, and feature flag boundary.
+- The script must not open a browser, read real API keys, require provider SDKs, call real providers, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, execute Runner, store provider responses, or log prompt/result/provider body content.
 
 ## 2026-06-08 实现备注：工作流只读接口
 

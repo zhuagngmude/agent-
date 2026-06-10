@@ -21,6 +21,7 @@ status-local.ps1
 stop-local.ps1
 verify-mock-flows.ps1
 verify-sqlite-flows.ps1
+verify-model-gateway.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -40,6 +41,8 @@ sqlite/
 `verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
 
 `verify-sqlite-flows.ps1` 会在独立端口启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。
+
+`verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -73,3 +76,18 @@ Provider adapter acceptance currently checks only the disabled adapter registry 
 `verify-local-ui.ps1` also checks the cheng.pink OpenAI-compatible relay request builder through direct backend helper calls. This builder check is local only: it verifies URL normalization, fixed non-stream ping body shape, unsupported model rejection, unsafe base URL rejection, and all-false side effects. It must not read real API keys, call the relay, store provider responses, or log prompt/result content.
 
 Model Gateway backend logic lives in `../services/api/model-gateway.js`; `server.js` should only wire routes to that module.
+
+## verify-model-gateway.ps1
+
+`verify-model-gateway.ps1` is the dedicated Model Gateway acceptance entry for the currently running local API:
+
+- `GET /api/model-gateway/status` must stay disabled and expose only env var names / booleans, provider adapter metadata, and safety flags.
+- `POST /api/model-gateway/dry-run` must remain a no-provider-call dry-run with all side effects false.
+- `POST /api/model-gateway/connectivity-test` must remain blocked through the disabled adapter stub with `realProviderRequestAttempted=false`.
+- `modelGatewayConnectivityPreflight(...)` failure paths are checked through direct backend helper calls without real credentials.
+- Disabled adapter registry entries for OpenAI, Anthropic, Google Gemini, and `openai_compat` are checked as metadata only.
+- The `openai_compat` relay interface remains `interface_disabled`.
+- The cheng.pink request builder checks URL normalization, fixed `gpt-5.4-mini` body shape, unsafe URL rejection, unsupported model rejection, client input rejection, and all-false side effects.
+- Setting `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST=true` in the script process must still keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
+
+This script is acceptance verification, not a real connectivity test. It must not require API keys, import provider SDKs, call OpenAI/Anthropic/Gemini/DeepSeek/cheng.pink, read `data/local/` directly, write runtime state, create tasks/approvals/Runner jobs, or log prompt/result/provider body content.

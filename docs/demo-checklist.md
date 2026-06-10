@@ -139,6 +139,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 ```
 
@@ -150,6 +151,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
+- `verify-model-gateway.ps1` 会独立覆盖 Model Gateway status、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。
 - 设置页和集成页必须展示 Model Gateway dry-run 只读预览，且浏览器控制台保持 0 errors / 0 warnings。
 
 脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
@@ -160,7 +162,8 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - No demo script may require real API keys or provider SDKs.
 - `POST /api/model-gateway/connectivity-test` must return `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all side effects false.
 - The connectivity-test response now includes a backend `preflight` object. It may report blocked categories such as `missing_key` or `feature_disabled`, but it must still report `realProviderRequestAttempted=false` and all side effects false.
-- `scripts/verify-local-ui.ps1` calls the exported preflight helper directly to cover feature disabled, missing key, unsupported provider, unsupported model, invalid purpose, timeout, and provider-error paths without real keys or provider SDKs.
+- `scripts/verify-model-gateway.ps1` is the dedicated non-browser acceptance entry for Model Gateway; it calls the exported preflight helper directly to cover feature disabled, missing key, unsupported provider, unsupported model, invalid purpose, timeout, and provider-error paths without real keys or provider SDKs.
+- `scripts/verify-local-ui.ps1` remains the browser UI smoke entry and may keep overlapping Model Gateway assertions until a later cleanup batch.
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is only a reported request flag in MVP-0.2; it must not make `manualConnectivityTestActive` or `realProviderRequestsAllowed` true.
 - Provider adapter verification currently covers only the disabled adapter registry and stub; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
@@ -192,7 +195,8 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - `docs/relay-provider-info-checklist.md` is the safe place for non-secret relay documentation facts. It must not contain keys, auth headers, account ids, prompts, model outputs, provider bodies, token usage, cost, or raw errors.
 - The cheng.pink relay facts are operator-provided and non-secret; demo scripts must still not call the relay, require a real key, store provider bodies, log prompt/result, or report token usage/cost.
 - `docs/cheng-relay-manual-ping-spec.md` freezes the future cheng.pink non-stream ping shape and URL normalization rules. Demo scripts must still verify these only through disabled or simulated paths until a later implementation commit explicitly changes the feature flag boundary.
-- `verify-local-ui.ps1` may verify the cheng.pink request builder and URL normalization as pure local helper calls. These checks must keep `realProviderRequestAttempted=false`, must not read keys, and must not make network requests.
+- `verify-model-gateway.ps1` verifies the cheng.pink request builder and URL normalization as pure local helper calls. These checks must keep `realProviderRequestAttempted=false`, must not read keys, and must not make network requests.
+- `verify-local-ui.ps1` may keep UI-level Model Gateway smoke checks, but it should not become a real connectivity test.
 
 ## Model Gateway DeepSeek Provider Checklist
 
