@@ -1032,6 +1032,30 @@ Planned response draft:
     "manualConnectivityTestActive": false,
     "realProviderRequestsAllowed": false
   },
+  "preflight": {
+    "ok": false,
+    "result": "blocked",
+    "errorCategory": "missing_key",
+    "requestValid": true,
+    "providerSupported": true,
+    "modelSupported": true,
+    "keyConfigured": false,
+    "realProviderRequestAttempted": false,
+    "blockingCategories": ["missing_key", "feature_disabled"],
+    "checks": {
+      "providerSupported": true,
+      "modelPresent": true,
+      "modelSupported": true,
+      "purposeValid": true,
+      "secondConfirmPresent": true,
+      "confirmTextPresent": true,
+      "featureEnabled": false,
+      "realProviderRequestsAllowed": false,
+      "keyConfigured": false,
+      "timeoutWithinLimit": true,
+      "responseBodyLimitWithinLimit": true
+    }
+  },
   "adapter": "disabled_provider_connectivity_adapter",
   "providerAdapterId": "openai_disabled_connectivity_adapter",
   "providerAdapterMode": "disabled",
@@ -1069,6 +1093,14 @@ Manual connectivity acceptance rules:
 - It must have a timeout and a small response/body limit before any real provider request is allowed.
 - It must stay disabled by default until verification covers blocked, missing-key, unsupported-provider, timeout, and provider-error cases.
 - MVP-0.2 may report `featureFlags.manualConnectivityTestRequested=true` when `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST=true` is present on the API process, but `manualConnectivityTestActive` and `realProviderRequestsAllowed` must still remain `false`.
+
+Preflight gate implementation:
+
+- `services/api/model-gateway.js` exports `modelGatewayConnectivityPreflight(...)` for backend and regression verification.
+- `POST /api/model-gateway/connectivity-test` includes a `preflight` object, but the top-level response still routes through the disabled provider adapter and remains `blocked / feature_disabled`.
+- The preflight gate validates provider support, provider-specific fixed connectivity model, `purpose=manual_connectivity_test`, second confirmation, feature flag status, server-side key presence, timeout, and response body limit.
+- The preflight helper has acceptance-only options for deterministic regression checks such as missing key, timeout, and provider error. These options are not part of the HTTP API request body and must not become frontend controls.
+- Preflight failure-path verification must keep `realProviderRequestAttempted=false` and all side effects false for feature disabled, missing key, unsupported provider, unsupported model, invalid purpose, timeout, and provider error.
 
 Implementation order before enabling real provider requests:
 

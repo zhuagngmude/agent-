@@ -1076,3 +1076,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：把“下一阶段第一家真实 provider 怎么开始”限定到最小、可验收、可回滚的范围，避免一次性接入多家 provider 或把连通性测试扩展成通用聊天/Agent/Runner 能力。
 - 影响模块：`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍未实现真实 provider 请求，只冻结后续实现规格和验收条件。
+
+## 2026-06-10 变更记录：Model Gateway manual connectivity preflight gate
+
+- 改了什么：`services/api/model-gateway.js` 新增后端 `modelGatewayConnectivityPreflight(...)` 闸门函数；`connectivity-test` 响应包含 `preflight` 对象但顶层仍经 disabled adapter 返回 blocked；`verify-local-ui.ps1` 直接调用 helper 覆盖 feature disabled、missing key、unsupported provider、unsupported model、invalid purpose、timeout、provider error 和 no-side-effect 断言。
+- 为什么改：在第一家真实 provider 前先把所有保险丝和失败路径固定下来，确保 feature flag、二次确认、server-side key、timeout/body limit 与无副作用边界都可回归。
+- 影响模块：`services/api/model-gateway.js`、`services/api/model-gateway-adapters.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不接 provider SDK、不发 OpenAI/Anthropic/Gemini 请求、不读取或保存 API Key、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent。

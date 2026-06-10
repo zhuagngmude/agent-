@@ -115,6 +115,26 @@ function Assert-ConnectivityTestNoSideEffects {
   Assert-Equal $ConnectivityTest.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
 }
 
+function Assert-PreflightNoSideEffects {
+  param(
+    [Parameter(Mandatory = $true)][object]$Preflight,
+    [string]$Prefix = "Model Gateway connectivity preflight"
+  )
+
+  Assert-ModelGatewayFeatureFlags -FeatureFlags $Preflight.featureFlags -Prefix "$Prefix feature flags"
+  Assert-Equal $Preflight.realProviderRequestAttempted $false "$Prefix should not attempt provider requests."
+  Assert-Equal $Preflight.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
+  Assert-Equal $Preflight.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
+  Assert-Equal $Preflight.sideEffects.createsTasks $false "$Prefix should not create tasks."
+  Assert-Equal $Preflight.sideEffects.createsApprovals $false "$Prefix should not create approvals."
+  Assert-Equal $Preflight.sideEffects.createsRunnerJobs $false "$Prefix should not create Runner jobs."
+  Assert-Equal $Preflight.sideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+  Assert-Equal $Preflight.sideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $Preflight.sideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $Preflight.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
+  Assert-Equal $Preflight.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
+}
+
 function Assert-DisabledConnectivityAdapter {
   param(
     [Parameter(Mandatory = $true)][object]$ConnectivityTest,
@@ -309,6 +329,60 @@ Assert-Equal $connectivityTest.providerSupported $true "OpenAI provider should b
 Assert-Equal $connectivityTest.realModelCallsAllowed $false "Model Gateway connectivity-test stub should not allow real calls."
 Assert-DisabledConnectivityAdapter -ConnectivityTest $connectivityTest -ExpectedProviderAdapterId "openai_disabled_connectivity_adapter"
 Assert-ConnectivityTestNoSideEffects -ConnectivityTest $connectivityTest
+Assert-PreflightNoSideEffects -Preflight $connectivityTest.preflight -Prefix "Connectivity-test response preflight"
+Assert-TextContains (@($connectivityTest.preflight.blockingCategories) -join "`n") "feature_disabled" "Connectivity-test preflight should remain feature-disabled."
+
+$preflightJson = node -e @"
+const gateway = require('./services/api/model-gateway');
+const base = {
+  provider: 'openai',
+  model: 'gpt-4.1-mini',
+  purpose: 'manual_connectivity_test',
+  secondConfirm: true,
+  confirmText: 'local preflight acceptance'
+};
+const cases = {
+  featureDisabled: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true }),
+  missingKey: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: false }),
+  unsupportedProvider: gateway.modelGatewayConnectivityPreflight({ ...base, provider: 'unknown' }),
+  unsupportedModel: gateway.modelGatewayConnectivityPreflight({ ...base, model: 'not-a-connectivity-model' }, { acceptanceOnlyKeyConfigured: true }),
+  invalidPurpose: gateway.modelGatewayConnectivityPreflight({ ...base, purpose: 'chat_completion' }, { acceptanceOnlyKeyConfigured: true }),
+  timeout: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'timeout' }),
+  providerError: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'provider_error' })
+};
+process.stdout.write(JSON.stringify(cases));
+"@
+$preflightCases = $preflightJson | ConvertFrom-Json
+
+Assert-Equal $preflightCases.featureDisabled.result "blocked" "Preflight should remain blocked when feature is disabled."
+Assert-TextContains (@($preflightCases.featureDisabled.blockingCategories) -join "`n") "feature_disabled" "Preflight should report feature disabled."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.featureDisabled -Prefix "Feature-disabled preflight"
+
+Assert-Equal $preflightCases.missingKey.result "blocked" "Missing-key preflight should remain blocked."
+Assert-TextContains (@($preflightCases.missingKey.blockingCategories) -join "`n") "missing_key" "Preflight should report missing key."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.missingKey -Prefix "Missing-key preflight"
+
+Assert-Equal $preflightCases.unsupportedProvider.requestValid $false "Unsupported-provider preflight should be invalid."
+Assert-Equal $preflightCases.unsupportedProvider.providerSupported $false "Unsupported-provider preflight should not support provider."
+Assert-TextContains (@($preflightCases.unsupportedProvider.blockingCategories) -join "`n") "unsupported_provider" "Preflight should report unsupported provider."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.unsupportedProvider -Prefix "Unsupported-provider preflight"
+
+Assert-Equal $preflightCases.unsupportedModel.requestValid $false "Unsupported-model preflight should be invalid."
+Assert-Equal $preflightCases.unsupportedModel.modelSupported $false "Unsupported-model preflight should not support model."
+Assert-TextContains (@($preflightCases.unsupportedModel.blockingCategories) -join "`n") "unsupported_model" "Preflight should report unsupported model."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.unsupportedModel -Prefix "Unsupported-model preflight"
+
+Assert-Equal $preflightCases.invalidPurpose.requestValid $false "Invalid-purpose preflight should be invalid."
+Assert-TextContains (@($preflightCases.invalidPurpose.validationErrors) -join "`n") "purpose must be manual_connectivity_test." "Preflight should report invalid purpose."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.invalidPurpose -Prefix "Invalid-purpose preflight"
+
+Assert-Equal $preflightCases.timeout.result "blocked" "Timeout preflight should remain blocked."
+Assert-TextContains (@($preflightCases.timeout.blockingCategories) -join "`n") "timeout" "Preflight should report timeout."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.timeout -Prefix "Timeout preflight"
+
+Assert-Equal $preflightCases.providerError.result "blocked" "Provider-error preflight should remain blocked."
+Assert-TextContains (@($preflightCases.providerError.blockingCategories) -join "`n") "provider_error" "Preflight should report provider error."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.providerError -Prefix "Provider-error preflight"
 
 $providerAdapterCases = @(
   @{ Provider = "anthropic"; Model = "claude-3-5-haiku-latest"; AdapterId = "anthropic_disabled_connectivity_adapter" },

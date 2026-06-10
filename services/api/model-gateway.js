@@ -14,12 +14,44 @@ function providerById(providerId) {
   return modelGatewayProviders.find((item) => item.id === providerId);
 }
 
+function providerAdapterPolicy(providerId) {
+  return disabledProviderAdapterRegistry[providerId] || null;
+}
+
 function parseProviderId(request) {
   return typeof request.provider === "string" ? request.provider.trim().toLowerCase() : "";
 }
 
 function parseString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parsePositiveInteger(value, fallback) {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function modelGatewaySideEffects() {
+  return {
+    writesSqlite: false,
+    writesRuntimeState: false,
+    createsTasks: false,
+    createsApprovals: false,
+    createsRunnerJobs: false,
+    triggersAgents: false,
+    callsRealModel: false,
+    executesRunner: false,
+    logsPromptOrResult: false,
+    storesProviderResponse: false,
+  };
 }
 
 function modelGatewayFeatureFlags() {
@@ -29,6 +61,17 @@ function modelGatewayFeatureFlags() {
     manualConnectivityTestActive: false,
     realProviderRequestsAllowed: false,
   };
+}
+
+function preflightErrorCategory(blockingCategories) {
+  if (blockingCategories.includes("unsupported_provider")) return "unsupported_provider";
+  if (blockingCategories.includes("unsupported_model")) return "unsupported_model";
+  if (blockingCategories.includes("missing_key")) return "missing_key";
+  if (blockingCategories.includes("timeout")) return "timeout";
+  if (blockingCategories.includes("provider_error")) return "provider_unavailable";
+  if (blockingCategories.includes("response_body_limit")) return "invalid_request";
+  if (blockingCategories.includes("feature_disabled")) return "feature_disabled";
+  return "feature_disabled";
 }
 
 function modelGatewayStatus() {
@@ -45,6 +88,9 @@ function modelGatewayStatus() {
       configured: Boolean(process.env[provider.envVar]),
       providerAdapterId: disabledProviderAdapterRegistry[provider.id]?.providerAdapterId || "",
       providerAdapterMode: disabledProviderAdapterRegistry[provider.id]?.mode || "disabled",
+      connectivityTestModel: disabledProviderAdapterRegistry[provider.id]?.connectivityTestModel || "",
+      maxTimeoutMs: disabledProviderAdapterRegistry[provider.id]?.maxTimeoutMs || 5000,
+      maxResponseBodyLimitBytes: disabledProviderAdapterRegistry[provider.id]?.maxResponseBodyLimitBytes || 4096,
       keyExposedToFrontend: false,
       canRunConnectivityTest: false,
     })),
@@ -64,6 +110,127 @@ function modelGatewayStatus() {
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
       "This endpoint only reports provider configuration boundaries.",
     ],
+  };
+}
+
+function modelGatewayConnectivityPreflight(request, options = {}) {
+  const providerId = parseProviderId(request);
+  const model = parseString(request.model);
+  const purpose = parseString(request.purpose);
+  const confirmText = parseString(request.confirmText);
+  const provider = providerById(providerId);
+  const adapterPolicy = providerAdapterPolicy(providerId);
+  const maxTimeoutMs = adapterPolicy?.maxTimeoutMs || 5000;
+  const maxResponseBodyLimitBytes = adapterPolicy?.maxResponseBodyLimitBytes || 4096;
+  const timeoutMs = parsePositiveInteger(request.timeoutMs, maxTimeoutMs);
+  const responseBodyLimitBytes = parsePositiveInteger(
+    request.responseBodyLimitBytes,
+    maxResponseBodyLimitBytes
+  );
+  const validationErrors = [];
+  const blockingCategories = [];
+  const featureFlags = modelGatewayFeatureFlags();
+  const acceptanceSimulation = parseString(options.acceptanceSimulation);
+  const keyConfigured = provider
+    ? options.acceptanceOnlyKeyConfigured === true
+      ? true
+      : options.acceptanceOnlyKeyConfigured === false
+        ? false
+        : Boolean(process.env[provider.envVar])
+    : false;
+  const modelSupported = Boolean(adapterPolicy && model && model === adapterPolicy.connectivityTestModel);
+  const timeoutWithinLimit = timeoutMs <= maxTimeoutMs;
+  const responseBodyLimitWithinLimit = responseBodyLimitBytes <= maxResponseBodyLimitBytes;
+
+  if (!providerId) {
+    validationErrors.push("provider is required.");
+  } else if (!provider) {
+    validationErrors.push("provider is not supported.");
+    blockingCategories.push("unsupported_provider");
+  }
+
+  if (!model) {
+    validationErrors.push("model is required.");
+  } else if (provider && !modelSupported) {
+    validationErrors.push("model is not supported for manual connectivity test.");
+    blockingCategories.push("unsupported_model");
+  }
+
+  if (purpose !== "manual_connectivity_test") {
+    validationErrors.push("purpose must be manual_connectivity_test.");
+  }
+
+  if (request.secondConfirm !== true) {
+    validationErrors.push("secondConfirm must be true.");
+  }
+
+  if (!confirmText) {
+    validationErrors.push("confirmText is required.");
+  }
+
+  if (!timeoutWithinLimit) {
+    validationErrors.push("timeoutMs exceeds provider limit.");
+    blockingCategories.push("timeout");
+  }
+
+  if (!responseBodyLimitWithinLimit) {
+    validationErrors.push("responseBodyLimitBytes exceeds provider limit.");
+    blockingCategories.push("response_body_limit");
+  }
+
+  if (!keyConfigured && provider) {
+    blockingCategories.push("missing_key");
+  }
+
+  if (!featureFlags.manualConnectivityTestActive || !featureFlags.realProviderRequestsAllowed) {
+    blockingCategories.push("feature_disabled");
+  }
+
+  if (acceptanceSimulation === "timeout") {
+    blockingCategories.push("timeout");
+  } else if (acceptanceSimulation === "provider_error") {
+    blockingCategories.push("provider_error");
+  }
+
+  const uniqueBlockingCategories = [...new Set(blockingCategories)];
+
+  return {
+    ok: false,
+    result: "blocked",
+    errorCategory: preflightErrorCategory(uniqueBlockingCategories),
+    provider: providerId,
+    model,
+    purpose,
+    requestValid: validationErrors.length === 0,
+    validationErrors,
+    providerSupported: Boolean(provider),
+    modelSupported,
+    keyEnvVar: provider?.envVar || "",
+    keyConfigured,
+    featureFlags,
+    timeoutMs,
+    responseBodyLimitBytes,
+    limits: {
+      maxTimeoutMs,
+      maxResponseBodyLimitBytes,
+    },
+    checks: {
+      providerSupported: Boolean(provider),
+      modelPresent: Boolean(model),
+      modelSupported,
+      purposeValid: purpose === "manual_connectivity_test",
+      secondConfirmPresent: request.secondConfirm === true,
+      confirmTextPresent: Boolean(confirmText),
+      featureEnabled: featureFlags.manualConnectivityTestActive === true,
+      realProviderRequestsAllowed: featureFlags.realProviderRequestsAllowed === true,
+      keyConfigured,
+      timeoutWithinLimit,
+      responseBodyLimitWithinLimit,
+    },
+    acceptanceSimulation,
+    blockingCategories: uniqueBlockingCategories,
+    realProviderRequestAttempted: false,
+    sideEffects: modelGatewaySideEffects(),
   };
 }
 
@@ -122,31 +289,8 @@ function modelGatewayConnectivityTest(request) {
   const providerId = parseProviderId(request);
   const model = parseString(request.model);
   const purpose = parseString(request.purpose);
-  const confirmText = parseString(request.confirmText);
   const provider = providerById(providerId);
-  const validationErrors = [];
-
-  if (!providerId) {
-    validationErrors.push("provider is required.");
-  } else if (!provider) {
-    validationErrors.push("provider is not supported.");
-  }
-
-  if (!model) {
-    validationErrors.push("model is required.");
-  }
-
-  if (purpose !== "manual_connectivity_test") {
-    validationErrors.push("purpose must be manual_connectivity_test.");
-  }
-
-  if (request.secondConfirm !== true) {
-    validationErrors.push("secondConfirm must be true.");
-  }
-
-  if (!confirmText) {
-    validationErrors.push("confirmText is required.");
-  }
+  const preflight = modelGatewayConnectivityPreflight(request);
 
   const adapterResult = disabledProviderConnectivityAdapter({
     provider: providerId,
@@ -159,12 +303,14 @@ function modelGatewayConnectivityTest(request) {
     provider: providerId,
     model,
     purpose,
-    requestValid: validationErrors.length === 0,
-    validationErrors,
+    requestValid: preflight.requestValid,
+    validationErrors: preflight.validationErrors,
     providerSupported: Boolean(provider),
+    modelSupported: preflight.modelSupported,
     keyEnvVar: provider?.envVar || "",
-    keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    keyConfigured: preflight.keyConfigured,
     featureFlags: modelGatewayFeatureFlags(),
+    preflight,
     realModelCallsAllowed: false,
     adapter: adapterResult.adapter,
     providerAdapterId: adapterResult.providerAdapterId,
@@ -197,6 +343,7 @@ function modelGatewayConnectivityTest(request) {
 
 module.exports = {
   modelGatewayConnectivityTest,
+  modelGatewayConnectivityPreflight,
   modelGatewayDryRun,
   modelGatewayStatus,
 };

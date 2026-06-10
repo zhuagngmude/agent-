@@ -159,6 +159,8 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - No local demo step may call a real OpenAI, Anthropic, Google Gemini, or other provider API yet.
 - No demo script may require real API keys or provider SDKs.
 - `POST /api/model-gateway/connectivity-test` must return `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all side effects false.
+- The connectivity-test response now includes a backend `preflight` object. It may report blocked categories such as `missing_key` or `feature_disabled`, but it must still report `realProviderRequestAttempted=false` and all side effects false.
+- `scripts/verify-local-ui.ps1` calls the exported preflight helper directly to cover feature disabled, missing key, unsupported provider, unsupported model, invalid purpose, timeout, and provider-error paths without real keys or provider SDKs.
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is only a reported request flag in MVP-0.2; it must not make `manualConnectivityTestActive` or `realProviderRequestsAllowed` true.
 - Provider adapter verification currently covers only the disabled adapter registry and stub; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.

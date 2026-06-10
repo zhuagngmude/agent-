@@ -6,18 +6,27 @@ const disabledProviderAdapterRegistry = {
     provider: "openai",
     providerLabel: "OpenAI",
     mode: "disabled",
+    connectivityTestModel: "gpt-4.1-mini",
+    maxTimeoutMs: 5000,
+    maxResponseBodyLimitBytes: 4096,
   },
   anthropic: {
     providerAdapterId: "anthropic_disabled_connectivity_adapter",
     provider: "anthropic",
     providerLabel: "Anthropic",
     mode: "disabled",
+    connectivityTestModel: "claude-3-5-haiku-latest",
+    maxTimeoutMs: 5000,
+    maxResponseBodyLimitBytes: 4096,
   },
   google: {
     providerAdapterId: "google_disabled_connectivity_adapter",
     provider: "google",
     providerLabel: "Google Gemini",
     mode: "disabled",
+    connectivityTestModel: "gemini-1.5-flash",
+    maxTimeoutMs: 5000,
+    maxResponseBodyLimitBytes: 4096,
   },
 };
 
