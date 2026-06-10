@@ -1097,3 +1097,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：在接中转真实请求前，先固定 relay 与官方 OpenAI 的隔离边界，确认 base URL 只能来自服务端 env，且不会被前端或请求体覆盖。
 - 影响模块：`services/api/model-gateway.js`、`services/api/model-gateway-adapters.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不接 relay SDK/HTTP 请求，不读取或保存真实 key/base URL 值，不写 SQLite/runtime state，不创建任务/审批/Runner job，不触发 Agent，不保存 prompt/result/provider body。
+
+## 2026-06-10 Change log: Model Gateway OpenAI-compatible relay adapter interface checkpoint
+
+- What changed: added an interface-disabled future relay adapter boundary in `services/api/model-gateway-adapters.js`, exposed `futureProviderAdapterId=openai_compat_manual_connectivity_adapter` as metadata, and extended `scripts/verify-local-ui.ps1` to verify relay interface failure paths without real credentials or network calls.
+- Why: before any real OpenAI-compatible relay request is implemented, the adapter contract must prove that keys and base URLs remain server-side, prompts and Agent/Runner context are rejected, failure categories stay coarse, and all side effects remain false.
+- Impacted modules: `services/api/model-gateway-adapters.js`, `services/api/model-gateway.js`, `scripts/verify-local-ui.ps1`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a backend safety checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.

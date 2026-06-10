@@ -184,3 +184,8 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - 不会连接真实数据库或云同步。
 
 如果后续要开放真实 Runner 或真实 Agent 配置写入，必须先补 Approval Service、二次确认、Git checkpoint 和回滚策略。
+
+## Model Gateway Relay Interface Checkpoint
+
+- The relay adapter interface checkpoint may expose future metadata such as `openai_compat_manual_connectivity_adapter` and `interface_disabled`, but it must still be tested only through backend helpers with simulated preflight failures.
+- Relay interface verification must cover missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, feature disabled, and all-false side effects without real relay credentials or network calls.

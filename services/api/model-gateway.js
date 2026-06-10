@@ -150,6 +150,8 @@ function modelGatewayStatus() {
       baseUrlRequired: provider.requiresBaseUrl === true,
       providerAdapterId: disabledProviderAdapterRegistry[provider.id]?.providerAdapterId || "",
       providerAdapterMode: disabledProviderAdapterRegistry[provider.id]?.mode || "disabled",
+      futureProviderAdapterId: disabledProviderAdapterRegistry[provider.id]?.futureProviderAdapterId || "",
+      futureProviderAdapterMode: disabledProviderAdapterRegistry[provider.id]?.futureMode || "",
       connectivityTestModel: disabledProviderAdapterRegistry[provider.id]?.connectivityTestModel || "",
       maxTimeoutMs: disabledProviderAdapterRegistry[provider.id]?.maxTimeoutMs || 5000,
       maxResponseBodyLimitBytes: disabledProviderAdapterRegistry[provider.id]?.maxResponseBodyLimitBytes || 4096,

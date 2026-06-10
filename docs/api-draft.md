@@ -1253,6 +1253,16 @@ OpenAI-compatible relay disabled preflight implementation:
 - The HTTP API must not accept relay base URL overrides. Test-only base URL injection is limited to direct backend helper calls from regression scripts.
 - `scripts/verify-local-ui.ps1` must cover `missing_base_url`, `invalid_base_url`, safe-shape-but-feature-disabled, and all-false side effects for `openai_compat`.
 
+OpenAI-compatible relay adapter interface checkpoint:
+
+- `services/api/model-gateway-adapters.js` now exposes `openai_compat_manual_connectivity_adapter` as future adapter metadata only, with current mode `interface_disabled`.
+- The relay interface checkpoint is not wired to real HTTP, provider SDKs, or real relay requests. It only documents and verifies the future adapter input/output boundary.
+- The interface only accepts backend-shaped manual connectivity inputs: provider id, fixed relay model id, purpose, preflight result, timeout limit, and response body limit.
+- The future adapter must read the relay key and base URL only from server env. It must not accept API keys, base URLs, free-form prompts, Agent context, files, tool calls, Runner jobs, arbitrary headers, arbitrary URLs, or arbitrary HTTP options from the request body.
+- The interface returns only coarse blocked status, coarse `errorCategory`, redaction booleans, duration metadata, and a request-shape contract. It must not return key values, base URL values, request headers, provider bodies, model text, token usage, cost, or raw errors.
+- `scripts/verify-local-ui.ps1` directly calls the backend helper and verifies relay interface failure paths for missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, and feature disabled.
+- All relay interface cases must keep `realProviderRequestAttempted=false`, `providerResponseStored=false`, and all side effects false.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：

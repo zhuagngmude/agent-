@@ -153,6 +153,46 @@ function Assert-DisabledConnectivityAdapter {
   Assert-Equal $ConnectivityTest.redactionApplied $true "$Prefix should report redaction applied."
 }
 
+function Assert-OpenAiCompatRelayInterface {
+  param(
+    [Parameter(Mandatory = $true)][object]$RelayInterface,
+    [Parameter(Mandatory = $true)][string]$ExpectedErrorCategory,
+    [string]$Prefix = "OpenAI-compatible relay adapter interface"
+  )
+
+  Assert-Equal $RelayInterface.adapter "openai_compat_relay_connectivity_adapter_interface" "$Prefix should use the relay interface checkpoint adapter."
+  Assert-Equal $RelayInterface.providerAdapterId "openai_compat_manual_connectivity_adapter" "$Prefix should expose the future relay adapter id."
+  Assert-Equal $RelayInterface.providerAdapterMode "interface_disabled" "$Prefix should remain interface-disabled."
+  Assert-Equal $RelayInterface.result "blocked" "$Prefix should stay blocked."
+  Assert-Equal $RelayInterface.errorCategory $ExpectedErrorCategory "$Prefix should report the expected coarse error category."
+  Assert-Equal $RelayInterface.realProviderRequestAttempted $false "$Prefix should not attempt provider requests."
+  Assert-Equal $RelayInterface.providerResponseStored $false "$Prefix should not store provider responses."
+  Assert-Equal $RelayInterface.redactionApplied $true "$Prefix should report redaction applied."
+  Assert-Equal $RelayInterface.interfaceOnly $true "$Prefix should identify itself as interface-only."
+  Assert-Equal $RelayInterface.requestShape.provider "openai_compat" "$Prefix should be scoped to openai_compat."
+  Assert-Equal $RelayInterface.requestShape.keySource "server_env" "$Prefix should read key only from server env in future."
+  Assert-Equal $RelayInterface.requestShape.baseUrlSource "server_env" "$Prefix should read base URL only from server env in future."
+  Assert-Equal $RelayInterface.requestShape.acceptsRequestBaseUrl $false "$Prefix should not accept request base URL overrides."
+  Assert-Equal $RelayInterface.requestShape.acceptsApiKeyFromClient $false "$Prefix should not accept client API keys."
+  Assert-Equal $RelayInterface.requestShape.acceptsFreeFormPrompt $false "$Prefix should not accept free-form prompts."
+  Assert-Equal $RelayInterface.requestShape.acceptsAgentContext $false "$Prefix should not accept Agent context."
+  Assert-Equal $RelayInterface.requestShape.acceptsFiles $false "$Prefix should not accept files."
+  Assert-Equal $RelayInterface.requestShape.acceptsToolCalls $false "$Prefix should not accept tool calls."
+  Assert-Equal $RelayInterface.requestShape.acceptsRunnerJob $false "$Prefix should not accept Runner jobs."
+  Assert-Equal $RelayInterface.requestShape.fixedMinimalPingOnly $true "$Prefix should allow only a future fixed minimal ping."
+  Assert-Equal $RelayInterface.requestShape.endpointShapeConfirmed $false "$Prefix endpoint shape should remain unconfirmed."
+  Assert-Equal $RelayInterface.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
+  Assert-Equal $RelayInterface.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
+  Assert-Equal $RelayInterface.sideEffects.createsTasks $false "$Prefix should not create tasks."
+  Assert-Equal $RelayInterface.sideEffects.createsApprovals $false "$Prefix should not create approvals."
+  Assert-Equal $RelayInterface.sideEffects.createsRunnerJobs $false "$Prefix should not create Runner jobs."
+  Assert-Equal $RelayInterface.sideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+  Assert-Equal $RelayInterface.sideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $RelayInterface.sideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $RelayInterface.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
+  Assert-Equal $RelayInterface.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
+}
+
 function Test-Command {
   param([string]$Name)
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -265,6 +305,8 @@ Assert-Equal $gateway.safety.makesNetworkRequests $false "Model Gateway status s
 Assert-ModelGatewayFeatureFlags -FeatureFlags $gateway.featureFlags -Prefix "Model Gateway status feature flags"
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai" }).providerAdapterId) "openai_disabled_connectivity_adapter" "OpenAI status should expose disabled adapter id."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).providerAdapterId) "openai_compat_disabled_connectivity_adapter" "OpenAI-compatible relay status should expose disabled adapter id."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).futureProviderAdapterId) "openai_compat_manual_connectivity_adapter" "OpenAI-compatible relay status should expose the future relay adapter id as metadata only."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).futureProviderAdapterMode) "interface_disabled" "OpenAI-compatible relay future adapter should remain interface-disabled."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).keyEnvVar) "AGENT_SWARM_OPENAI_COMPAT_API_KEY" "OpenAI-compatible relay should use a dedicated key env var."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).baseUrlEnvVar) "AGENT_SWARM_OPENAI_COMPAT_BASE_URL" "OpenAI-compatible relay should use a dedicated base URL env var."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).baseUrlRequired) $true "OpenAI-compatible relay should require a server-side base URL."
@@ -338,6 +380,7 @@ Assert-TextContains (@($connectivityTest.preflight.blockingCategories) -join "`n
 
 $preflightJson = node -e @"
 const gateway = require('./services/api/model-gateway');
+const adapters = require('./services/api/model-gateway-adapters');
 const base = {
   provider: 'openai',
   model: 'gpt-4.1-mini',
@@ -361,9 +404,21 @@ const cases = {
   timeout: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'timeout' }),
   providerError: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'provider_error' }),
   relayMissingBaseUrl: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: '' }),
+  relayMissingKey: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: false, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1' }),
   relayInvalidBaseUrl: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'http://127.0.0.1:8787/v1' }),
   relayValidBaseUrlBlocked: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1' })
 };
+const relayInterfaceCases = {
+  missingKey: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.relayMissingKey }),
+  missingBaseUrl: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.relayMissingBaseUrl }),
+  invalidBaseUrl: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.relayInvalidBaseUrl }),
+  unsupportedProvider: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.unsupportedProvider }),
+  unsupportedModel: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: gateway.modelGatewayConnectivityPreflight({ ...relayBase, model: 'not-a-relay-model' }, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1' }) }),
+  timeout: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1', acceptanceSimulation: 'timeout' }) }),
+  providerError: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1', acceptanceSimulation: 'provider_error' }) }),
+  featureDisabled: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.relayValidBaseUrlBlocked })
+};
+cases.relayInterfaceCases = relayInterfaceCases;
 process.stdout.write(JSON.stringify(cases));
 "@
 $preflightCases = $preflightJson | ConvertFrom-Json
@@ -404,6 +459,11 @@ Assert-Equal $preflightCases.relayMissingBaseUrl.baseUrlConfigured $false "Relay
 Assert-TextContains (@($preflightCases.relayMissingBaseUrl.blockingCategories) -join "`n") "missing_base_url" "Relay preflight should report missing base URL."
 Assert-PreflightNoSideEffects -Preflight $preflightCases.relayMissingBaseUrl -Prefix "Relay missing-base-url preflight"
 
+Assert-Equal $preflightCases.relayMissingKey.result "blocked" "Relay missing-key preflight should remain blocked."
+Assert-Equal $preflightCases.relayMissingKey.keyConfigured $false "Relay missing-key preflight should report missing key."
+Assert-TextContains (@($preflightCases.relayMissingKey.blockingCategories) -join "`n") "missing_key" "Relay preflight should report missing key."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.relayMissingKey -Prefix "Relay missing-key preflight"
+
 Assert-Equal $preflightCases.relayInvalidBaseUrl.result "blocked" "Relay invalid-base-url preflight should remain blocked."
 Assert-Equal $preflightCases.relayInvalidBaseUrl.baseUrlConfigured $true "Relay invalid-base-url preflight should report configured base URL."
 Assert-Equal $preflightCases.relayInvalidBaseUrl.baseUrlValid $false "Relay invalid-base-url preflight should reject unsafe base URL."
@@ -415,6 +475,15 @@ Assert-Equal $preflightCases.relayValidBaseUrlBlocked.baseUrlConfigured $true "R
 Assert-Equal $preflightCases.relayValidBaseUrlBlocked.baseUrlValid $true "Relay valid-base-url preflight should accept safe URL shape."
 Assert-TextContains (@($preflightCases.relayValidBaseUrlBlocked.blockingCategories) -join "`n") "feature_disabled" "Relay valid-base-url preflight should remain feature-disabled."
 Assert-PreflightNoSideEffects -Preflight $preflightCases.relayValidBaseUrlBlocked -Prefix "Relay valid-base-url preflight"
+
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.missingKey -ExpectedErrorCategory "missing_key" -Prefix "Relay interface missing-key case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.missingBaseUrl -ExpectedErrorCategory "invalid_request" -Prefix "Relay interface missing-base-url case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.invalidBaseUrl -ExpectedErrorCategory "invalid_request" -Prefix "Relay interface invalid-base-url case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.unsupportedProvider -ExpectedErrorCategory "unsupported_provider" -Prefix "Relay interface unsupported-provider case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.unsupportedModel -ExpectedErrorCategory "unsupported_model" -Prefix "Relay interface unsupported-model case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.timeout -ExpectedErrorCategory "timeout" -Prefix "Relay interface timeout case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.providerError -ExpectedErrorCategory "provider_unavailable" -Prefix "Relay interface provider-error case"
+Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.featureDisabled -ExpectedErrorCategory "feature_disabled" -Prefix "Relay interface feature-disabled case"
 
 $providerAdapterCases = @(
   @{ Provider = "openai_compat"; Model = "openai-compatible-relay-model"; AdapterId = "openai_compat_disabled_connectivity_adapter" },
