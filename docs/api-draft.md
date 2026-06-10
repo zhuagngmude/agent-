@@ -983,6 +983,8 @@ Purpose: planned manual real-provider connectivity test after dry-run is stable.
 
 Current MVP-0.2 implementation is a disabled backend stub. It validates the request shape and returns `not_implemented` with all side effects set to false. It does not add provider SDKs, does not make OpenAI/Anthropic/Gemini requests, and is not exposed as an active frontend control.
 
+Implementation boundary: `services/api/model-gateway.js` owns provider metadata, env var presence checks, dry-run validation, and the disabled connectivity-test stub. `services/api/server.js` should only wire HTTP routes to that module.
+
 This phase is narrower than general model calling. It only proves that a server-side provider key can reach the provider with a minimal, fixed connectivity check. It is not an Agent run, not a chat/completion feature, not a Runner capability, and not a logged model-call pipeline.
 
 Planned request draft:

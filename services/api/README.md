@@ -23,7 +23,10 @@ SQLite 初始化和 seed 方案见：
 ```text
 server.js
 mock-data.js
+model-gateway.js
 ```
+
+`model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, and the disabled connectivity-test stub. It must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 
 启动：
 

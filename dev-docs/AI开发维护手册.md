@@ -1027,3 +1027,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：把上一轮规格落成可回归的安全边界，先证明“接口存在但不会真实连通”，再考虑后续 provider adapter 和 feature flag。
 - 影响模块：`services/api/server.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。
+
+## 2026-06-10 变更记录：Model Gateway 后端隔离层
+
+- 改了什么：新增 `services/api/model-gateway.js`，集中管理 provider metadata、env var presence、dry-run 校验和 connectivity-test 禁用态 stub；`services/api/server.js` 改为只做 HTTP route wiring。
+- 为什么改：先把 Model Gateway 边界从通用 API server 中拆出，避免后续 feature flag 或 provider adapter 设计散落在路由层，同时保持当前所有接口行为不变。
+- 影响模块：`services/api/model-gateway.js`、`services/api/server.js`、`services/api/README.md`、`docs/api-draft.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是后端结构整理，不新增真实 provider SDK、真实模型请求、API Key 输入/保存、Agent 触发或 Runner job 创建。
