@@ -1111,3 +1111,10 @@ docs/runner-safety-acceptance.md
 - Why: the operator does not yet know the relay endpoint family, model id, or request shape. Capturing only documentation facts first prevents mixing official OpenAI behavior with relay behavior and avoids accidental key, prompt, or provider-body leakage.
 - Impacted modules: `docs/relay-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a development checklist and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway DeepSeek provider information checklist
+
+- What changed: added `docs/deepseek-provider-info-checklist.md` as a documentation-only checklist for the official DeepSeek API provider candidate.
+- Why: the unknown relay candidate lacks public endpoint and model details, while DeepSeek has public docs for OpenAI-compatible Chat Completions. Recording only non-secret facts lets the project compare provider candidates without handling API keys or making real requests.
+- Impacted modules: `docs/deepseek-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a development checklist and does not enable real DeepSeek calls, real model calls, Runner execution, cloud sync, or permission changes.

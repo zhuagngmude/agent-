@@ -1264,6 +1264,15 @@ OpenAI-compatible relay adapter interface checkpoint:
 - `scripts/verify-local-ui.ps1` directly calls the backend helper and verifies relay interface failure paths for missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, and feature disabled.
 - All relay interface cases must keep `realProviderRequestAttempted=false`, `providerResponseStored=false`, and all side effects false.
 
+DeepSeek provider information checkpoint:
+
+- `docs/deepseek-provider-info-checklist.md` records non-secret facts from the official DeepSeek API docs before any real DeepSeek request implementation.
+- DeepSeek is a distinct provider candidate from official OpenAI, Anthropic, Google Gemini, and unknown OpenAI-compatible relays.
+- Current status remains documentation-only: no DeepSeek SDK import, no DeepSeek HTTP request, no feature flag activation, no real model call.
+- The future provider id should be distinct, such as `deepseek`, and the future key env var should be server-only, such as `AGENT_SWARM_DEEPSEEK_API_KEY`.
+- The first DeepSeek manual ping must remain backend-only, fixed, non-streaming, timeout-limited, response-size-limited, redacted, and manually triggered.
+- It must not accept free-form prompts, Agent context, files, tools, Runner job ids, arbitrary headers, arbitrary URLs, or client-provided API keys.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：

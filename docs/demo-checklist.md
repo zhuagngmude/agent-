@@ -190,3 +190,9 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - The relay adapter interface checkpoint may expose future metadata such as `openai_compat_manual_connectivity_adapter` and `interface_disabled`, but it must still be tested only through backend helpers with simulated preflight failures.
 - Relay interface verification must cover missing key, missing base URL, invalid base URL, unsupported provider, unsupported model, timeout, provider error, feature disabled, and all-false side effects without real relay credentials or network calls.
 - `docs/relay-provider-info-checklist.md` is the safe place for non-secret relay documentation facts. It must not contain keys, auth headers, account ids, prompts, model outputs, provider bodies, token usage, cost, or raw errors.
+
+## Model Gateway DeepSeek Provider Checklist
+
+- `docs/deepseek-provider-info-checklist.md` records only non-secret facts from official DeepSeek documentation.
+- DeepSeek may be considered a first real-provider candidate later, but no local demo step may call DeepSeek yet.
+- Demo verification must still pass without real DeepSeek credentials, SDK imports, network calls, stored provider responses, prompt/result logs, token usage, cost, or raw provider errors.
