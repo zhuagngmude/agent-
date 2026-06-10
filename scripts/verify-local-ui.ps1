@@ -67,6 +67,22 @@ function Assert-TextContains {
   }
 }
 
+function Assert-DryRunNoSideEffects {
+  param(
+    [Parameter(Mandatory = $true)][object]$DryRun,
+    [string]$Prefix = "Model Gateway dry-run"
+  )
+
+  Assert-Equal $DryRun.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
+  Assert-Equal $DryRun.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
+  Assert-Equal $DryRun.sideEffects.createsTasks $false "$Prefix should not create tasks."
+  Assert-Equal $DryRun.sideEffects.createsApprovals $false "$Prefix should not create approvals."
+  Assert-Equal $DryRun.sideEffects.createsRunnerJobs $false "$Prefix should not create Runner jobs."
+  Assert-Equal $DryRun.sideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+  Assert-Equal $DryRun.sideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $DryRun.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
+}
+
 function Test-Command {
   param([string]$Name)
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -190,14 +206,37 @@ Assert-Equal $dryRun.requestValid $true "Model Gateway dry-run request should be
 Assert-Equal $dryRun.providerSupported $true "OpenAI provider should be recognized by dry-run."
 Assert-Equal $dryRun.realModelCallsAllowed $false "Model Gateway dry-run should not allow real calls."
 Assert-Equal $dryRun.wouldCallProvider $false "Model Gateway dry-run should not call providers."
-Assert-Equal $dryRun.sideEffects.writesSqlite $false "Model Gateway dry-run should not write SQLite."
-Assert-Equal $dryRun.sideEffects.writesRuntimeState $false "Model Gateway dry-run should not write runtime state."
-Assert-Equal $dryRun.sideEffects.createsTasks $false "Model Gateway dry-run should not create tasks."
-Assert-Equal $dryRun.sideEffects.createsApprovals $false "Model Gateway dry-run should not create approvals."
-Assert-Equal $dryRun.sideEffects.createsRunnerJobs $false "Model Gateway dry-run should not create Runner jobs."
-Assert-Equal $dryRun.sideEffects.triggersAgents $false "Model Gateway dry-run should not trigger Agents."
-Assert-Equal $dryRun.sideEffects.callsRealModel $false "Model Gateway dry-run should not call real models."
-Assert-Equal $dryRun.sideEffects.logsPromptOrResult $false "Model Gateway dry-run should not log prompts or results."
+Assert-DryRunNoSideEffects -DryRun $dryRun
+
+$unknownProviderDryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
+  provider = "unknown"
+  model = "gpt-4.1-mini"
+  purpose = "connectivity_check"
+  requestedBy = "local_user"
+}
+Assert-Equal $unknownProviderDryRun.requestValid $false "Unknown provider dry-run should be invalid."
+Assert-Equal $unknownProviderDryRun.providerSupported $false "Unknown provider should not be supported."
+Assert-Equal $unknownProviderDryRun.wouldCallProvider $false "Unknown provider dry-run should not call providers."
+Assert-DryRunNoSideEffects -DryRun $unknownProviderDryRun -Prefix "Unknown provider dry-run"
+
+$missingModelDryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
+  provider = "openai"
+  purpose = "connectivity_check"
+  requestedBy = "local_user"
+}
+Assert-Equal $missingModelDryRun.requestValid $false "Missing model dry-run should be invalid."
+Assert-TextContains (@($missingModelDryRun.validationErrors) -join "`n") "model is required." "Missing model dry-run should report validation error."
+Assert-DryRunNoSideEffects -DryRun $missingModelDryRun -Prefix "Missing model dry-run"
+
+$invalidPurposeDryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
+  provider = "openai"
+  model = "gpt-4.1-mini"
+  purpose = "chat_completion"
+  requestedBy = "local_user"
+}
+Assert-Equal $invalidPurposeDryRun.requestValid $false "Invalid purpose dry-run should be invalid."
+Assert-TextContains (@($invalidPurposeDryRun.validationErrors) -join "`n") "purpose must be connectivity_check." "Invalid purpose dry-run should report validation error."
+Assert-DryRunNoSideEffects -DryRun $invalidPurposeDryRun -Prefix "Invalid purpose dry-run"
 
 $runner = Invoke-Json -Path "/api/projects/$projectId/runner/status"
 Assert-Equal $runner.permissions.writeFiles "approval_required" "Runner writes should remain approval-gated."
