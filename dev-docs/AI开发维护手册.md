@@ -1203,6 +1203,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/server.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/README.md`, `scripts/README.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this keeps the boundary disabled and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
+## 2026-06-10 Change log: Agent config dry-run negative helper checks
+
+- What changed: exported the Agent config dry-run builder for local helper verification and added `scripts/verify-agent-config-dry-run.ps1` for negative precondition checks.
+- Why: some unsafe states, such as an application linked to an unapproved source approval or an approval with a Runner job, should be covered without creating impossible states through public HTTP flows.
+- Impacted modules: `services/api/server.js`, `scripts/verify-agent-config-dry-run.ps1`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/agent-config-apply-dry-run-spec.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is disabled dry-run regression only and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

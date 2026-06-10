@@ -1163,14 +1163,21 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { error: "not_found", path: pathname });
 }
 
-loadRuntimeState();
+if (require.main === module) {
+  loadRuntimeState();
 
-const server = http.createServer((req, res) => {
-  handleRequest(req, res).catch((error) => {
-    sendJson(res, 500, { error: "internal_error", message: error.message });
+  const server = http.createServer((req, res) => {
+    handleRequest(req, res).catch((error) => {
+      sendJson(res, 500, { error: "internal_error", message: error.message });
+    });
   });
-});
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`agent蜂群 mock API listening on http://127.0.0.1:${port}`);
-});
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`agent蜂群 mock API listening on http://127.0.0.1:${port}`);
+  });
+}
+
+module.exports = {
+  buildAgentConfigApplyDryRun,
+  noAgentConfigDryRunSideEffects,
+};

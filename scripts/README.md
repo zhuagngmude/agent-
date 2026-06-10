@@ -23,6 +23,7 @@ verify-mock-flows.ps1
 verify-sqlite-flows.ps1
 verify-model-gateway.ps1
 verify-agent-permissions.ps1
+verify-agent-config-dry-run.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -52,6 +53,8 @@ sqlite/
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 
 `verify-agent-permissions.ps1` validates the local Agent permission profile helper. It expands mock profiles, rejects `all=true`, rejects unknown capabilities, rejects forbidden Agent capabilities, and checks all validation side effects stay false. It does not start local services, change Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+
+`verify-agent-config-dry-run.ps1` validates the local Agent config dry-run helper without starting services. It covers blocked preview, missing second confirmation, missing confirm text, non-`pending_apply` application, unapproved source approval, source approval with a Runner job, wrong target service, missing target Agent, and all-false side effects. It does not write Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -106,3 +109,12 @@ This script is acceptance verification, not a real connectivity test. It must no
 - `architect_admin` and `all_agents_full_management` may include broad planning/orchestration/request authority, but must not include self-approval, high-risk approval, direct Runner execution, direct file/command/Git/network operations, or raw secret access.
 - Invalid contracts such as unsupported profiles, `all=true`, unknown capabilities, direct execution capabilities, and raw-secret capabilities must be rejected.
 - Every validation result must keep side effects false: no SQLite/runtime-state writes, no tasks, no approvals, no Runner jobs, no Agent triggers, no Runner execution, no real model calls, and no raw-secret reads.
+
+## verify-agent-config-dry-run.ps1
+
+`verify-agent-config-dry-run.ps1` is the dedicated Agent config dry-run helper contract check.
+
+- `services/api/server.js` exports `buildAgentConfigApplyDryRun(...)` for local helper verification without starting the API server.
+- Valid pending applications must still return `ok=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
+- Invalid dry-run inputs must be reported without side effects: missing second confirmation, missing confirm text, non-pending application, unapproved approval, approval with Runner job, wrong target service, and missing target Agent.
+- The helper check does not start local services, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.

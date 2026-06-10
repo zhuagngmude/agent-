@@ -290,6 +290,15 @@ try {
     appliedBy = "verify_mock_flows"
   }
   Assert-Equal $applied.application.status "applied" "Agent config application should be applied."
+  $appliedDryRun = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/dry-run" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify applied dry-run stays blocked."
+    requestedBy = "verify_mock_flows"
+  }
+  Assert-Equal $appliedDryRun.dryRun $true "Applied Agent config dry-run should identify itself as dry-run."
+  Assert-Equal $appliedDryRun.canApply $false "Applied Agent config dry-run should not allow apply."
+  Assert-TextContains (@($appliedDryRun.validationErrors) -join "`n") "application must be pending_apply" "Applied Agent config dry-run should reject non-pending state."
+  Assert-AgentConfigDryRunNoSideEffects -DryRun $appliedDryRun
   $agentsAfterMockApply = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
   $reviewerAfterMockApply = @($agentsAfterMockApply.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
   Assert-Equal (@($reviewerAfterMockApply.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "Mock apply should not modify Agent permissions."

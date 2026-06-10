@@ -293,6 +293,15 @@ try {
     appliedBy = "verify_sqlite_flows"
   }
   Assert-Equal $applied.application.status "applied" "Agent config application should be applied."
+  $appliedDryRun = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/dry-run" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify applied sqlite dry-run stays blocked."
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $appliedDryRun.dryRun $true "Applied SQLite Agent config dry-run should identify itself as dry-run."
+  Assert-Equal $appliedDryRun.canApply $false "Applied SQLite Agent config dry-run should not allow apply."
+  Assert-TextContains (@($appliedDryRun.validationErrors) -join "`n") "application must be pending_apply" "Applied SQLite Agent config dry-run should reject non-pending state."
+  Assert-AgentConfigDryRunNoSideEffects -DryRun $appliedDryRun
   $agentsAfterSqliteApply = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
   $reviewerAfterSqliteApply = @($agentsAfterSqliteApply.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
   Assert-Equal (@($reviewerAfterSqliteApply.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "SQLite mock apply should not modify Agent permissions."

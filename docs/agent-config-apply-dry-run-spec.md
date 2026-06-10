@@ -162,6 +162,7 @@ Rollback must not:
 Before any real apply endpoint can be enabled:
 
 - Dry-run endpoint exists and is covered by Mock and SQLite verification.
+- Helper-level regression covers preconditions that normal HTTP flow cannot create, including unapproved source approval and source approval with a Runner job.
 - Dry-run blocked state keeps all side effects false.
 - Invalid application ID returns a safe error.
 - Non-`pending_apply` application is rejected.
