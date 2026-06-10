@@ -907,6 +907,72 @@ Response example:
 }
 ```
 
+### POST /api/model-gateway/dry-run
+
+Purpose: validate the shape and safety boundary of a future model connectivity test without calling a real model provider.
+
+This is a planned next step, not an implemented endpoint yet. The dry-run phase is intentionally narrower than the long-term product. Its "must not" rules apply only to dry-run; they do not mean the final product will never write model logs, create tasks, trigger Agents, or call real models.
+
+Request draft:
+
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "purpose": "connectivity_check",
+  "promptPreview": "optional short user-visible test prompt label",
+  "requestedBy": "local_user"
+}
+```
+
+Response draft:
+
+```json
+{
+  "ok": false,
+  "dryRun": true,
+  "provider": "openai",
+  "providerSupported": true,
+  "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
+  "keyConfigured": false,
+  "realModelCallsAllowed": false,
+  "wouldCallProvider": false,
+  "blockedReasons": [
+    "Dry-run does not call real providers.",
+    "Real model calls are disabled in MVP-0.2.",
+    "Approval, logging, cost tracking, and key-safety rules are not ready."
+  ],
+  "sideEffects": {
+    "writesSqlite": false,
+    "writesRuntimeState": false,
+    "createsTasks": false,
+    "createsApprovals": false,
+    "createsRunnerJobs": false,
+    "triggersAgents": false,
+    "callsRealModel": false,
+    "logsPromptOrResult": false
+  }
+}
+```
+
+Dry-run acceptance rules:
+
+- It must not write SQLite or `data/mock/runtime-state.json`.
+- It must not create tasks, approvals, Runner jobs, workflow runs, runtime events, or model call records.
+- It must not trigger any Agent.
+- It must not call OpenAI, Anthropic, Google, or any real provider network API.
+- It must not log prompts, prompt previews, model outputs, API keys, provider responses, or error bodies.
+- It may only validate request shape, supported provider ids, expected server-side env var names, and current safety switches.
+- It must return key presence as a boolean only; it must never return raw keys, key suffixes, or masked key fragments.
+- It must stay backend-only; the frontend must not send, store, or display real API keys.
+
+Later phases, intentionally not part of dry-run:
+
+1. Manual connectivity test: user-triggered, real provider ping with minimal response and no Agent/Runner side effects.
+2. Logged model call: redacted audit trail, token/cost/error tracking, and retention rules.
+3. Agent orchestration: model output can create proposed tasks or approvals through controlled services.
+4. Runner integration: only approved work may create Runner jobs after Runner safety acceptance passes.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：
