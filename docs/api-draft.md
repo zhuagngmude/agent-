@@ -890,6 +890,8 @@ Response example:
       "label": "OpenAI",
       "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
       "configured": false,
+      "providerAdapterId": "openai_disabled_connectivity_adapter",
+      "providerAdapterMode": "disabled",
       "keyExposedToFrontend": false,
       "canRunConnectivityTest": false
     }
@@ -1031,6 +1033,8 @@ Planned response draft:
     "realProviderRequestsAllowed": false
   },
   "adapter": "disabled_provider_connectivity_adapter",
+  "providerAdapterId": "openai_disabled_connectivity_adapter",
+  "providerAdapterMode": "disabled",
   "realProviderRequestAttempted": false,
   "result": "blocked",
   "errorCategory": "feature_disabled",
@@ -1078,6 +1082,7 @@ Implementation order before enabling real provider requests:
 Purpose: define the future backend-only adapter boundary before any real provider SDK or network request is added.
 
 Current MVP-0.2 status: disabled stub only. `services/api/model-gateway-adapters.js` provides a disabled provider connectivity adapter; it must not import OpenAI, Anthropic, Google Gemini, or other provider SDKs. No code path should send real provider requests yet.
+The current disabled registry may expose provider-specific disabled adapter ids for OpenAI, Anthropic, and Google Gemini, but those ids are metadata only and must still map to blocked, no-request behavior.
 
 Adapter ownership:
 
@@ -1116,6 +1121,9 @@ Adapter output draft:
   "ok": false,
   "provider": "openai",
   "model": "gpt-4.1-mini",
+  "adapter": "disabled_provider_connectivity_adapter",
+  "providerAdapterId": "openai_disabled_connectivity_adapter",
+  "providerAdapterMode": "disabled",
   "result": "blocked",
   "errorCategory": "feature_disabled",
   "realProviderRequestAttempted": false,
@@ -1167,6 +1175,26 @@ Adapter acceptance before any implementation:
 - Each provider must be implemented and verified one at a time.
 - Adding a provider SDK must be a separate commit from this draft and must not happen until the feature flag boundary is changed intentionally and reviewed.
 - The disabled stub response may still include `provider`, `model`, `adapter`, `durationMs`, and redaction booleans, but it must never expose raw keys, provider responses, or prompt/result bodies.
+- The disabled stub may also return `providerAdapterId` and `providerAdapterMode=disabled` so the registry can be verified provider by provider, but that metadata must never imply a real request path.
+
+Real-provider phase gate:
+
+- Do not start the first real provider adapter until the disabled registry verifies OpenAI, Anthropic, and Google Gemini metadata separately.
+- The first real provider adapter must be a separate commit from the disabled registry work.
+- The feature flag contract must change explicitly before `manualConnectivityTestActive` or `realProviderRequestsAllowed` can become `true`.
+- The first real provider adapter must include tests for blocked, missing-key, unsupported-provider, timeout, provider-error, and no-side-effect paths before it can send a provider request.
+- The first real provider adapter must keep the request fixed and minimal; it must not accept free-form prompt, Agent context, files, tool calls, Runner job ids, arbitrary headers, or arbitrary HTTP options.
+
+First real-provider manual connectivity spec freeze:
+
+- Start with exactly one provider in the first real-provider commit; do not enable OpenAI, Anthropic, and Google Gemini together.
+- The request body shape must stay the same as the current connectivity-test stub.
+- The backend must select the provider-specific adapter from the registry; the route handler must not import SDKs or construct provider requests.
+- The adapter may read only the selected provider's server-side env var and may return only boolean key presence plus coarse result fields.
+- The adapter must enforce `timeoutMs <= 5000` and `responseBodyLimitBytes <= 4096` before the feature flag can allow a request.
+- A real request can be attempted only when the provider is supported, the model is non-empty, `purpose=manual_connectivity_test`, `secondConfirm=true`, `confirmText` is non-empty, `manualConnectivityTestActive=true`, and `realProviderRequestsAllowed=true`.
+- Even on success, the response must not include provider response body, model text, token usage, cost, request headers, authorization headers, raw error body, raw key, key suffix, or masked key fragment.
+- The verification script for the first real provider must be able to run without real credentials and still pass blocked/missing-key/no-side-effect cases.
 
 ## 2026-06-08 实现备注：工作流只读接口
 

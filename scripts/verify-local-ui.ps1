@@ -115,6 +115,24 @@ function Assert-ConnectivityTestNoSideEffects {
   Assert-Equal $ConnectivityTest.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
 }
 
+function Assert-DisabledConnectivityAdapter {
+  param(
+    [Parameter(Mandatory = $true)][object]$ConnectivityTest,
+    [Parameter(Mandatory = $true)][string]$ExpectedProviderAdapterId,
+    [string]$Prefix = "Model Gateway connectivity test"
+  )
+
+  Assert-Equal $ConnectivityTest.adapter "disabled_provider_connectivity_adapter" "$Prefix should use the disabled adapter stub."
+  Assert-Equal $ConnectivityTest.providerAdapterId $ExpectedProviderAdapterId "$Prefix should report the provider-specific disabled adapter id."
+  Assert-Equal $ConnectivityTest.providerAdapterMode "disabled" "$Prefix provider adapter should remain disabled."
+  Assert-Equal $ConnectivityTest.realProviderRequestAttempted $false "$Prefix should not attempt provider requests."
+  Assert-Equal $ConnectivityTest.result "blocked" "$Prefix should stay blocked."
+  Assert-Equal $ConnectivityTest.errorCategory "feature_disabled" "$Prefix should report feature disabled."
+  Assert-Equal $ConnectivityTest.providerResponseStored $false "$Prefix should not store provider responses."
+  Assert-Equal $ConnectivityTest.durationMs 0 "$Prefix should not spend time in provider calls."
+  Assert-Equal $ConnectivityTest.redactionApplied $true "$Prefix should report redaction applied."
+}
+
 function Test-Command {
   param([string]$Name)
   return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -225,6 +243,12 @@ Assert-Equal $gateway.safety.writesDatabase $false "Model Gateway status should 
 Assert-Equal $gateway.safety.createsRunnerJobs $false "Model Gateway status should not create Runner jobs."
 Assert-Equal $gateway.safety.makesNetworkRequests $false "Model Gateway status should not make provider network requests."
 Assert-ModelGatewayFeatureFlags -FeatureFlags $gateway.featureFlags -Prefix "Model Gateway status feature flags"
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai" }).providerAdapterId) "openai_disabled_connectivity_adapter" "OpenAI status should expose disabled adapter id."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "anthropic" }).providerAdapterId) "anthropic_disabled_connectivity_adapter" "Anthropic status should expose disabled adapter id."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "google" }).providerAdapterId) "google_disabled_connectivity_adapter" "Google status should expose disabled adapter id."
+foreach ($provider in $gateway.providers) {
+  Assert-Equal $provider.providerAdapterMode "disabled" "Provider $($provider.id) adapter mode should remain disabled."
+}
 
 $dryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
   provider = "openai"
@@ -283,14 +307,29 @@ Assert-Equal $connectivityTest.ok $false "Model Gateway connectivity-test stub s
 Assert-Equal $connectivityTest.requestValid $true "Model Gateway connectivity-test stub request should be valid."
 Assert-Equal $connectivityTest.providerSupported $true "OpenAI provider should be recognized by connectivity-test stub."
 Assert-Equal $connectivityTest.realModelCallsAllowed $false "Model Gateway connectivity-test stub should not allow real calls."
-Assert-Equal $connectivityTest.adapter "disabled_provider_connectivity_adapter" "Model Gateway connectivity-test should use the disabled adapter stub."
-Assert-Equal $connectivityTest.realProviderRequestAttempted $false "Model Gateway connectivity-test stub should not attempt provider requests."
-Assert-Equal $connectivityTest.result "blocked" "Model Gateway connectivity-test stub should stay blocked."
-Assert-Equal $connectivityTest.errorCategory "feature_disabled" "Model Gateway connectivity-test stub should report feature disabled."
-Assert-Equal $connectivityTest.providerResponseStored $false "Model Gateway connectivity-test stub should not store provider responses."
-Assert-Equal $connectivityTest.durationMs 0 "Model Gateway connectivity-test stub should not spend time in provider calls."
-Assert-Equal $connectivityTest.redactionApplied $true "Model Gateway connectivity-test stub should report redaction applied."
+Assert-DisabledConnectivityAdapter -ConnectivityTest $connectivityTest -ExpectedProviderAdapterId "openai_disabled_connectivity_adapter"
 Assert-ConnectivityTestNoSideEffects -ConnectivityTest $connectivityTest
+
+$providerAdapterCases = @(
+  @{ Provider = "anthropic"; Model = "claude-3-5-haiku-latest"; AdapterId = "anthropic_disabled_connectivity_adapter" },
+  @{ Provider = "google"; Model = "gemini-1.5-flash"; AdapterId = "google_disabled_connectivity_adapter" }
+)
+
+foreach ($case in $providerAdapterCases) {
+  $providerConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
+    provider = $case.Provider
+    model = $case.Model
+    purpose = "manual_connectivity_test"
+    secondConfirm = $true
+    confirmText = "I understand this will make one real provider connectivity request."
+    requestedBy = "local_user"
+  }
+  Assert-Equal $providerConnectivityTest.ok $false "$($case.Provider) connectivity-test stub should remain blocked."
+  Assert-Equal $providerConnectivityTest.requestValid $true "$($case.Provider) connectivity-test request should be valid."
+  Assert-Equal $providerConnectivityTest.providerSupported $true "$($case.Provider) should be recognized by connectivity-test stub."
+  Assert-DisabledConnectivityAdapter -ConnectivityTest $providerConnectivityTest -ExpectedProviderAdapterId $case.AdapterId -Prefix "$($case.Provider) connectivity-test"
+  Assert-ConnectivityTestNoSideEffects -ConnectivityTest $providerConnectivityTest -Prefix "$($case.Provider) connectivity-test"
+}
 
 $unknownProviderConnectivityTest = Invoke-Json -Method "POST" -Path "/api/model-gateway/connectivity-test" -Body @{
   provider = "unknown"
@@ -336,9 +375,7 @@ try {
   Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
   Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.2."
   Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.2."
-  Assert-Equal $flagBoundary.adapter "disabled_provider_connectivity_adapter" "Manual connectivity env var should still use the disabled adapter stub."
-  Assert-Equal $flagBoundary.realProviderRequestAttempted $false "Manual connectivity env var should not attempt provider requests in MVP-0.2."
-  Assert-Equal $flagBoundary.errorCategory "feature_disabled" "Manual connectivity env var should still report feature disabled."
+  Assert-DisabledConnectivityAdapter -ConnectivityTest $flagBoundary -ExpectedProviderAdapterId "openai_disabled_connectivity_adapter" -Prefix "Manual connectivity env var boundary"
 } finally {
   $env:AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST = $previousManualConnectivityEnv
 }

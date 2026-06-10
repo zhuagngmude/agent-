@@ -1,4 +1,7 @@
-const { disabledProviderConnectivityAdapter } = require("./model-gateway-adapters");
+const {
+  disabledProviderAdapterRegistry,
+  disabledProviderConnectivityAdapter,
+} = require("./model-gateway-adapters");
 
 const modelGatewayProviders = [
   { id: "openai", label: "OpenAI", envVar: "AGENT_SWARM_OPENAI_API_KEY" },
@@ -40,6 +43,8 @@ function modelGatewayStatus() {
       label: provider.label,
       keyEnvVar: provider.envVar,
       configured: Boolean(process.env[provider.envVar]),
+      providerAdapterId: disabledProviderAdapterRegistry[provider.id]?.providerAdapterId || "",
+      providerAdapterMode: disabledProviderAdapterRegistry[provider.id]?.mode || "disabled",
       keyExposedToFrontend: false,
       canRunConnectivityTest: false,
     })),
@@ -162,6 +167,8 @@ function modelGatewayConnectivityTest(request) {
     featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
     adapter: adapterResult.adapter,
+    providerAdapterId: adapterResult.providerAdapterId,
+    providerAdapterMode: adapterResult.providerAdapterMode,
     realProviderRequestAttempted: adapterResult.realProviderRequestAttempted,
     result: adapterResult.result,
     errorCategory: adapterResult.errorCategory,

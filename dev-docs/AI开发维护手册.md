@@ -1055,3 +1055,24 @@ docs/runner-safety-acceptance.md
 - 为什么改：把上一轮 provider adapter 草案落成可回归的禁用态服务边界，先证明 adapter 插槽存在但仍不会真实连通 provider。
 - 影响模块：`services/api/model-gateway-adapters.js`、`services/api/model-gateway.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不读取或保存 API Key、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。
+
+## 2026-06-10 变更记录：Model Gateway provider-specific disabled registry
+
+- 改了什么：扩展 `services/api/model-gateway-adapters.js`，为 OpenAI、Anthropic 和 Google Gemini 增加 provider-specific disabled adapter registry；`GET /api/model-gateway/status` 和 `POST /api/model-gateway/connectivity-test` 可返回 `providerAdapterId` 与 `providerAdapterMode=disabled`；`scripts/verify-local-ui.ps1` 覆盖三家 provider 的禁用 adapter 断言。
+- 为什么改：在进入任何真实 provider SDK 或网络请求前，先把 provider 级 adapter 边界固定为可回归元数据，证明每个 provider 都只能走禁用态路径。
+- 影响模块：`services/api/model-gateway-adapters.js`、`services/api/model-gateway.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`services/api/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是后端禁用 adapter 元数据和验收补强，不新增真实模型调用、provider SDK、API Key 读取/保存、SQLite/runtime state 写入、任务/审批/Runner job 创建、Agent 触发或 prompt/result/provider response 存储。
+
+## 2026-06-10 变更记录：Model Gateway real-provider phase gate
+
+- 改了什么：在 `docs/api-draft.md` 和开发路线中补充真实 provider 阶段准入条件，要求真实 adapter 必须独立提交、显式改变 feature flag 边界、保持后端手动固定最小 ping、覆盖 blocked/missing-key/unsupported/timeout/provider-error 和 no-side-effect 验收。
+- 为什么改：用户已确认继续推进到下一阶段前置工作，但当前仍不能直接开放真实模型调用；需要先把进入真实连通性测试的门槛写成可执行清单。
+- 影响模块：`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是技术准入条件，不改变当前本地试用能力，仍禁止真实 OpenAI/Anthropic/Gemini 请求。
+
+## 2026-06-10 变更记录：Model Gateway first real-provider spec freeze
+
+- 改了什么：在 `docs/api-draft.md` 固定第一家真实 provider 手动连通性测试规格：一次只做一家 provider、请求体沿用当前 stub、route 不接 SDK、adapter 只读所选 provider 服务端 env var、先验证超时和响应大小限制、无真实凭据时仍可通过 blocked/missing-key/no-side-effect 验收。
+- 为什么改：把“下一阶段第一家真实 provider 怎么开始”限定到最小、可验收、可回滚的范围，避免一次性接入多家 provider 或把连通性测试扩展成通用聊天/Agent/Runner 能力。
+- 影响模块：`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍未实现真实 provider 请求，只冻结后续实现规格和验收条件。
