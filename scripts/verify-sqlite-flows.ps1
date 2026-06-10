@@ -199,6 +199,9 @@ try {
   Assert-Equal $invalidApproval.Count 0 "Invalid permission request should not create SQLite approval."
 
   Write-Step "Verify Agent config apply persists in SQLite."
+  $agentsBeforeApplyRequest = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
+  $reviewerBeforeApplyRequest = @($agentsBeforeApplyRequest.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
+  $reviewerPermissionsBeforeApplyRequest = @($reviewerBeforeApplyRequest.permissions) -join "`n"
   $applyRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -Body @{
     changeType = "permission"
     riskLevel = "high"
@@ -220,13 +223,29 @@ try {
     confirmText = "Verify sqlite agent config approval."
   }
   Assert-Equal $applyApproval.status "approved" "Agent config approval should be approved."
+  Assert-Equal $applyApproval.runnerJobId "" "Agent config approval should not create a Runner job."
   Assert-True ($applyApproval.agentConfigApplicationId -like "agent_config_application_*") "Approval should create an application id."
+  $applicationsAfterApproval = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agent-config-applications"
+  $pendingApplication = @($applicationsAfterApproval.applications | Where-Object { $_.id -eq $applyApproval.agentConfigApplicationId })[0]
+  Assert-True ($null -ne $pendingApplication) "Agent config approval should create a pending SQLite application record."
+  Assert-Equal $pendingApplication.status "pending_apply" "SQLite agent config application should start pending_apply."
+  Assert-Equal $pendingApplication.approvalId $applyRequest.approval.id "SQLite agent config application should reference the source approval."
+  Assert-Equal $pendingApplication.agentId "agent_reviewer" "SQLite agent config application should target the reviewer agent."
+  $jobsAfterAgentConfigApproval = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $agentConfigJobs = @($jobsAfterAgentConfigApproval.jobs | Where-Object { $_.approvalId -eq $applyRequest.approval.id })
+  Assert-Equal $agentConfigJobs.Count 0 "SQLite agent config approval should not create a Runner job queue item."
+  $agentsAfterAgentConfigApproval = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
+  $reviewerAfterAgentConfigApproval = @($agentsAfterAgentConfigApproval.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
+  Assert-Equal (@($reviewerAfterAgentConfigApproval.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "SQLite agent config approval should not modify Agent permissions."
   $applied = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/apply" -Body @{
     secondConfirm = $true
     confirmText = "Verify sqlite apply status transition."
     appliedBy = "verify_sqlite_flows"
   }
   Assert-Equal $applied.application.status "applied" "Agent config application should be applied."
+  $agentsAfterSqliteApply = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
+  $reviewerAfterSqliteApply = @($agentsAfterSqliteApply.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
+  Assert-Equal (@($reviewerAfterSqliteApply.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "SQLite mock apply should not modify Agent permissions."
 
   Write-Step "Verify Agent config cancel persists in SQLite."
   $cancelRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_docs/change-requests" -Body @{

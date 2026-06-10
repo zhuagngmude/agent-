@@ -1182,6 +1182,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `AGENTS.md`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is verification hygiene and does not enable real Runner execution, real model calls, cloud sync, broad runtime permissions, or secret access.
 
+## 2026-06-10 Change log: Agent config application safety regression
+
+- What changed: expanded Mock and SQLite flow verification to assert that approved `agent_config` approvals only create `pending_apply` application records, keep `runnerJobId` empty, create no Runner queue item, and leave Agent permissions unchanged after approval and Mock apply.
+- Why: the permission change-request boundary is only useful if the next approval/application step cannot accidentally become a real Agent config write or Runner job path.
+- Impacted modules: `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, roadmap, and maintenance docs.
+- Human docs sync: not required; this is regression coverage only and does not enable real Agent config writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
