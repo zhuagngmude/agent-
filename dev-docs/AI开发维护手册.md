@@ -1217,6 +1217,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/server.js`, `scripts/verify-agent-config-apply-gate.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is helper-only gate verification and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
+## 2026-06-10 Change log: Agent config change-plan field whitelist
+
+- What changed: added `services/api/agent-config-fields.js` and `scripts/verify-agent-config-fields.ps1`, and wired `changePlanValidation` into Agent config dry-run and real apply gate helpers.
+- Why: future real Agent config writes need a narrow executable whitelist before any write path exists, so higher-trust Agent profiles cannot smuggle secrets, Runner/tool/file/command/Git/network fields, parent/reporting changes, forbidden capabilities, or `all=true` through a change plan.
+- Impacted modules: `services/api/agent-config-fields.js`, `services/api/server.js`, `scripts/verify-agent-config-fields.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is helper-only field validation and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

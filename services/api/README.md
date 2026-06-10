@@ -24,11 +24,14 @@ SQLite 初始化和 seed 方案见：
 server.js
 mock-data.js
 agent-permissions.js
+agent-config-fields.js
 model-gateway.js
 model-gateway-adapters.js
 ```
 
 `agent-permissions.js` owns the mock Agent permission profile boundary. `POST /api/agents/:agentId/change-requests` validates `changeType=permission` before creating an approval. Safe profiles create an Agent config approval with `permissionValidation` recorded in `changeRequest`; forbidden capabilities, unknown capabilities, unsupported profiles, and `all=true` return `422 agent_permission_validation_failed` without writing runtime state or SQLite.
+
+`agent-config-fields.js` owns the helper-only Agent config change-plan whitelist. Current allowed future-write fields are `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`. It rejects unsupported fields, secret/API-key/provider/prompt/local-path content, Runner/tool/command/file/Git/network/workspace fields, parent/reporting relationship fields, forbidden Agent capabilities, and `all=true`. It does not write Agent config or persist anything.
 
 `POST /api/agent-config-applications/:applicationId/dry-run` is implemented as a disabled Agent config apply preview. It reads the current application, source approval, and target Agent, then returns `dryRun=true`, `canApply=false`, `blockedReasons=["feature_disabled"]`, write/rollback plans, and all-false side effects. It must not write `agents`, `agent_config_versions`, SQLite/runtime state, approvals, Runner jobs, runtime events, call models, execute Runner, or read raw secrets.
 

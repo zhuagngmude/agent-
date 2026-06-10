@@ -109,6 +109,34 @@ The dry-run must reject or block when any condition is false:
 - The change plan does not contain raw secrets, API keys, provider headers, prompts, provider responses, local private paths, or unchecked tool/Runner fields.
 - The operation does not require Runner execution.
 
+## Change Plan Field Whitelist
+
+Current executable helper:
+
+```text
+validateAgentConfigChangePlan(...)
+```
+
+Current status: helper-only and no-write. It validates future write plans before dry-run/apply-gate can proceed, but it does not modify Agent config.
+
+Allowed fields for the current phase:
+
+- `permissions`
+- `model`
+- `status`
+- `maxSubAgents`
+- `canSpawnSubAgents`
+
+Forbidden change-plan content:
+
+- API keys, raw secrets, tokens, authorization headers, provider headers, provider responses, prompts, and local private paths.
+- Runner, tool, command, file, Git, network, workspace, parent Agent, and reporting relationship fields.
+- Arbitrary complete Agent config JSON from the client.
+- `all=true` permission grants.
+- Forbidden Agent capabilities such as direct Runner execution, local file writes/deletes, command execution, Git modification, network requests, high-risk/self approval, or raw secret access.
+
+The dry-run response includes `changePlanValidation`. Future real apply must require this result to be `ok=true` before considering any write.
+
 ## First Real Apply Gate
 
 The first real Agent config apply implementation must be a separate commit after dry-run is stable.
@@ -126,6 +154,7 @@ Required gate inputs before any future real write can be considered:
 - Matching dry-run result for the same application, approval, and target Agent.
 - Dry-run result is the current feature-disabled preview: `dryRun=true`, `ok=false`, `canApply=false`, and `blockedReasons` includes `feature_disabled`.
 - Dry-run result has no validation errors.
+- Dry-run result has `changePlanValidation.ok=true`.
 - Dry-run result has all side effects false.
 - Application exists and remains `pending_apply`.
 - Source approval exists, is `approved`, targets `agent_config`, and has no Runner job.
@@ -187,6 +216,8 @@ Before any real apply endpoint can be enabled:
 - Real apply gate helper exists and is covered by `scripts/verify-agent-config-apply-gate.ps1`.
 - Real apply gate can report `preconditionsReady=true` for valid input while still keeping `gateReady=false`, `canApply=false`, and `feature_disabled`.
 - Real apply gate rejects missing requestedBy, missing Git checkpoint, missing rollback acceptance, missing or mismatched dry-run proof, dry-run validation errors, dry-run side effects, and source approval with Runner job.
+- Field whitelist helper exists and is covered by `scripts/verify-agent-config-fields.ps1`.
+- Dry-run and real apply gate both reject unsupported fields, forbidden fields, forbidden values, `all=true`, and forbidden Agent capabilities.
 - Dry-run blocked state keeps all side effects false.
 - Invalid application ID returns a safe error.
 - Non-`pending_apply` application is rejected.

@@ -23,6 +23,7 @@ verify-mock-flows.ps1
 verify-sqlite-flows.ps1
 verify-model-gateway.ps1
 verify-agent-permissions.ps1
+verify-agent-config-fields.ps1
 verify-agent-config-dry-run.ps1
 verify-agent-config-apply-gate.ps1
 verify-local-ui.ps1
@@ -54,6 +55,8 @@ sqlite/
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 
 `verify-agent-permissions.ps1` validates the local Agent permission profile helper. It expands mock profiles, rejects `all=true`, rejects unknown capabilities, rejects forbidden Agent capabilities, and checks all validation side effects stay false. It does not start local services, change Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+
+`verify-agent-config-fields.ps1` validates the future Agent config write field whitelist helper without starting services. It covers allowed fields, unsupported fields, forbidden field names, forbidden secret/prompt/provider/local-path values, invalid field value shapes, forbidden permission capabilities, `all=true`, and dry-run/apply-gate integration. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `verify-agent-config-dry-run.ps1` validates the local Agent config dry-run helper without starting services. It covers blocked preview, missing second confirmation, missing confirm text, non-`pending_apply` application, unapproved source approval, source approval with a Runner job, wrong target service, missing target Agent, and all-false side effects. It does not write Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
@@ -121,6 +124,16 @@ This script is acceptance verification, not a real connectivity test. It must no
 - Valid pending applications must still return `ok=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
 - Invalid dry-run inputs must be reported without side effects: missing second confirmation, missing confirm text, non-pending application, unapproved approval, approval with Runner job, wrong target service, and missing target Agent.
 - The helper check does not start local services, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+
+## verify-agent-config-fields.ps1
+
+`verify-agent-config-fields.ps1` is the dedicated Agent config change-plan field whitelist check.
+
+- `services/api/agent-config-fields.js` owns allowed fields for future real writes: `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`.
+- Forbidden fields include secrets/API keys, provider headers/responses, prompts, Runner/tool/command/file/Git/network fields, workspace paths, parent/reporting relationship fields, and broad raw-secret tokens.
+- Permission changes still use `services/api/agent-permissions.js`, so forbidden capabilities such as `canExecuteRunnerJob`, raw secret access, and `all=true` are rejected.
+- `buildAgentConfigApplyDryRun(...)` and `buildAgentConfigRealApplyGate(...)` include the field validation result, but still keep real write side effects false.
+- The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
 
 ## verify-agent-config-apply-gate.ps1
 

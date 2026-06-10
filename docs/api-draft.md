@@ -475,6 +475,14 @@ Current status: helper-only, no HTTP route, no real write.
 
 Even when all preconditions are present, MVP-0.2 must return `preconditionsReady=true` but keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. A later real apply implementation must be a separate feature-flagged commit and must not reuse this helper as permission to write `agents` or `agent_config_versions` by itself.
 
+### Agent config change-plan field whitelist helper
+
+Current status: helper-only, no HTTP route, no real write.
+
+`services/api/agent-config-fields.js` exports `validateAgentConfigChangePlan(...)`. The current allowed future-write fields are `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`. The helper rejects unsupported fields, API keys, raw secrets, tokens, authorization/provider headers, provider responses, prompts, local private paths, Runner/tool/command/file/Git/network/workspace fields, parent/reporting relationship fields, forbidden Agent capabilities, and `all=true`.
+
+`POST /api/agent-config-applications/:applicationId/dry-run` and `buildAgentConfigRealApplyGate(...)` include the helper result as `changePlanValidation`. This only tightens the disabled safety boundary; it does not enable Agent config writes.
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks

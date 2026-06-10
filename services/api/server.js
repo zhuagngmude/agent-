@@ -14,6 +14,9 @@ const {
   agentPermissionProfiles,
   validateAgentCapabilities,
 } = require("./agent-permissions");
+const {
+  validateAgentConfigChangePlan,
+} = require("./agent-config-fields");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -491,6 +494,8 @@ function allAgentConfigSideEffectsFalse(sideEffects = {}) {
 function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, body = {} }) {
   const blockedReasons = ["feature_disabled"];
   const validationErrors = [];
+  const localChangePlanValidation = validateAgentConfigChangePlan({ changes: application?.changes });
+  const dryRunChangePlanValidation = dryRun?.changePlanValidation;
   const requiredChecks = {
     applicationExists: Boolean(application),
     applicationPending: application?.status === "pending_apply",
@@ -509,6 +514,7 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
     dryRunMatchesApproval: dryRun?.approvalId === application?.approvalId,
     dryRunMatchesAgent: dryRun?.agentId === application?.agentId,
     dryRunValidationPassed: Array.isArray(dryRun?.validationErrors) && dryRun.validationErrors.length === 0,
+    dryRunChangePlanValid: dryRunChangePlanValidation?.ok === true,
     dryRunIsDisabledPreview: dryRun?.dryRun === true
       && dryRun?.ok === false
       && dryRun?.canApply === false
@@ -553,6 +559,9 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
   if (!requiredChecks.rollbackPlanAccepted) {
     validationErrors.push("rollbackPlanAccepted=true is required.");
   }
+  if (!localChangePlanValidation.ok) {
+    validationErrors.push(...localChangePlanValidation.validationErrors);
+  }
   if (!requiredChecks.dryRunResultProvided) {
     validationErrors.push("dryRun result is required before real apply.");
   }
@@ -568,6 +577,9 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
     }
     if (!requiredChecks.dryRunValidationPassed) {
       validationErrors.push("dryRun must have no validation errors.");
+    }
+    if (!requiredChecks.dryRunChangePlanValid) {
+      validationErrors.push("dryRun change plan must pass Agent config field validation.");
     }
     if (!requiredChecks.dryRunIsDisabledPreview) {
       validationErrors.push("dryRun must be the current feature-disabled preview.");
@@ -619,6 +631,7 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
       storesRawSecrets: false,
       createsRunnerJob: false,
     },
+    changePlanValidation: localChangePlanValidation,
     sideEffects: noAgentConfigApplyGateSideEffects(),
   };
 }
@@ -626,6 +639,7 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
 function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }) {
   const blockedReasons = ["feature_disabled"];
   const validationErrors = [];
+  const changePlanValidation = validateAgentConfigChangePlan({ changes: application?.changes });
 
   if (!application) {
     validationErrors.push("application not found.");
@@ -653,6 +667,10 @@ function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }
 
   if (!agent) {
     validationErrors.push("target agent not found.");
+  }
+
+  if (!changePlanValidation.ok) {
+    validationErrors.push(...changePlanValidation.validationErrors);
   }
 
   if (body.secondConfirm !== true) {
@@ -691,6 +709,7 @@ function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }
       wouldRestoreVersion: currentVersion,
       rollbackAction: "create_new_agent_config_application",
     },
+    changePlanValidation,
     sideEffects: noAgentConfigDryRunSideEffects(),
   };
 }
