@@ -646,8 +646,9 @@ function agentChangeDraft(agent, type) {
       riskClass: "red",
       requiresApproval: true,
       reason: "新增代码执行请求权限会影响 Runner 安全边界，必须二次确认。",
+      permissionProfile: agent.role === "reviewer" ? "reviewer_agent" : "executor_agent",
       changes: [
-        ["permissions", (agent.permissions || []).join(" / ") || "无", `${(agent.permissions || []).join(" / ")} / request_code_execution`],
+        ["permissions", (agent.permissions || []).join(" / ") || "无", agent.role === "reviewer" ? "reviewer_agent" : "executor_agent"],
       ],
     },
   };
@@ -661,6 +662,7 @@ function agentChangeRequestBody(agent, type) {
     changeType: type,
     riskLevel: draft.riskClass === "red" ? "high" : draft.riskClass === "orange" ? "medium" : "low",
     reason: draft.reason,
+    permissionProfile: type === "permission" ? draft.permissionProfile : "",
     changes: draft.changes.map(([field, before, after]) => ({ field, before, after })),
   };
 }

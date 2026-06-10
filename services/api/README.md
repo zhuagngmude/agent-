@@ -23,9 +23,12 @@ SQLite 初始化和 seed 方案见：
 ```text
 server.js
 mock-data.js
+agent-permissions.js
 model-gateway.js
 model-gateway-adapters.js
 ```
+
+`agent-permissions.js` owns the mock Agent permission profile boundary. `POST /api/agents/:agentId/change-requests` validates `changeType=permission` before creating an approval. Safe profiles create an Agent config approval with `permissionValidation` recorded in `changeRequest`; forbidden capabilities, unknown capabilities, unsupported profiles, and `all=true` return `422 agent_permission_validation_failed` without writing runtime state or SQLite.
 
 `model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. `model-gateway-adapters.js` owns the disabled provider adapter registry and stub for OpenAI, Anthropic, and Google Gemini. These modules must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 

@@ -221,15 +221,24 @@ canAccessRawSecrets
 
 用途：把 Agent 配置变更预览转换为审批申请。当前只创建 Approval Request，不修改 Agent 配置。
 
+Permission changes are mock-validated before an approval is created:
+
+- `changeType=permission` may include `permissionProfile`, `profile`, or explicit `capabilities`.
+- Safe profiles such as `reviewer_agent` and `executor_agent` create a pending `agent_config` approval and return `permissionValidation`.
+- The approval `changeRequest` stores the same `permissionValidation` for audit.
+- Unsupported profiles, `all=true`, unknown capabilities, direct Runner/file/command/Git/network capabilities, high-risk approval, self-approval, and raw-secret access return `422 agent_permission_validation_failed`.
+- A failed permission validation must not write SQLite, write runtime state, create an approval, create a Runner job, trigger Agents, execute Runner, call models, or read secrets.
+
 请求：
 
 ```json
 {
   "changeType": "permission",
   "riskLevel": "high",
+  "permissionProfile": "reviewer_agent",
   "reason": "新增代码执行请求权限会影响 Runner 安全边界，必须二次确认。",
   "changes": [
-    { "field": "permissions", "before": "read_project", "after": "read_project / request_code_execution" }
+    { "field": "permissions", "before": "read_project / review_risk / review_diff", "after": "reviewer_agent" }
   ]
 }
 ```
@@ -241,7 +250,24 @@ canAccessRawSecrets
   "approval": {
     "id": "approval_agent_agent_frontend_permission",
     "status": "pending",
-    "targetService": "agent_config"
+    "targetService": "agent_config",
+    "changeRequest": {
+      "permissionProfile": "reviewer_agent",
+      "permissionValidation": {
+        "ok": true
+      }
+    }
+  },
+  "permissionValidation": {
+    "ok": true,
+    "profile": "reviewer_agent",
+    "sideEffects": {
+      "writesSqlite": false,
+      "createsApprovals": false,
+      "executesRunner": false,
+      "callsRealModel": false,
+      "readsRawSecrets": false
+    }
   },
   "message": "Agent change request created. Agent config was not modified."
 }

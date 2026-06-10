@@ -31,6 +31,38 @@ function Invoke-Json {
     -Body ($Body | ConvertTo-Json -Depth 10)
 }
 
+function Invoke-JsonExpectStatus {
+  param(
+    [Parameter(Mandatory = $true)][string]$Method,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][int]$ExpectedStatus,
+    [object]$Body = $null
+  )
+
+  try {
+    $result = Invoke-Json -Method $Method -Path $Path -Body $Body
+    throw "Expected HTTP $ExpectedStatus but request succeeded: $($result | ConvertTo-Json -Depth 10)"
+  } catch {
+    $response = $_.Exception.Response
+    if ($null -eq $response) {
+      throw
+    }
+
+    $actualStatus = [int]$response.StatusCode
+    if ($actualStatus -ne $ExpectedStatus) {
+      throw "Expected HTTP $ExpectedStatus, got HTTP $actualStatus."
+    }
+
+    $raw = $_.ErrorDetails.Message
+    if (-not $raw) {
+      $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
+      $raw = $reader.ReadToEnd()
+    }
+
+    return $raw | ConvertFrom-Json
+  }
+}
+
 function Assert-Equal {
   param(
     [object]$Actual,
@@ -54,6 +86,18 @@ function Assert-True {
   }
 }
 
+function Assert-TextContains {
+  param(
+    [string]$Text,
+    [string]$Needle,
+    [string]$Message
+  )
+
+  if (-not $Text.Contains($Needle)) {
+    throw "$Message Missing '$Needle'."
+  }
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -61,6 +105,10 @@ function Test-ApiReady {
   } catch {
     return $false
   }
+}
+
+if (Test-ApiReady) {
+  throw "Port $port already has an API responding before verification started. This script will not attach to an existing service; stop that process or use a different isolated verification port."
 }
 
 Write-Step "Rebuild SQLite database from seed."
@@ -87,6 +135,9 @@ try {
   $ready = $false
   for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Milliseconds 250
+    if ($process.HasExited) {
+      break
+    }
     if (Test-ApiReady) {
       $ready = $true
       break
@@ -126,20 +177,44 @@ try {
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should be read back from SQLite."
 
+  Write-Step "Verify invalid Agent permission request is rejected before SQLite write."
+  $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{
+    changeType = "permission"
+    riskLevel = "high"
+    reason = "Verify invalid sqlite agent permission validation."
+    capabilities = @("canViewProject", "canExecuteRunnerJob")
+    changes = @(
+      @{
+        field = "permissions"
+        before = "reviewer_agent"
+        after = "canViewProject / canExecuteRunnerJob"
+      }
+    )
+  }
+  Assert-Equal $invalidPermission.error "agent_permission_validation_failed" "Invalid permission request should fail validation."
+  Assert-Equal $invalidPermission.permissionValidation.ok $false "Invalid permission validation should be false."
+  Assert-TextContains (@($invalidPermission.permissionValidation.forbiddenCapabilities) -join "`n") "canExecuteRunnerJob" "Invalid permission should identify Runner execution."
+  $approvalsAfterInvalidPermission = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/approvals"
+  $invalidApproval = @($approvalsAfterInvalidPermission.approvals | Where-Object { $_.id -eq "approval_agent_agent_reviewer_permission" })
+  Assert-Equal $invalidApproval.Count 0 "Invalid permission request should not create SQLite approval."
+
   Write-Step "Verify Agent config apply persists in SQLite."
   $applyRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -Body @{
     changeType = "permission"
     riskLevel = "high"
     reason = "Verify sqlite agent config apply flow."
+    permissionProfile = "reviewer_agent"
     changes = @(
       @{
         field = "permissions"
         before = "read_project / review_risk / review_diff"
-        after = "read_project / review_risk / review_diff / request_code_execution"
+        after = "reviewer_agent"
       }
     )
   }
   Assert-Equal $applyRequest.approval.status "pending" "Agent config approval should start pending."
+  Assert-Equal $applyRequest.permissionValidation.ok $true "Safe permission profile should validate."
+  Assert-Equal $applyRequest.approval.changeRequest.permissionValidation.ok $true "SQLite approval should store permission validation."
   $applyApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($applyRequest.approval.id)/approve" -Body @{
     secondConfirm = $true
     confirmText = "Verify sqlite agent config approval."

@@ -10,6 +10,10 @@ const {
   modelGatewayDryRun,
   modelGatewayStatus,
 } = require("./model-gateway");
+const {
+  agentPermissionProfiles,
+  validateAgentCapabilities,
+} = require("./agent-permissions");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -349,6 +353,96 @@ function riskTone(riskLevel) {
   return "low";
 }
 
+function noPermissionValidationSideEffects() {
+  return {
+    writesSqlite: false,
+    writesRuntimeState: false,
+    createsTasks: false,
+    createsApprovals: false,
+    createsRunnerJobs: false,
+    triggersAgents: false,
+    executesRunner: false,
+    callsRealModel: false,
+    readsRawSecrets: false,
+  };
+}
+
+function invalidPermissionValidation(message, input = {}) {
+  return {
+    ok: false,
+    profile: input.profile || "",
+    allFlagRequested: input.all === true,
+    capabilities: Array.isArray(input.capabilities) ? input.capabilities : [],
+    unknownCapabilities: [],
+    forbiddenCapabilities: [],
+    validationErrors: [message],
+    sideEffects: noPermissionValidationSideEffects(),
+  };
+}
+
+function splitPermissionText(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => splitPermissionText(item));
+  }
+
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  return value
+    .split(/[,\n/]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function permissionValidationInputFromChangeRequest(body = {}) {
+  const input = {};
+  if (body.all === true) {
+    input.all = true;
+  }
+
+  const profile = body.permissionProfile || body.profile;
+  if (typeof profile === "string" && profile.trim()) {
+    input.profile = profile.trim();
+  }
+
+  if (Array.isArray(body.capabilities) && body.capabilities.length > 0) {
+    input.capabilities = body.capabilities;
+  }
+
+  if (!input.profile && !input.capabilities) {
+    const permissionChange = Array.isArray(body.changes)
+      ? body.changes.find((change) => change && change.field === "permissions")
+      : null;
+    const afterValue = permissionChange?.after;
+    const afterText = typeof afterValue === "string" ? afterValue.trim() : "";
+
+    if (afterText && agentPermissionProfiles[afterText]) {
+      input.profile = afterText;
+    } else {
+      const capabilities = splitPermissionText(afterValue);
+      if (capabilities.length > 0) {
+        input.capabilities = capabilities;
+      }
+    }
+  }
+
+  return input;
+}
+
+function validatePermissionChangeRequest(body = {}) {
+  if (body.changeType !== "permission") {
+    return null;
+  }
+
+  const input = permissionValidationInputFromChangeRequest(body);
+  if (!input.profile && !input.capabilities && input.all !== true) {
+    return invalidPermissionValidation("permission change must include a profile or explicit capabilities.", input);
+  }
+
+  return validateAgentCapabilities(input);
+}
+
 function createAgentChangeApproval(agent, body) {
   const now = new Date().toISOString();
   const changeType = body.changeType || "model";
@@ -387,6 +481,9 @@ function createAgentChangeApproval(agent, body) {
     agentId: agent.id,
     changeType,
     changes,
+    permissionProfile: body.permissionProfile || body.profile || "",
+    capabilities: Array.isArray(body.capabilities) ? body.capabilities : [],
+    permissionValidation: body.permissionValidation || null,
   };
 
   if (!existing) {
@@ -472,6 +569,20 @@ async function handleApprovalAction(req, res, approvalId, action) {
 
 async function handleAgentChangeRequest(req, res, agentId) {
   const body = await readBody(req);
+  const permissionValidation = validatePermissionChangeRequest(body);
+  if (permissionValidation && !permissionValidation.ok) {
+    sendJson(res, 422, {
+      error: "agent_permission_validation_failed",
+      message: "Agent permission change request failed mock validation.",
+      permissionValidation,
+    });
+    return;
+  }
+
+  if (permissionValidation) {
+    body.permissionValidation = permissionValidation;
+  }
+
   if (sqliteReadEnabled()) {
     sendSqliteWriteResult(res, runSqliteWrite("createAgentChangeRequest", {
       projectId: data.projectId,
@@ -491,6 +602,7 @@ async function handleAgentChangeRequest(req, res, agentId) {
   saveRuntimeState();
   sendJson(res, 201, {
     approval,
+    permissionValidation: permissionValidation || null,
     message: "Agent change request created. Agent config was not modified.",
   });
 }

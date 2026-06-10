@@ -64,6 +64,13 @@ logs/mock-api.err.log
 http://127.0.0.1:8787
 ```
 
+端口约定：
+
+- `8787` 是人类本地试用和手动开发默认入口，保留给 `start-local.ps1` / `start-dev.ps1` / 前端默认 API 使用。
+- AI 自启动的自动验收脚本不能复用 `8787`，避免连到人类正在查看的旧服务或污染本地试用状态。
+- `verify-mock-flows.ps1` 自启 Mock API 时使用隔离端口 `8789`；`verify-sqlite-flows.ps1` 自启 SQLite API 时使用隔离端口 `8788`。
+- `verify-local-ui.ps1` 和 `verify-model-gateway.ps1` 是“当前本地试用服务检查”，期望 `start-local.ps1` 已经在 `8787` 运行；它们不启动或停止服务。
+
 浏览器或 PowerShell 可检查：
 
 ```powershell
@@ -151,12 +158,15 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Runner 审批通过后只生成只读 Runner job。
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
+- Agent permission change requests must run mock profile validation before approvals are created. Safe profiles may create pending `agent_config` approvals; forbidden capabilities such as `canExecuteRunnerJob` must return 422 and create no approval/runtime/SQLite write.
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
 - `verify-model-gateway.ps1` 会独立覆盖 Model Gateway status、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。
 - `verify-agent-permissions.ps1` 会独立覆盖 Agent permission profile 展开、`all=true` 拒绝、未知能力拒绝、禁止 Agent 能力拒绝和全 false sideEffects。
 - 设置页和集成页必须展示 Model Gateway dry-run 只读预览，且浏览器控制台保持 0 errors / 0 warnings。
 
 脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
+
+注意：会自启动 API 的验收脚本必须使用隔离端口，并且启动前如果发现端口已有 API 响应，会直接失败，不会连接已有进程。`8787` 不删除，但只作为人工本地试用和当前运行服务检查入口。
 
 Model Gateway manual connectivity test currently has only a disabled backend stub:
 

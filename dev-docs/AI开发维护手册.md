@@ -1168,6 +1168,20 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/agent-permissions.js`, `scripts/verify-agent-permissions.ps1`, `docs/agent-permission-contract.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/demo-checklist.md`, `docs/module-stability-map.md`, `scripts/README.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is mock/profile validation only and does not enable runtime authorization, Agent config writes, Runner execution, real model calls, cloud sync, or secret access.
 
+## 2026-06-10 Change log: Agent permission change-request validation
+
+- What changed: wired the Agent permission helper into `POST /api/agents/:agentId/change-requests` for `changeType=permission`, updated the web permission preview to submit safe profile names, stored successful `permissionValidation` in approval `changeRequest`, and expanded Mock/SQLite flow verification with invalid permission rejection cases.
+- Why: permission profiles should be checked at the first write boundary so forbidden capabilities cannot create an approval, SQLite row, runtime-state entry, Runner job, Agent trigger, model call, or secret read.
+- Impacted modules: `services/api/server.js`, `services/api/agent-permissions.js`, `scripts/sqlite/sqlite_write.py`, `apps/web/app.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/README.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `scripts/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this keeps the current Mock/disabled safety boundary and does not enable real Agent config writes, runtime authorization, Runner execution, real model calls, cloud sync, or secret access.
+
+## 2026-06-10 Change log: Local verification port isolation
+
+- What changed: kept `8787` reserved for human local trial/manual development, documented the port policy, moved self-contained Mock flow verification to isolated `8789`, and added startup guards so Mock/SQLite flow scripts fail instead of attaching to an existing API on their isolated ports.
+- Why: automated AI verification must not connect to or mutate the user's current `8787` local trial, and it must not silently validate against stale server code.
+- Impacted modules: `AGENTS.md`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is verification hygiene and does not enable real Runner execution, real model calls, cloud sync, broad runtime permissions, or secret access.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

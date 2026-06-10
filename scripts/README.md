@@ -39,9 +39,15 @@ sqlite/
 
 `stop-local.ps1` 会停止 `start-local.ps1` 启动的本地试用进程，并清理对应 pid 文件。
 
-`verify-mock-flows.ps1` 会验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。
+端口约定：
 
-`verify-sqlite-flows.ps1` 会在独立端口启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。
+- `8787` 保留给人类本地试用和手动开发入口，例如 `start-local.ps1`、`start-dev.ps1`、前端默认 API、`verify-local-ui.ps1` 和 `verify-model-gateway.ps1` 对当前运行服务的检查。
+- AI 自启动的自动验收脚本不得复用 `8787`，也不得连接一个已经存在的未知进程。
+- `verify-sqlite-flows.ps1` 使用隔离端口 `8788`；`verify-mock-flows.ps1` 使用隔离端口 `8789`。如果对应端口启动前已经有 API 响应，脚本会直接失败，而不是误连旧服务。
+
+`verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。It also checks that invalid Agent permission change requests are rejected before approval creation.
+
+`verify-sqlite-flows.ps1` 会在隔离端口 `8788` 启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。It also checks that invalid Agent permission change requests are rejected before SQLite writes.
 
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 

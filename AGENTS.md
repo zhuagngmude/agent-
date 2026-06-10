@@ -96,3 +96,10 @@ Mock API default:
 ```text
 http://127.0.0.1:8787
 ```
+
+Port policy:
+
+- Keep `8787` for human local trial and manual development (`start-local.ps1`, `start-dev.ps1`, web default API, and checks against the currently running local trial).
+- AI self-contained verification scripts must not reuse `8787` or attach to an already-running unknown service.
+- `scripts/verify-sqlite-flows.ps1` uses isolated port `8788`; `scripts/verify-mock-flows.ps1` uses isolated port `8789`.
+- `scripts/verify-local-ui.ps1` and `scripts/verify-model-gateway.ps1` only check the currently running local trial on `8787`; they must not start or stop services.

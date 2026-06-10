@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $apiScript = Join-Path $root "services\api\server.js"
-$port = 8787
+$port = 8789
 $baseUrl = "http://127.0.0.1:$port"
 $projectId = "project_agent_swarm"
 
@@ -30,6 +30,38 @@ function Invoke-Json {
     -Body ($Body | ConvertTo-Json -Depth 10)
 }
 
+function Invoke-JsonExpectStatus {
+  param(
+    [Parameter(Mandatory = $true)][string]$Method,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][int]$ExpectedStatus,
+    [object]$Body = $null
+  )
+
+  try {
+    $result = Invoke-Json -Method $Method -Path $Path -Body $Body
+    throw "Expected HTTP $ExpectedStatus but request succeeded: $($result | ConvertTo-Json -Depth 10)"
+  } catch {
+    $response = $_.Exception.Response
+    if ($null -eq $response) {
+      throw
+    }
+
+    $actualStatus = [int]$response.StatusCode
+    if ($actualStatus -ne $ExpectedStatus) {
+      throw "Expected HTTP $ExpectedStatus, got HTTP $actualStatus."
+    }
+
+    $raw = $_.ErrorDetails.Message
+    if (-not $raw) {
+      $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
+      $raw = $reader.ReadToEnd()
+    }
+
+    return $raw | ConvertFrom-Json
+  }
+}
+
 function Assert-Equal {
   param(
     [object]$Actual,
@@ -53,6 +85,18 @@ function Assert-True {
   }
 }
 
+function Assert-TextContains {
+  param(
+    [string]$Text,
+    [string]$Needle,
+    [string]$Message
+  )
+
+  if (-not $Text.Contains($Needle)) {
+    throw "$Message Missing '$Needle'."
+  }
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -62,25 +106,47 @@ function Test-ApiReady {
   }
 }
 
-if (-not (Test-ApiReady)) {
-  Write-Step "Mock API not ready, starting local server."
-  $outLog = Join-Path $root "logs\mock-api.out.log"
-  $errLog = Join-Path $root "logs\mock-api.err.log"
-  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outLog) | Out-Null
-  Start-Process -WindowStyle Hidden -FilePath "node" -ArgumentList @($apiScript) -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+$outLog = Join-Path $root "logs\mock-flow-api.out.log"
+$errLog = Join-Path $root "logs\mock-flow-api.err.log"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outLog) | Out-Null
 
-  $ready = $false
-  for ($i = 0; $i -lt 20; $i++) {
-    Start-Sleep -Milliseconds 250
-    if (Test-ApiReady) {
-      $ready = $true
-      break
-    }
-  }
+if (Test-ApiReady) {
+  throw "Port $port already has an API responding before verification started. This script will not attach to an existing service; stop that process or use a different isolated verification port."
+}
 
-  if (-not $ready) {
-    throw "Mock API did not start. Check logs/mock-api.out.log and logs/mock-api.err.log"
+Write-Step "Start isolated Mock API on port $port."
+$previousPort = $env:AGENT_SWARM_API_PORT
+$previousSource = $env:AGENT_SWARM_DASHBOARD_SOURCE
+$env:AGENT_SWARM_API_PORT = "$port"
+$env:AGENT_SWARM_DASHBOARD_SOURCE = "mock"
+$process = Start-Process `
+  -WindowStyle Hidden `
+  -FilePath "node" `
+  -ArgumentList @($apiScript) `
+  -RedirectStandardOutput $outLog `
+  -RedirectStandardError $errLog `
+  -PassThru
+
+$ready = $false
+for ($i = 0; $i -lt 20; $i++) {
+  Start-Sleep -Milliseconds 250
+  if ($process.HasExited) {
+    break
   }
+  if (Test-ApiReady) {
+    $ready = $true
+    break
+  }
+}
+
+if (-not $ready) {
+  if ($process -and -not $process.HasExited) {
+    Stop-Process -Id $process.Id -Force
+    $process.WaitForExit()
+  }
+  $env:AGENT_SWARM_API_PORT = $previousPort
+  $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
+  throw "Mock API did not start on port $port. Check logs/mock-flow-api.out.log and logs/mock-flow-api.err.log"
 }
 
 try {
@@ -108,20 +174,44 @@ try {
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should appear in queue."
 
+  Write-Step "Verify invalid Agent permission request is rejected."
+  $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{
+    changeType = "permission"
+    riskLevel = "high"
+    reason = "Verify invalid mock agent permission validation."
+    capabilities = @("canViewProject", "canExecuteRunnerJob")
+    changes = @(
+      @{
+        field = "permissions"
+        before = "reviewer_agent"
+        after = "canViewProject / canExecuteRunnerJob"
+      }
+    )
+  }
+  Assert-Equal $invalidPermission.error "agent_permission_validation_failed" "Invalid permission request should fail validation."
+  Assert-Equal $invalidPermission.permissionValidation.ok $false "Invalid permission validation should be false."
+  Assert-TextContains (@($invalidPermission.permissionValidation.forbiddenCapabilities) -join "`n") "canExecuteRunnerJob" "Invalid permission should identify Runner execution."
+  $approvalsAfterInvalidPermission = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/approvals"
+  $invalidApproval = @($approvalsAfterInvalidPermission.approvals | Where-Object { $_.id -eq "approval_agent_agent_reviewer_permission" })
+  Assert-Equal $invalidApproval.Count 0 "Invalid permission request should not create approval."
+
   Write-Step "Verify Agent config apply flow."
   $applyRequest = Invoke-Json -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -Body @{
     changeType = "permission"
     riskLevel = "high"
     reason = "Verify mock agent config apply flow."
+    permissionProfile = "reviewer_agent"
     changes = @(
       @{
         field = "permissions"
         before = "read_project / review_risk / review_diff"
-        after = "read_project / review_risk / review_diff / request_code_execution"
+        after = "reviewer_agent"
       }
     )
   }
   Assert-Equal $applyRequest.approval.status "pending" "Agent config approval should start pending."
+  Assert-Equal $applyRequest.permissionValidation.ok $true "Safe permission profile should validate."
+  Assert-Equal $applyRequest.approval.changeRequest.permissionValidation.ok $true "Approval should store permission validation."
   $applyApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($applyRequest.approval.id)/approve" -Body @{
     secondConfirm = $true
     confirmText = "Verify agent config approval."
@@ -164,4 +254,11 @@ try {
   } catch {
     Write-Warning "Failed to reset runtime state: $($_.Exception.Message)"
   }
+  Write-Step "Stop isolated Mock API and restore environment."
+  if ($process -and -not $process.HasExited) {
+    Stop-Process -Id $process.Id -Force
+    $process.WaitForExit()
+  }
+  $env:AGENT_SWARM_API_PORT = $previousPort
+  $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
 }

@@ -362,7 +362,14 @@ def create_agent_change_request(connection):
     changes = body.get("changes") if isinstance(body.get("changes"), list) else []
     approval_id = f"approval_agent_{agent_id}_{change_type}"
     diff_preview = [f"~ {item.get('field')}: {item.get('before')} -> {item.get('after')}" for item in changes] or [f"~ {change_type}: 等待补充变更字段"]
-    change_request = {"agentId": agent_id, "changeType": change_type, "changes": changes}
+    change_request = {
+        "agentId": agent_id,
+        "changeType": change_type,
+        "changes": changes,
+        "permissionProfile": body.get("permissionProfile") or body.get("profile") or "",
+        "capabilities": body.get("capabilities") if isinstance(body.get("capabilities"), list) else [],
+        "permissionValidation": body.get("permissionValidation"),
+    }
     existing = fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (approval_id, project_id))
     before = approval_row_to_api(existing) if existing else None
 
@@ -419,7 +426,14 @@ def create_agent_change_request(connection):
     )
     updated = approval_row_to_api(fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (approval_id, project_id)))
     runtime_event(connection, "approval", approval_id, "created" if before is None else "updated", before, updated, reason="agent_change_request")
-    return {"statusCode": 201, "body": {"approval": updated, "message": "Agent change request created. Agent config was not modified."}}
+    return {
+        "statusCode": 201,
+        "body": {
+            "approval": updated,
+            "permissionValidation": body.get("permissionValidation"),
+            "message": "Agent change request created. Agent config was not modified.",
+        },
+    }
 
 
 def agent_config_application_action(connection):
