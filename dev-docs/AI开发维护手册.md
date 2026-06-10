@@ -1104,3 +1104,10 @@ docs/runner-safety-acceptance.md
 - Why: before any real OpenAI-compatible relay request is implemented, the adapter contract must prove that keys and base URLs remain server-side, prompts and Agent/Runner context are rejected, failure categories stay coarse, and all side effects remain false.
 - Impacted modules: `services/api/model-gateway-adapters.js`, `services/api/model-gateway.js`, `scripts/verify-local-ui.ps1`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a backend safety checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway relay provider information checklist
+
+- What changed: added `docs/relay-provider-info-checklist.md` as a safe, non-secret checklist for confirming the first OpenAI-compatible relay before implementation.
+- Why: the operator does not yet know the relay endpoint family, model id, or request shape. Capturing only documentation facts first prevents mixing official OpenAI behavior with relay behavior and avoids accidental key, prompt, or provider-body leakage.
+- Impacted modules: `docs/relay-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a development checklist and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.

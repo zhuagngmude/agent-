@@ -1257,6 +1257,7 @@ OpenAI-compatible relay adapter interface checkpoint:
 
 - `services/api/model-gateway-adapters.js` now exposes `openai_compat_manual_connectivity_adapter` as future adapter metadata only, with current mode `interface_disabled`.
 - The relay interface checkpoint is not wired to real HTTP, provider SDKs, or real relay requests. It only documents and verifies the future adapter input/output boundary.
+- `docs/relay-provider-info-checklist.md` records the non-secret relay documentation facts required before real request implementation.
 - The interface only accepts backend-shaped manual connectivity inputs: provider id, fixed relay model id, purpose, preflight result, timeout limit, and response body limit.
 - The future adapter must read the relay key and base URL only from server env. It must not accept API keys, base URLs, free-form prompts, Agent context, files, tool calls, Runner jobs, arbitrary headers, arbitrary URLs, or arbitrary HTTP options from the request body.
 - The interface returns only coarse blocked status, coarse `errorCategory`, redaction booleans, duration metadata, and a request-shape contract. It must not return key values, base URL values, request headers, provider bodies, model text, token usage, cost, or raw errors.
