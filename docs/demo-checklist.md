@@ -163,7 +163,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - `POST /api/model-gateway/connectivity-test` must return `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all side effects false.
 - The connectivity-test response now includes a backend `preflight` object. It may report blocked categories such as `missing_key` or `feature_disabled`, but it must still report `realProviderRequestAttempted=false` and all side effects false.
 - `scripts/verify-model-gateway.ps1` is the dedicated non-browser acceptance entry for Model Gateway; it calls the exported preflight helper directly to cover feature disabled, missing key, unsupported provider, unsupported model, invalid purpose, timeout, and provider-error paths without real keys or provider SDKs.
-- `scripts/verify-local-ui.ps1` remains the browser UI smoke entry and may keep overlapping Model Gateway assertions until a later cleanup batch.
+- `scripts/verify-local-ui.ps1` is the browser UI smoke entry; it only checks rendered Model Gateway UI status/copy and does not run backend helper or connectivity-test deep assertions.
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is only a reported request flag in MVP-0.2; it must not make `manualConnectivityTestActive` or `realProviderRequestsAllowed` true.
 - Provider adapter verification currently covers only the disabled adapter registry and stub; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
@@ -196,7 +196,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - The cheng.pink relay facts are operator-provided and non-secret; demo scripts must still not call the relay, require a real key, store provider bodies, log prompt/result, or report token usage/cost.
 - `docs/cheng-relay-manual-ping-spec.md` freezes the future cheng.pink non-stream ping shape and URL normalization rules. Demo scripts must still verify these only through disabled or simulated paths until a later implementation commit explicitly changes the feature flag boundary.
 - `verify-model-gateway.ps1` verifies the cheng.pink request builder and URL normalization as pure local helper calls. These checks must keep `realProviderRequestAttempted=false`, must not read keys, and must not make network requests.
-- `verify-local-ui.ps1` may keep UI-level Model Gateway smoke checks, but it should not become a real connectivity test.
+- `verify-local-ui.ps1` keeps only UI-level Model Gateway smoke checks and must not become a real connectivity test.
 
 ## Model Gateway DeepSeek Provider Checklist
 

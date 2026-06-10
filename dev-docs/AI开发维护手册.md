@@ -1146,3 +1146,10 @@ docs/runner-safety-acceptance.md
 - Why: Model Gateway deep checks had grown inside the browser UI smoke script. A dedicated entry keeps backend/API/helper acceptance easy to run without opening a browser or mixing it with UI smoke coverage.
 - Impacted modules: `scripts/verify-model-gateway.ps1`, `scripts/README.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is an acceptance-script split and does not enable real relay calls, real model calls, provider SDKs, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Narrow local UI smoke script
+
+- What changed: narrowed `scripts/verify-local-ui.ps1` to browser UI smoke coverage only, while keeping Model Gateway deep acceptance in `scripts/verify-model-gateway.ps1`; updated `scripts/README.md`, `docs/demo-checklist.md`, and `dev-docs/下一步开发路线.md`.
+- Why: after the dedicated Model Gateway verification script existed, duplicating backend helper/preflight/adapter assertions inside the browser UI script made the UI smoke path too broad and slower to reason about.
+- Impacted modules: `scripts/verify-local-ui.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is test-script scope cleanup and does not enable real provider calls, provider SDKs, Runner execution, cloud sync, or permission changes.
