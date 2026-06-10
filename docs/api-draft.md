@@ -491,6 +491,14 @@ Current status: helper-only, no HTTP route, no SQLite write.
 
 Even when the plan is valid, MVP-0.2 must return `ok=false`, `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. The helper must not call SQLite, write runtime state, create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
 
+### Agent config rollback request helper
+
+Current status: helper-only, no HTTP route, no approval creation, no SQLite write.
+
+`services/api/agent-config-rollback-request.js` exports `buildAgentConfigRollbackRequest(...)`. The helper validates a future rollback request against an applied original application, an approved `agent_config` source approval without Runner job, the target Agent, current and restore versions that belong to that Agent, restore-version ordering, second confirmation, requester, reason, and changed fields.
+
+Even when the request is valid, MVP-0.2 must return `ok=false`, `requestReady=true`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, draft-only approval/application objects, rollback rules, and all side effects false. The helper must not create approvals, create applications, write `agents`, write `agent_config_versions`, call SQLite, write runtime state, create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks

@@ -1231,6 +1231,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/agent-config-transaction-plan.js`, `services/api/server.js`, `scripts/verify-agent-config-transaction-plan.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is helper-only transaction planning and does not enable real Agent config writes, `agent_config_versions` writes, SQLite/runtime-state writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
+## 2026-06-11 Change log: Agent config rollback request helper
+
+- What changed: added `services/api/agent-config-rollback-request.js` and `scripts/verify-agent-config-rollback-request.ps1` to define and verify the helper-only Agent config rollback request contract.
+- Why: rollback must be a new approved Agent config change and future version, not a delete, overwrite, direct `agents` update, Runner job, or hidden SQLite write. The helper makes those rules executable before any route or real rollback implementation exists.
+- Impacted modules: `services/api/agent-config-rollback-request.js`, `scripts/verify-agent-config-rollback-request.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is helper-only rollback request validation and does not create approvals/applications, write Agent config, write `agent_config_versions`, write SQLite/runtime state, create Runner jobs, execute Runner, call models, cloud sync, or change runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

@@ -26,6 +26,7 @@ mock-data.js
 agent-permissions.js
 agent-config-fields.js
 agent-config-transaction-plan.js
+agent-config-rollback-request.js
 model-gateway.js
 model-gateway-adapters.js
 ```
@@ -39,6 +40,8 @@ model-gateway-adapters.js
 `buildAgentConfigRealApplyGate(...)` is a helper-only future real-apply gate. It can prove that dry-run proof, source approval, target Agent, second confirmation, requestedBy, Git checkpoint, and rollback acceptance are present, but MVP-0.2 must still return `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not be wired to real Agent config writes until a later explicit feature-flagged commit.
 
 `agent-config-transaction-plan.js` owns the helper-only future real-write transaction plan. It can preview that a later implementation must update `agents`, insert `agent_config_versions`, mark the application applied, and insert `runtime_events` in one transaction, but MVP-0.2 must still keep `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not call SQLite or write runtime state directly.
+
+`agent-config-rollback-request.js` owns the helper-only future rollback request draft. It can validate an applied original application, approved `agent_config` source approval without Runner job, target Agent, version ownership/order, second confirmation, requester, reason, and changed fields, then draft a future approval/application/version plan. MVP-0.2 must still keep `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not create approvals/applications, write Agent config, write versions, call SQLite, write runtime state, create Runner jobs, execute Runner, call models, or read raw secrets.
 
 `model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. `model-gateway-adapters.js` owns the disabled provider adapter registry and stub for OpenAI, Anthropic, and Google Gemini. These modules must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 

@@ -27,6 +27,7 @@ verify-agent-config-fields.ps1
 verify-agent-config-dry-run.ps1
 verify-agent-config-apply-gate.ps1
 verify-agent-config-transaction-plan.ps1
+verify-agent-config-rollback-request.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -64,6 +65,8 @@ sqlite/
 `verify-agent-config-apply-gate.ps1` validates the future real Agent config apply gate helper without starting services. It proves that all real-apply preconditions can be checked while the feature gate remains closed: even valid inputs keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `verify-agent-config-transaction-plan.ps1` validates the future real Agent config apply transaction plan helper without starting services. It proves the planned write set would update `agents`, insert `agent_config_versions`, mark the application applied, and insert `runtime_events` in one transaction, while still keeping `canWrite=false` and all side effects false. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+
+`verify-agent-config-rollback-request.ps1` validates the helper-only Agent config rollback request contract without starting services. It proves a valid rollback request can draft a future approval/application/version while still keeping `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. It covers applied original application, approved `agent_config` source approval, no Runner job, version ownership/order, second confirmation, requester, reason, changed fields, and rollback rules.
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -157,3 +160,12 @@ This script is acceptance verification, not a real connectivity test. It must no
 - The planned write set must be one transaction: update `agents`, insert `agent_config_versions`, mark `agent_config_applications` applied, and insert `runtime_events`.
 - The plan must require version increment by exactly 1, `agent_id + version` uniqueness, rollback on any failure, pending application status at write time, and approved `agent_config` source approval without Runner job.
 - The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+
+## verify-agent-config-rollback-request.ps1
+
+`verify-agent-config-rollback-request.ps1` is the dedicated Agent config rollback request contract check.
+
+- `services/api/agent-config-rollback-request.js` owns the helper-only rollback request draft for a later rollback flow.
+- A valid request may return `requestReady=true`, but must still return `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
+- The helper requires an applied original application, approved `agent_config` source approval without Runner job, target Agent, current/restore versions that belong to the target Agent, restore version older than current version, second confirmation, requester, reason, and at least one changed field.
+- Rollback must draft a new approval, new application, and future new version. It must not delete or overwrite version history, directly update `agents`, create Runner jobs, execute Runner, call models, write SQLite/runtime state, or read raw secrets.
