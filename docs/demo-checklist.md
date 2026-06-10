@@ -164,7 +164,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is only a reported request flag in MVP-0.2; it must not make `manualConnectivityTestActive` or `realProviderRequestsAllowed` true.
 - Provider adapter verification currently covers only the disabled adapter registry and stub; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
-- OpenAI is the first planned real-provider candidate, but this checklist still forbids real OpenAI requests until a later explicit implementation commit changes the feature-flag boundary and passes blocked/missing-key/no-side-effect verification.
+- An OpenAI-compatible relay is the first planned real-provider candidate, but this checklist still forbids real relay or official OpenAI requests until a later explicit implementation commit changes the feature-flag boundary and passes blocked/missing-key/missing-base-url/invalid-base-url/no-side-effect verification.
 
 ## 7. 当前安全边界
 

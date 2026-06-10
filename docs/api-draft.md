@@ -1228,18 +1228,20 @@ First real-provider manual connectivity spec freeze:
 - Even on success, the response must not include provider response body, model text, token usage, cost, request headers, authorization headers, raw error body, raw key, key suffix, or masked key fragment.
 - The verification script for the first real provider must be able to run without real credentials and still pass blocked/missing-key/no-side-effect cases.
 
-OpenAI first-provider candidate plan:
+OpenAI-compatible relay first-provider candidate plan:
 
-- The first real-provider candidate is OpenAI only. Anthropic and Google Gemini must stay on disabled adapters during this step.
-- This is still a plan, not an implementation. Do not import the OpenAI SDK, do not call OpenAI, and do not change `manualConnectivityTestActive` or `realProviderRequestsAllowed` yet.
-- The candidate adapter id should be introduced separately from the current disabled adapter, for example `openai_manual_connectivity_adapter`, while preserving the disabled adapter for default behavior.
-- The adapter may read only `AGENT_SWARM_OPENAI_API_KEY` on the backend. It must never accept an API key from the frontend or request body.
-- The fixed connectivity model may start from the registry value `gpt-4.1-mini`, but the implementation commit must verify the current official OpenAI documentation before any real request code is added.
+- The first real-provider candidate is an OpenAI-compatible relay only, not official OpenAI. Anthropic, Google Gemini, and official OpenAI must stay on disabled adapters during this step.
+- This is still a plan, not an implementation. Do not import the OpenAI SDK, do not call OpenAI or the relay, and do not change `manualConnectivityTestActive` or `realProviderRequestsAllowed` yet.
+- The candidate provider id should be distinct from official OpenAI, for example `openai_compat`, so official OpenAI and relay credentials cannot be mixed.
+- The candidate adapter id should be introduced separately from the current disabled adapter, for example `openai_compat_manual_connectivity_adapter`, while preserving disabled adapters for default behavior.
+- The adapter may read only backend env vars dedicated to the relay: `AGENT_SWARM_OPENAI_COMPAT_API_KEY` and `AGENT_SWARM_OPENAI_COMPAT_BASE_URL`. It must never accept an API key or base URL from the frontend or request body.
+- The implementation must validate the relay base URL against an operator-provided allowlist or exact env var. It must not accept arbitrary URLs, redirects to non-HTTPS endpoints, localhost, private network targets, or request-time base URL overrides.
+- The fixed connectivity model must be configured as relay-specific metadata, because relay model names may not match official OpenAI names. Do not assume `gpt-4.1-mini` works for the relay.
 - The future real request must be a fixed minimal connectivity ping. It must not accept free-form prompt text, system prompt text, Agent context, files, tools, Runner job ids, arbitrary headers, arbitrary URLs, or arbitrary HTTP options.
-- The feature flag change must be explicit and reviewed in the same commit as the first real OpenAI adapter or in a preceding dedicated commit. Until then, preflight may report the flag as requested but must keep real provider requests blocked.
-- The first OpenAI implementation commit must keep all no-side-effect guarantees: no SQLite/runtime-state writes, no task/approval/Runner job/Agent creation, no model-call records, no billing records, no stored provider response, and no prompt/result logging.
-- The first OpenAI verification must pass without real credentials by covering `feature_disabled`, `missing_key`, `unsupported_provider`, `unsupported_model`, `timeout`, `provider_error`, and no-side-effect cases.
-- A real credential run, if ever performed manually, must be a separate operator action with the server env var set outside Git and with logs checked for absence of key, prompt, result, provider body, headers, token usage, and cost.
+- The feature flag change must be explicit and reviewed in the same commit as the first relay adapter or in a preceding dedicated commit. Until then, preflight may report the flag as requested but must keep real provider requests blocked.
+- The first relay implementation commit must keep all no-side-effect guarantees: no SQLite/runtime-state writes, no task/approval/Runner job/Agent creation, no model-call records, no billing records, no stored provider response, and no prompt/result logging.
+- The first relay verification must pass without real credentials by covering `feature_disabled`, `missing_key`, `missing_base_url`, `unsupported_provider`, `unsupported_model`, `timeout`, `provider_error`, invalid base URL, and no-side-effect cases.
+- A real credential run, if ever performed manually, must be a separate operator action with the server env vars set outside Git and with logs checked for absence of key, base URL secrets, prompt, result, provider body, headers, token usage, and cost.
 
 ## 2026-06-08 实现备注：工作流只读接口
 

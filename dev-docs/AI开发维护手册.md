@@ -1084,9 +1084,9 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/model-gateway.js`、`services/api/model-gateway-adapters.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不接 provider SDK、不发 OpenAI/Anthropic/Gemini 请求、不读取或保存 API Key、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent。
 
-## 2026-06-10 变更记录：Model Gateway OpenAI first-provider candidate
+## 2026-06-10 变更记录：Model Gateway OpenAI-compatible relay first-provider candidate
 
-- 改了什么：把 OpenAI 记录为第一家真实 provider 手动连通性测试候选，并在 `docs/api-draft.md`、`docs/demo-checklist.md` 和开发路线中固定后续实现前置条件。
-- 为什么改：用户确认可以先选第一家 provider；为了避免跳太快，先只冻结 OpenAI 候选和验收边界，不接 SDK、不发请求、不改变 feature flag 行为。
+- 改了什么：把第一家真实 provider 候选从官方 OpenAI 修正为 OpenAI-compatible relay，并在 `docs/api-draft.md`、`docs/demo-checklist.md` 和开发路线中固定 relay 专用 env var 草案：`AGENT_SWARM_OPENAI_COMPAT_API_KEY` 与 `AGENT_SWARM_OPENAI_COMPAT_BASE_URL`。
+- 为什么改：用户说明没有官方 OpenAI key，只有中转 key；为了避免官方 OpenAI 与中转 provider 混用，必须把 provider id、key env var 和 base URL 边界拆开记录。
 - 影响模块：`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
-- 是否需要同步人类说明书：暂不需要；当前仍未实现真实 OpenAI 请求，Anthropic 和 Google Gemini 也继续保持 disabled adapter。
+- 是否需要同步人类说明书：暂不需要；当前仍未实现真实 relay 或官方 OpenAI 请求，官方 OpenAI、Anthropic 和 Google Gemini 也继续保持 disabled adapter。
