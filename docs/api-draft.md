@@ -1275,6 +1275,14 @@ DeepSeek provider information checkpoint:
 - The first DeepSeek manual ping must remain backend-only, fixed, non-streaming, timeout-limited, response-size-limited, redacted, and manually triggered.
 - It must not accept free-form prompts, Agent context, files, tools, Runner job ids, arbitrary headers, arbitrary URLs, or client-provided API keys.
 
+Cheng relay fixed manual ping spec:
+
+- `docs/cheng-relay-manual-ping-spec.md` freezes the cheng.pink `openai_compat` manual ping before implementation.
+- The fixed model is `gpt-5.4-mini`; the fixed provider request is a non-stream Chat Completions ping and must not accept client prompt text.
+- The future adapter must normalize `AGENT_SWARM_OPENAI_COMPAT_BASE_URL` whether it is configured as `https://api.cheng.pink` or `https://api.cheng.pink/v1`, and must produce only `/v1/chat/completions`.
+- Acceptance checks must cover feature disabled, missing key, missing base URL, invalid base URL, supported base URLs with and without `/v1`, unsupported provider, unsupported model, timeout, provider error, and all-false side effects without real credentials.
+- Current status remains documentation-only: no relay SDK, no relay HTTP request, no feature flag activation, no real model call.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：

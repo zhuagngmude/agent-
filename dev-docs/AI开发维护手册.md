@@ -1125,3 +1125,10 @@ docs/runner-safety-acceptance.md
 - Why: the relay administrator provided enough non-secret information to draft a fixed minimal ping later, while still keeping API keys and account data outside Git, logs, SQLite, and frontend code.
 - Impacted modules: `docs/relay-provider-info-checklist.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a documentation checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway cheng.pink fixed manual ping spec
+
+- What changed: added `docs/cheng-relay-manual-ping-spec.md` to freeze the future cheng.pink non-stream manual ping request, URL normalization rules, coarse result contract, error mapping, and implementation-order checklist.
+- Why: before adding any request-builder code or real relay adapter, the project needs a fixed reviewed target that prevents duplicated `/v1` paths, client prompt injection, API key exposure, provider body storage, and hidden side effects.
+- Impacted modules: `docs/cheng-relay-manual-ping-spec.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a documentation checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
