@@ -913,6 +913,8 @@ Purpose: validate the shape and safety boundary of a future model connectivity t
 
 Current MVP-0.2 implementation is disabled and read-only. The dry-run phase is intentionally narrower than the long-term product. Its "must not" rules apply only to dry-run; they do not mean the final product will never write model logs, create tasks, trigger Agents, or call real models.
 
+The settings and integrations pages may display this dry-run result as a read-only preview. The frontend must use a fixed connectivity-check request and must not collect, store, or display API keys or free-form prompts.
+
 Request draft:
 
 ```json

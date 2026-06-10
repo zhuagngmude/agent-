@@ -150,6 +150,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
+- 设置页和集成页必须展示 Model Gateway dry-run 只读预览，且浏览器控制台保持 0 errors / 0 warnings。
 
 脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
 

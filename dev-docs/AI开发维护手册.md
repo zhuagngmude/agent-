@@ -1006,3 +1006,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：把真实模型接入前的第一步落成可验证后端接口，确认服务边界和禁用态行为稳定，而不是直接连接 provider SDK。
 - 影响模块：`services/api/server.js`、`scripts/verify-local-ui.ps1`、`scripts/README.md`、`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不写 SQLite、不创建任务/审批/Runner job、不触发 Agent、不记录 prompt/result。
+
+## 2026-06-10 变更记录：Model Gateway dry-run 前端预览
+
+- 改了什么：设置页和集成页新增 Model Gateway dry-run 只读预览，展示 provider、env var、provider call 边界和 sideEffects；`verify-local-ui.ps1` 增加页面级断言。
+- 为什么改：让用户能在界面上看到“离真实模型还差什么”，同时仍保持禁用态和无副作用边界。
+- 影响模块：`apps/web/app.js`、`apps/web/styles.css`、`scripts/verify-local-ui.ps1`、`scripts/README.md`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前只是只读预览，不新增真实模型调用、API Key 输入、任务/审批/Runner job 创建或 Agent 触发。

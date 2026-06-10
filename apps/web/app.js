@@ -539,6 +539,25 @@ async function requestModelGatewayStatus() {
   return result;
 }
 
+async function requestModelGatewayDryRun() {
+  const response = await fetch(`${apiBase}/api/model-gateway/dry-run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      purpose: "connectivity_check",
+      promptPreview: "settings panel connectivity preview",
+      requestedBy: "local_user",
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 function localTrialModeLabel(mode) {
   if (mode === "sqlite") return "SQLite 本地持久化";
   if (mode === "mock") return "Mock 运行态";
@@ -1427,6 +1446,45 @@ function renderModelGatewayStatusCard(status) {
   `;
 }
 
+function renderModelGatewayDryRunCard(result) {
+  const sideEffects = result.sideEffects || {};
+  const sideEffectItems = [
+    ["SQLite writes", sideEffects.writesSqlite],
+    ["Runtime state writes", sideEffects.writesRuntimeState],
+    ["Task creation", sideEffects.createsTasks],
+    ["Approval creation", sideEffects.createsApprovals],
+    ["Runner job creation", sideEffects.createsRunnerJobs],
+    ["Agent trigger", sideEffects.triggersAgents],
+    ["Real model call", sideEffects.callsRealModel],
+    ["Prompt/result logging", sideEffects.logsPromptOrResult],
+  ];
+  const errors = result.validationErrors || [];
+
+  return `
+    <div class="model-gateway-dryrun" id="modelGatewayDryRunResult">
+      <div class="card-head compact">
+        <h3>Connectivity Dry-Run</h3>
+        <span class="badge ${result.requestValid ? "green" : "orange"}">${result.requestValid ? "request valid" : "request blocked"}</span>
+      </div>
+      <div class="model-gateway-summary dryrun-summary">
+        <div><span>Provider</span><strong>${escapeHtml(result.provider || "openai")}</strong></div>
+        <div><span>Env var</span><strong>${result.keyConfigured ? "present" : "missing"}</strong></div>
+        <div><span>Would call provider</span><strong>${result.wouldCallProvider ? "yes" : "no"}</strong></div>
+      </div>
+      <div class="model-gateway-side-effects">
+        ${sideEffectItems.map(([label, active]) => `
+          <div>
+            <span>${escapeHtml(label)}</span>
+            <strong class="${active ? "risk-on" : "risk-off"}">${active ? "yes" : "no"}</strong>
+          </div>
+        `).join("")}
+      </div>
+      ${errors.length > 0 ? `<ul class="model-gateway-reasons">${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join("")}</ul>` : ""}
+      <p class="runner-safety-note">Dry-run is a backend-only preview. It validates provider configuration and safety switches, but it does not send prompts, call providers, write storage, create tasks, create approvals, trigger Agents, or create Runner jobs.</p>
+    </div>
+  `;
+}
+
 async function renderModelGatewayStatus() {
   ensureModelGatewayContainers();
   const containers = [
@@ -1438,7 +1496,8 @@ async function renderModelGatewayStatus() {
 
   try {
     const status = await requestModelGatewayStatus();
-    const html = renderModelGatewayStatusCard(status);
+    const dryRun = await requestModelGatewayDryRun();
+    const html = `${renderModelGatewayStatusCard(status)}${renderModelGatewayDryRunCard(dryRun)}`;
     containers.forEach((container) => { container.innerHTML = html; });
     if (badge) {
       badge.textContent = status.realModelCallsAllowed ? "enabled" : "disabled";

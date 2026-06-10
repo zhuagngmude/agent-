@@ -92,12 +92,24 @@ function Invoke-PlaywrightCli {
 
   Push-Location $playwrightWorkDir
   try {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $output = & npx --package "@playwright/cli" playwright-cli @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-      throw ($output | Out-String)
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $previousErrorActionPreference
+
+    $filteredOutput = @($output | ForEach-Object { "$_" } | Where-Object {
+      -not $_.StartsWith("npm warn ")
+    })
+
+    if ($exitCode -ne 0) {
+      throw ($filteredOutput | Out-String)
     }
-    return ($output | Out-String)
+    return ($filteredOutput | Out-String)
   } finally {
+    if ($null -ne $previousErrorActionPreference) {
+      $ErrorActionPreference = $previousErrorActionPreference
+    }
     Pop-Location
   }
 }
@@ -228,10 +240,14 @@ try {
   Invoke-PageClickByDataPage -Page "settings"
   Assert-True ((Invoke-PageText -Selector "#localTrialStatus").Length -gt 0) "Settings page should render local trial status."
   Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "API keys stay server-side" "Settings page should render Model Gateway safety copy."
+  Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "Connectivity Dry-Run" "Settings page should render Model Gateway dry-run preview."
+  Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "Would call provider" "Settings page should render dry-run provider call boundary."
+  Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "Prompt/result logging" "Settings page should render dry-run logging boundary."
 
   Invoke-PageClickByDataPage -Page "integrations"
   Assert-TextContains (Invoke-PageText -Selector "#integrations") "GitHub" "Integrations page should render integration cards."
   Assert-TextContains (Invoke-PageText -Selector "#modelGatewayIntegrationStatus") "Real calls" "Integrations page should render Model Gateway status."
+  Assert-TextContains (Invoke-PageText -Selector "#modelGatewayIntegrationStatus") "Connectivity Dry-Run" "Integrations page should render Model Gateway dry-run preview."
   Assert-Equal (Invoke-PageText -Selector "#modelGatewayIntegrationBadge") "disabled" "Model Gateway badge should be disabled."
 
   $hrefHashCount = Invoke-PageEval -Expression "() => Array.from(document.querySelectorAll('a')).filter((item) => item.getAttribute('href') === '#').length"
