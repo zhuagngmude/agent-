@@ -1,5 +1,7 @@
 const disabledAdapterName = "disabled_provider_connectivity_adapter";
 const openAiCompatRelayAdapterName = "openai_compat_relay_connectivity_adapter_interface";
+const chengRelayManualPingModel = "gpt-5.4-mini";
+const chengRelayManualPingEndpointPath = "/v1/chat/completions";
 
 const disabledProviderAdapterRegistry = {
   openai: {
@@ -18,7 +20,7 @@ const disabledProviderAdapterRegistry = {
     providerLabel: "OpenAI-compatible Relay",
     mode: "disabled",
     futureMode: "interface_disabled",
-    connectivityTestModel: "openai-compatible-relay-model",
+    connectivityTestModel: chengRelayManualPingModel,
     maxTimeoutMs: 5000,
     maxResponseBodyLimitBytes: 4096,
   },
@@ -81,6 +83,130 @@ function sideEffects() {
   };
 }
 
+function isPrivateIpv4Host(hostname) {
+  return /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
+}
+
+function normalizeChengRelayBaseUrl(rawBaseUrl) {
+  const value = typeof rawBaseUrl === "string" ? rawBaseUrl.trim() : "";
+  const validationErrors = [];
+
+  if (!value) {
+    return {
+      ok: false,
+      errorCategory: "missing_base_url",
+      validationErrors: ["base URL is required."],
+      normalizedBaseUrl: "",
+      endpointUrl: "",
+    };
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(value);
+  } catch {
+    return {
+      ok: false,
+      errorCategory: "invalid_base_url",
+      validationErrors: ["base URL is invalid."],
+      normalizedBaseUrl: "",
+      endpointUrl: "",
+    };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const pathname = parsedUrl.pathname.replace(/\/+$/, "");
+
+  if (parsedUrl.protocol !== "https:") {
+    validationErrors.push("base URL must use https.");
+  }
+
+  if (hostname === "localhost" || hostname === "::1" || isPrivateIpv4Host(hostname)) {
+    validationErrors.push("base URL must not target localhost, loopback, or private networks.");
+  }
+
+  if (parsedUrl.username || parsedUrl.password || parsedUrl.search || parsedUrl.hash) {
+    validationErrors.push("base URL must not contain credentials, query strings, or fragments.");
+  }
+
+  if (pathname && pathname !== "/v1") {
+    validationErrors.push("base URL path must be empty or /v1.");
+  }
+
+  if (validationErrors.length > 0) {
+    return {
+      ok: false,
+      errorCategory: "invalid_base_url",
+      validationErrors,
+      normalizedBaseUrl: "",
+      endpointUrl: "",
+    };
+  }
+
+  const origin = `${parsedUrl.protocol}//${parsedUrl.host}`;
+  const normalizedBaseUrl = pathname === "/v1" ? `${origin}/v1` : origin;
+  const endpointUrl = pathname === "/v1"
+    ? `${normalizedBaseUrl}/chat/completions`
+    : `${normalizedBaseUrl}${chengRelayManualPingEndpointPath}`;
+
+  return {
+    ok: true,
+    errorCategory: "",
+    validationErrors: [],
+    normalizedBaseUrl,
+    endpointUrl,
+  };
+}
+
+function buildChengRelayManualPingRequest(input = {}) {
+  const model = typeof input.model === "string" ? input.model.trim() : "";
+  const baseUrlResult = normalizeChengRelayBaseUrl(input.baseUrl);
+  const validationErrors = [...baseUrlResult.validationErrors];
+
+  if (!model) {
+    validationErrors.push("model is required.");
+  } else if (model !== chengRelayManualPingModel) {
+    validationErrors.push("model is not supported for cheng relay manual ping.");
+  }
+
+  const ok = baseUrlResult.ok && validationErrors.length === 0;
+
+  return {
+    ok,
+    provider: "openai_compat",
+    model,
+    endpointUrl: ok ? baseUrlResult.endpointUrl : "",
+    method: "POST",
+    headers: {
+      authorizationSource: "server_env",
+      contentType: "application/json",
+      acceptsClientHeaders: false,
+    },
+    body: ok ? {
+      model: chengRelayManualPingModel,
+      messages: [
+        {
+          role: "user",
+          content: "ping",
+        },
+      ],
+      stream: false,
+      max_tokens: 1,
+    } : null,
+    result: ok ? "ready" : "blocked",
+    errorCategory: ok ? "" : (baseUrlResult.errorCategory || "unsupported_model"),
+    validationErrors,
+    acceptsClientApiKey: false,
+    acceptsClientBaseUrl: false,
+    acceptsClientPrompt: false,
+    acceptsClientHeaders: false,
+    acceptsClientStreamSetting: false,
+    realProviderRequestAttempted: false,
+    providerResponseStored: false,
+    sideEffects: sideEffects(),
+  };
+}
+
 function classifyRelayInterfaceError(preflight) {
   const categories = Array.isArray(preflight?.blockingCategories) ? preflight.blockingCategories : [];
 
@@ -126,7 +252,9 @@ function openAiCompatRelayConnectivityAdapter(request) {
       acceptsToolCalls: false,
       acceptsRunnerJob: false,
       fixedMinimalPingOnly: true,
-      endpointShapeConfirmed: false,
+      endpointShapeConfirmed: true,
+      fixedModel: chengRelayManualPingModel,
+      fixedEndpointPath: chengRelayManualPingEndpointPath,
     },
     limits: {
       maxTimeoutMs: policy.maxTimeoutMs,
@@ -142,7 +270,9 @@ function openAiCompatRelayConnectivityAdapter(request) {
 }
 
 module.exports = {
+  buildChengRelayManualPingRequest,
   disabledProviderAdapterRegistry,
   disabledProviderConnectivityAdapter,
+  normalizeChengRelayBaseUrl,
   openAiCompatRelayConnectivityAdapter,
 };

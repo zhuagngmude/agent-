@@ -180,7 +180,9 @@ function Assert-OpenAiCompatRelayInterface {
   Assert-Equal $RelayInterface.requestShape.acceptsToolCalls $false "$Prefix should not accept tool calls."
   Assert-Equal $RelayInterface.requestShape.acceptsRunnerJob $false "$Prefix should not accept Runner jobs."
   Assert-Equal $RelayInterface.requestShape.fixedMinimalPingOnly $true "$Prefix should allow only a future fixed minimal ping."
-  Assert-Equal $RelayInterface.requestShape.endpointShapeConfirmed $false "$Prefix endpoint shape should remain unconfirmed."
+  Assert-Equal $RelayInterface.requestShape.endpointShapeConfirmed $true "$Prefix endpoint shape should be confirmed for cheng.pink."
+  Assert-Equal $RelayInterface.requestShape.fixedModel "gpt-5.4-mini" "$Prefix should expose the fixed cheng.pink manual ping model."
+  Assert-Equal $RelayInterface.requestShape.fixedEndpointPath "/v1/chat/completions" "$Prefix should expose the fixed cheng.pink manual ping endpoint path."
   Assert-Equal $RelayInterface.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
   Assert-Equal $RelayInterface.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
   Assert-Equal $RelayInterface.sideEffects.createsTasks $false "$Prefix should not create tasks."
@@ -191,6 +193,71 @@ function Assert-OpenAiCompatRelayInterface {
   Assert-Equal $RelayInterface.sideEffects.executesRunner $false "$Prefix should not execute Runner."
   Assert-Equal $RelayInterface.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
   Assert-Equal $RelayInterface.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
+}
+
+function Assert-ChengRelayManualPingBuilderNoSideEffects {
+  param(
+    [Parameter(Mandatory = $true)][object]$BuilderResult,
+    [string]$Prefix = "Cheng relay manual ping builder"
+  )
+
+  Assert-Equal $BuilderResult.realProviderRequestAttempted $false "$Prefix should not attempt provider requests."
+  Assert-Equal $BuilderResult.providerResponseStored $false "$Prefix should not store provider responses."
+  Assert-Equal $BuilderResult.sideEffects.writesSqlite $false "$Prefix should not write SQLite."
+  Assert-Equal $BuilderResult.sideEffects.writesRuntimeState $false "$Prefix should not write runtime state."
+  Assert-Equal $BuilderResult.sideEffects.createsTasks $false "$Prefix should not create tasks."
+  Assert-Equal $BuilderResult.sideEffects.createsApprovals $false "$Prefix should not create approvals."
+  Assert-Equal $BuilderResult.sideEffects.createsRunnerJobs $false "$Prefix should not create Runner jobs."
+  Assert-Equal $BuilderResult.sideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+  Assert-Equal $BuilderResult.sideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $BuilderResult.sideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $BuilderResult.sideEffects.logsPromptOrResult $false "$Prefix should not log prompts or results."
+  Assert-Equal $BuilderResult.sideEffects.storesProviderResponse $false "$Prefix should not store provider responses."
+}
+
+function Assert-ChengRelayManualPingReady {
+  param(
+    [Parameter(Mandatory = $true)][object]$BuilderResult,
+    [string]$Prefix = "Cheng relay manual ping builder"
+  )
+
+  Assert-Equal $BuilderResult.ok $true "$Prefix should build a ready request shape."
+  Assert-Equal $BuilderResult.provider "openai_compat" "$Prefix should target openai_compat."
+  Assert-Equal $BuilderResult.model "gpt-5.4-mini" "$Prefix should use the fixed cheng relay model."
+  Assert-Equal $BuilderResult.endpointUrl "https://api.cheng.pink/v1/chat/completions" "$Prefix should normalize to the canonical endpoint."
+  Assert-Equal $BuilderResult.method "POST" "$Prefix should use POST."
+  Assert-Equal $BuilderResult.headers.authorizationSource "server_env" "$Prefix should read authorization only from server env."
+  Assert-Equal $BuilderResult.headers.contentType "application/json" "$Prefix should use JSON."
+  Assert-Equal $BuilderResult.headers.acceptsClientHeaders $false "$Prefix should not accept client headers."
+  Assert-Equal $BuilderResult.body.model "gpt-5.4-mini" "$Prefix body should use the fixed model."
+  Assert-Equal $BuilderResult.body.stream $false "$Prefix body should be non-streaming."
+  Assert-Equal $BuilderResult.body.max_tokens 1 "$Prefix body should use the minimum token limit."
+  Assert-Equal $BuilderResult.body.messages.Count 1 "$Prefix body should contain exactly one fixed message."
+  Assert-Equal $BuilderResult.body.messages[0].role "user" "$Prefix body message role should be fixed."
+  Assert-Equal $BuilderResult.body.messages[0].content "ping" "$Prefix body message content should be fixed."
+  Assert-Equal $BuilderResult.acceptsClientApiKey $false "$Prefix should not accept client API keys."
+  Assert-Equal $BuilderResult.acceptsClientBaseUrl $false "$Prefix should not accept client base URLs."
+  Assert-Equal $BuilderResult.acceptsClientPrompt $false "$Prefix should not accept client prompts."
+  Assert-Equal $BuilderResult.acceptsClientHeaders $false "$Prefix should not accept client headers."
+  Assert-Equal $BuilderResult.acceptsClientStreamSetting $false "$Prefix should not accept client stream settings."
+  Assert-TextContains $BuilderResult.endpointUrl "/v1/chat/completions" "$Prefix endpoint should include /v1/chat/completions."
+  Assert-True (-not $BuilderResult.endpointUrl.Contains("/v1/v1/chat/completions")) "$Prefix endpoint should not duplicate /v1."
+  Assert-ChengRelayManualPingBuilderNoSideEffects -BuilderResult $BuilderResult -Prefix $Prefix
+}
+
+function Assert-ChengRelayManualPingBlocked {
+  param(
+    [Parameter(Mandatory = $true)][object]$BuilderResult,
+    [Parameter(Mandatory = $true)][string]$ExpectedErrorCategory,
+    [string]$Prefix = "Cheng relay manual ping builder"
+  )
+
+  Assert-Equal $BuilderResult.ok $false "$Prefix should be blocked."
+  Assert-Equal $BuilderResult.result "blocked" "$Prefix should report blocked."
+  Assert-Equal $BuilderResult.errorCategory $ExpectedErrorCategory "$Prefix should report the expected error category."
+  Assert-Equal $BuilderResult.endpointUrl "" "$Prefix should not expose an endpoint when blocked."
+  Assert-Equal $BuilderResult.body $null "$Prefix should not expose a request body when blocked."
+  Assert-ChengRelayManualPingBuilderNoSideEffects -BuilderResult $BuilderResult -Prefix $Prefix
 }
 
 function Test-Command {
@@ -390,10 +457,26 @@ const base = {
 };
 const relayBase = {
   provider: 'openai_compat',
-  model: 'openai-compatible-relay-model',
+  model: 'gpt-5.4-mini',
   purpose: 'manual_connectivity_test',
   secondConfirm: true,
   confirmText: 'local relay preflight acceptance'
+};
+const chengReadyWithoutV1 = adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink', model: 'gpt-5.4-mini' });
+const chengReadyWithV1 = adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink/v1', model: 'gpt-5.4-mini' });
+const chengReadyWithTrailingSlash = adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink/v1/', model: 'gpt-5.4-mini' });
+const chengBuilderCases = {
+  readyWithoutV1: chengReadyWithoutV1,
+  readyWithV1: chengReadyWithV1,
+  readyWithTrailingSlash: chengReadyWithTrailingSlash,
+  missingBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: '', model: 'gpt-5.4-mini' }),
+  httpBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'http://api.cheng.pink/v1', model: 'gpt-5.4-mini' }),
+  localhostBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://localhost/v1', model: 'gpt-5.4-mini' }),
+  loopbackBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://127.0.0.1/v1', model: 'gpt-5.4-mini' }),
+  privateBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://192.168.1.10/v1', model: 'gpt-5.4-mini' }),
+  queryTokenBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink/v1?token=secret', model: 'gpt-5.4-mini' }),
+  wrongPathBaseUrl: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink/openai/v1', model: 'gpt-5.4-mini' }),
+  unsupportedModel: adapters.buildChengRelayManualPingRequest({ baseUrl: 'https://api.cheng.pink/v1', model: 'gpt-5.5' })
 };
 const cases = {
   featureDisabled: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true }),
@@ -419,9 +502,22 @@ const relayInterfaceCases = {
   featureDisabled: adapters.openAiCompatRelayConnectivityAdapter({ ...relayBase, preflight: cases.relayValidBaseUrlBlocked })
 };
 cases.relayInterfaceCases = relayInterfaceCases;
+cases.chengBuilderCases = chengBuilderCases;
 process.stdout.write(JSON.stringify(cases));
 "@
 $preflightCases = $preflightJson | ConvertFrom-Json
+
+Assert-ChengRelayManualPingReady -BuilderResult $preflightCases.chengBuilderCases.readyWithoutV1 -Prefix "Cheng relay builder without /v1"
+Assert-ChengRelayManualPingReady -BuilderResult $preflightCases.chengBuilderCases.readyWithV1 -Prefix "Cheng relay builder with /v1"
+Assert-ChengRelayManualPingReady -BuilderResult $preflightCases.chengBuilderCases.readyWithTrailingSlash -Prefix "Cheng relay builder with trailing slash"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.missingBaseUrl -ExpectedErrorCategory "missing_base_url" -Prefix "Cheng relay builder missing base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.httpBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder http base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.localhostBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder localhost base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.loopbackBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder loopback base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.privateBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder private base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.queryTokenBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder query-token base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.wrongPathBaseUrl -ExpectedErrorCategory "invalid_base_url" -Prefix "Cheng relay builder wrong-path base URL"
+Assert-ChengRelayManualPingBlocked -BuilderResult $preflightCases.chengBuilderCases.unsupportedModel -ExpectedErrorCategory "unsupported_model" -Prefix "Cheng relay builder unsupported model"
 
 Assert-Equal $preflightCases.featureDisabled.result "blocked" "Preflight should remain blocked when feature is disabled."
 Assert-TextContains (@($preflightCases.featureDisabled.blockingCategories) -join "`n") "feature_disabled" "Preflight should report feature disabled."
@@ -486,7 +582,7 @@ Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterface
 Assert-OpenAiCompatRelayInterface -RelayInterface $preflightCases.relayInterfaceCases.featureDisabled -ExpectedErrorCategory "feature_disabled" -Prefix "Relay interface feature-disabled case"
 
 $providerAdapterCases = @(
-  @{ Provider = "openai_compat"; Model = "openai-compatible-relay-model"; AdapterId = "openai_compat_disabled_connectivity_adapter" },
+  @{ Provider = "openai_compat"; Model = "gpt-5.4-mini"; AdapterId = "openai_compat_disabled_connectivity_adapter" },
   @{ Provider = "anthropic"; Model = "claude-3-5-haiku-latest"; AdapterId = "anthropic_disabled_connectivity_adapter" },
   @{ Provider = "google"; Model = "gemini-1.5-flash"; AdapterId = "google_disabled_connectivity_adapter" }
 )

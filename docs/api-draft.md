@@ -1283,6 +1283,13 @@ Cheng relay fixed manual ping spec:
 - Acceptance checks must cover feature disabled, missing key, missing base URL, invalid base URL, supported base URLs with and without `/v1`, unsupported provider, unsupported model, timeout, provider error, and all-false side effects without real credentials.
 - Current status remains documentation-only: no relay SDK, no relay HTTP request, no feature flag activation, no real model call.
 
+Cheng relay request builder checkpoint:
+
+- `services/api/model-gateway-adapters.js` now exports pure local helpers for the cheng.pink relay manual ping request shape and URL normalization.
+- `buildChengRelayManualPingRequest(...)` only builds a deterministic endpoint/body preview. It does not read API keys, does not read env vars, does not make HTTP requests, and reports `realProviderRequestAttempted=false`.
+- The builder accepts only base URL and fixed model inputs for local verification, normalizes `https://api.cheng.pink`, `https://api.cheng.pink/v1`, and `https://api.cheng.pink/v1/` to `https://api.cheng.pink/v1/chat/completions`, and rejects unsafe URLs or unsupported models.
+- `scripts/verify-local-ui.ps1` verifies the builder through direct backend helper calls without real credentials or provider network calls.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：

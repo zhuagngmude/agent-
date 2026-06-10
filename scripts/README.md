@@ -70,4 +70,6 @@ Future real Model Gateway manual connectivity testing must remain behind an expl
 
 Provider adapter acceptance currently checks only the disabled adapter registry and stub. Verification scripts may check disabled adapter boundaries, request/response shapes, redaction rules, and no-side-effect guarantees, but they must not perform real connectivity tests or depend on real provider credentials.
 
+`verify-local-ui.ps1` also checks the cheng.pink OpenAI-compatible relay request builder through direct backend helper calls. This builder check is local only: it verifies URL normalization, fixed non-stream ping body shape, unsupported model rejection, unsafe base URL rejection, and all-false side effects. It must not read real API keys, call the relay, store provider responses, or log prompt/result content.
+
 Model Gateway backend logic lives in `../services/api/model-gateway.js`; `server.js` should only wire routes to that module.

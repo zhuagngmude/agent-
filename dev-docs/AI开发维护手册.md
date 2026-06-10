@@ -1132,3 +1132,10 @@ docs/runner-safety-acceptance.md
 - Why: before adding any request-builder code or real relay adapter, the project needs a fixed reviewed target that prevents duplicated `/v1` paths, client prompt injection, API key exposure, provider body storage, and hidden side effects.
 - Impacted modules: `docs/cheng-relay-manual-ping-spec.md`, `docs/api-draft.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is a documentation checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Model Gateway cheng.pink request builder checkpoint
+
+- What changed: added pure local cheng.pink request-builder helpers in `services/api/model-gateway-adapters.js` and extended `scripts/verify-local-ui.ps1` to verify URL normalization, fixed body shape, unsafe URL rejection, unsupported model rejection, and no-side-effect guarantees.
+- Why: the project needs deterministic request-shape checks before any real relay adapter can exist. This catches duplicated `/v1` paths and client-controlled prompt/header/base URL mistakes while still making zero provider network requests.
+- Impacted modules: `services/api/model-gateway-adapters.js`, `scripts/verify-local-ui.ps1`, `docs/api-draft.md`, `docs/demo-checklist.md`, `scripts/README.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
+- Human docs sync: not required; this is a backend verification checkpoint and does not enable real relay calls, real model calls, Runner execution, cloud sync, or permission changes.

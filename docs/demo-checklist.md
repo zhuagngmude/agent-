@@ -192,6 +192,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - `docs/relay-provider-info-checklist.md` is the safe place for non-secret relay documentation facts. It must not contain keys, auth headers, account ids, prompts, model outputs, provider bodies, token usage, cost, or raw errors.
 - The cheng.pink relay facts are operator-provided and non-secret; demo scripts must still not call the relay, require a real key, store provider bodies, log prompt/result, or report token usage/cost.
 - `docs/cheng-relay-manual-ping-spec.md` freezes the future cheng.pink non-stream ping shape and URL normalization rules. Demo scripts must still verify these only through disabled or simulated paths until a later implementation commit explicitly changes the feature flag boundary.
+- `verify-local-ui.ps1` may verify the cheng.pink request builder and URL normalization as pure local helper calls. These checks must keep `realProviderRequestAttempted=false`, must not read keys, and must not make network requests.
 
 ## Model Gateway DeepSeek Provider Checklist
 
