@@ -30,6 +30,8 @@ model-gateway.js
 
 `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is currently a visible request flag only. Even when that environment variable is `true`, MVP-0.2 must keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
 
+Provider adapter work is still specification-only. Future adapters must stay behind the Model Gateway service boundary, enforce timeout and response-size limits, return only coarse redacted status fields, and be implemented one provider at a time. Do not add provider SDK imports or real provider network calls in this stage.
+
 启动：
 
 ```powershell

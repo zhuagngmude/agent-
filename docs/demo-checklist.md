@@ -160,6 +160,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - No demo script may require real API keys or provider SDKs.
 - `POST /api/model-gateway/connectivity-test` must return `not_implemented`, `realProviderRequestAttempted=false`, and all side effects false.
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is only a reported request flag in MVP-0.2; it must not make `manualConnectivityTestActive` or `realProviderRequestsAllowed` true.
+- Provider adapter design is documentation-only; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
 
 ## 7. 当前安全边界

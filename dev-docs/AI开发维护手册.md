@@ -1041,3 +1041,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：在进入 provider adapter 设计前，先把“手动连通性测试即使被请求开启也不能真实生效”的边界固化成 API 字段和回归断言。
 - 影响模块：`services/api/model-gateway.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不接 provider SDK、不写 SQLite/runtime state、不创建任务/审批/Runner job、不触发 Agent、不保存 prompt/result 或 provider response。
+
+## 2026-06-10 变更记录：Model Gateway provider adapter 草案
+
+- 改了什么：`docs/api-draft.md` 新增 Model Gateway provider adapter 草案，定义后端隔离层归属、输入/输出形状、result/errorCategory 枚举、脱敏规则、超时和响应大小限制，以及实现前验收条件。
+- 为什么改：在任何真实 SDK 或网络请求进入仓库前，先固定 adapter 的安全契约，避免 UI、Agent、Runner 或通用路由层直接接触 provider SDK、API Key、prompt 或 provider response。
+- 影响模块：`docs/api-draft.md`、`services/api/README.md`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是技术草案，不新增真实 provider SDK、真实模型请求、API Key 输入/保存、Agent 触发、Runner job 创建、prompt/result/provider response 存储。
