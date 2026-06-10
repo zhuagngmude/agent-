@@ -97,6 +97,21 @@ function Assert-TextContains {
   }
 }
 
+function Assert-AgentConfigDryRunNoSideEffects {
+  param([object]$DryRun)
+
+  Assert-Equal $DryRun.sideEffects.writesAgents $false "Agent config dry-run should not write Agents."
+  Assert-Equal $DryRun.sideEffects.writesAgentConfigVersions $false "Agent config dry-run should not write versions."
+  Assert-Equal $DryRun.sideEffects.writesRuntimeEvents $false "Agent config dry-run should not write runtime events."
+  Assert-Equal $DryRun.sideEffects.writesSqlite $false "Agent config dry-run should not write SQLite."
+  Assert-Equal $DryRun.sideEffects.writesRuntimeState $false "Agent config dry-run should not write runtime state."
+  Assert-Equal $DryRun.sideEffects.createsApprovals $false "Agent config dry-run should not create approvals."
+  Assert-Equal $DryRun.sideEffects.createsRunnerJobs $false "Agent config dry-run should not create Runner jobs."
+  Assert-Equal $DryRun.sideEffects.executesRunner $false "Agent config dry-run should not execute Runner."
+  Assert-Equal $DryRun.sideEffects.callsRealModel $false "Agent config dry-run should not call models."
+  Assert-Equal $DryRun.sideEffects.readsRawSecrets $false "Agent config dry-run should not read raw secrets."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -234,6 +249,41 @@ try {
   $agentsAfterAgentConfigApproval = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
   $reviewerAfterAgentConfigApproval = @($agentsAfterAgentConfigApproval.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
   Assert-Equal (@($reviewerAfterAgentConfigApproval.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "Agent config approval should not modify Agent permissions."
+  $dryRun = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/dry-run" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify mock dry-run stays blocked."
+    requestedBy = "verify_mock_flows"
+  }
+  Assert-Equal $dryRun.dryRun $true "Agent config dry-run should identify itself as dry-run."
+  Assert-Equal $dryRun.ok $false "Agent config dry-run should remain blocked."
+  Assert-Equal $dryRun.canApply $false "Agent config dry-run should not allow apply."
+  Assert-TextContains (@($dryRun.blockedReasons) -join "`n") "feature_disabled" "Agent config dry-run should report feature disabled."
+  Assert-Equal $dryRun.applicationId $applyApproval.agentConfigApplicationId "Agent config dry-run should reference the application."
+  Assert-Equal $dryRun.approvalId $applyRequest.approval.id "Agent config dry-run should reference the approval."
+  Assert-Equal $dryRun.agentId "agent_reviewer" "Agent config dry-run should reference the target Agent."
+  Assert-Equal @($dryRun.validationErrors).Count 0 "Agent config dry-run should have no validation errors for a valid blocked preview."
+  Assert-Equal $dryRun.writePlan.wouldUpdateAgent $false "Agent config dry-run should not update Agent."
+  Assert-Equal $dryRun.writePlan.wouldCreateVersion $false "Agent config dry-run should not create version."
+  Assert-Equal $dryRun.writePlan.wouldWriteRuntimeEvent $false "Agent config dry-run should not write runtime event."
+  Assert-TextContains (@($dryRun.writePlan.changedFields) -join "`n") "permissions" "Agent config dry-run should preview changed fields."
+  Assert-Equal $dryRun.rollbackPlan.rollbackRequiresNewApproval $true "Agent config dry-run rollback should require approval."
+  Assert-Equal $dryRun.rollbackPlan.rollbackAction "create_new_agent_config_application" "Agent config dry-run rollback action mismatch."
+  Assert-AgentConfigDryRunNoSideEffects -DryRun $dryRun
+  $applicationsAfterDryRun = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agent-config-applications"
+  $applicationAfterDryRun = @($applicationsAfterDryRun.applications | Where-Object { $_.id -eq $applyApproval.agentConfigApplicationId })[0]
+  Assert-Equal $applicationAfterDryRun.status "pending_apply" "Agent config dry-run should not change application status."
+  $agentsAfterDryRun = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
+  $reviewerAfterDryRun = @($agentsAfterDryRun.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
+  Assert-Equal (@($reviewerAfterDryRun.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "Agent config dry-run should not modify Agent permissions."
+  $missingDryRun = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agent-config-applications/missing_application/dry-run" -ExpectedStatus 404 -Body @{
+    secondConfirm = $true
+    confirmText = "Verify missing dry-run stays safe."
+  }
+  Assert-Equal $missingDryRun.error "agent_config_application_not_found" "Missing Agent config dry-run should return safe not found."
+  Assert-Equal $missingDryRun.dryRun $true "Missing Agent config dry-run should identify itself as dry-run."
+  Assert-Equal $missingDryRun.canApply $false "Missing Agent config dry-run should not allow apply."
+  Assert-TextContains (@($missingDryRun.blockedReasons) -join "`n") "application_not_found" "Missing Agent config dry-run should report missing application."
+  Assert-AgentConfigDryRunNoSideEffects -DryRun $missingDryRun
   $applied = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/apply" -Body @{
     secondConfirm = $true
     confirmText = "Verify mock apply status transition."

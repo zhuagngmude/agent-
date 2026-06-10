@@ -45,9 +45,9 @@ sqlite/
 - AI 自启动的自动验收脚本不得复用 `8787`，也不得连接一个已经存在的未知进程。
 - `verify-sqlite-flows.ps1` 使用隔离端口 `8788`；`verify-mock-flows.ps1` 使用隔离端口 `8789`。如果对应端口启动前已经有 API 响应，脚本会直接失败，而不是误连旧服务。
 
-`verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。It also checks that invalid Agent permission change requests are rejected before approval creation, and that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes.
+`verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。It also checks that invalid Agent permission change requests are rejected before approval creation, that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes, and that Agent config dry-run stays feature-disabled with all side effects false.
 
-`verify-sqlite-flows.ps1` 会在隔离端口 `8788` 启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。It also checks that invalid Agent permission change requests are rejected before SQLite writes, and that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes.
+`verify-sqlite-flows.ps1` 会在隔离端口 `8788` 启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。It also checks that invalid Agent permission change requests are rejected before SQLite writes, that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes, and that Agent config dry-run stays feature-disabled with all side effects false.
 
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 

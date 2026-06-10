@@ -409,14 +409,63 @@ Permission changes are mock-validated before an approval is created:
 
 ### POST /api/agent-config-applications/:applicationId/dry-run
 
-用途：规划中的真实 Agent 配置写入前 dry-run。当前尚未实现，规格见 `docs/agent-config-apply-dry-run-spec.md`。
+用途：真实 Agent 配置写入前 dry-run 的禁用态接口。当前已实现为 blocked / feature-disabled，只返回 write plan 和 rollback plan 预览，不改变状态。规格见 `docs/agent-config-apply-dry-run-spec.md`。
 
 MVP-0.2 约束：
 
-- 即使后续新增该接口，默认也必须保持 feature-disabled / blocked。
+- 当前接口必须保持 feature-disabled / blocked。
 - dry-run 可以返回 write plan 和 rollback plan，但不得写 `agents`、`agent_config_versions`、SQLite/runtime state、审批、Runner job 或 runtime event。
 - dry-run 不得执行 Runner、调用真实模型、读取 raw secret、接受前端传入的任意 Agent config JSON 或 `all=true` 权限。
 - 所有真实写入必须等 dry-run 验收和回滚审批策略通过后，再由单独提交打开。
+
+请求：
+
+```json
+{
+  "secondConfirm": true,
+  "confirmText": "我确认这只是 Agent 配置 dry-run",
+  "requestedBy": "local_user"
+}
+```
+
+返回：
+
+```json
+{
+  "ok": false,
+  "dryRun": true,
+  "applicationId": "agent_config_application_approval_agent_agent_reviewer_permission",
+  "approvalId": "approval_agent_agent_reviewer_permission",
+  "agentId": "agent_reviewer",
+  "canApply": false,
+  "blockedReasons": ["feature_disabled"],
+  "validationErrors": [],
+  "writePlan": {
+    "wouldUpdateAgent": false,
+    "wouldCreateVersion": false,
+    "wouldWriteRuntimeEvent": false,
+    "targetVersion": 2,
+    "changedFields": ["permissions"]
+  },
+  "rollbackPlan": {
+    "rollbackRequiresNewApproval": true,
+    "wouldRestoreVersion": 1,
+    "rollbackAction": "create_new_agent_config_application"
+  },
+  "sideEffects": {
+    "writesAgents": false,
+    "writesAgentConfigVersions": false,
+    "writesRuntimeEvents": false,
+    "writesSqlite": false,
+    "writesRuntimeState": false,
+    "createsApprovals": false,
+    "createsRunnerJobs": false,
+    "executesRunner": false,
+    "callsRealModel": false,
+    "readsRawSecrets": false
+  }
+}
+```
 
 ## Tasks
 

@@ -1196,6 +1196,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `docs/agent-config-apply-dry-run-spec.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/runner-safety-acceptance.md`, `docs/demo-checklist.md`, `docs/module-stability-map.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is documentation/specification only and does not implement a dry-run endpoint, real Agent config writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
+## 2026-06-10 Change log: Agent config apply disabled dry-run endpoint
+
+- What changed: implemented `POST /api/agent-config-applications/:applicationId/dry-run` as a disabled preview endpoint and expanded Mock/SQLite flow verification to assert all-false side effects and no Agent config mutation.
+- Why: the real Agent config apply gate should exist as a locked, testable boundary before any future commit can enable real writes.
+- Impacted modules: `services/api/server.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/README.md`, `scripts/README.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this keeps the boundary disabled and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

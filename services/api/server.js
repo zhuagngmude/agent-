@@ -443,6 +443,93 @@ function validatePermissionChangeRequest(body = {}) {
   return validateAgentCapabilities(input);
 }
 
+function noAgentConfigDryRunSideEffects() {
+  return {
+    writesAgents: false,
+    writesAgentConfigVersions: false,
+    writesRuntimeEvents: false,
+    writesSqlite: false,
+    writesRuntimeState: false,
+    createsApprovals: false,
+    createsRunnerJobs: false,
+    executesRunner: false,
+    callsRealModel: false,
+    readsRawSecrets: false,
+  };
+}
+
+function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }) {
+  const blockedReasons = ["feature_disabled"];
+  const validationErrors = [];
+
+  if (!application) {
+    validationErrors.push("application not found.");
+  }
+
+  if (application && application.status !== "pending_apply") {
+    validationErrors.push(`application must be pending_apply, got ${application.status}.`);
+  }
+
+  if (!approval) {
+    validationErrors.push("source approval not found.");
+  }
+
+  if (approval) {
+    if (approval.status !== "approved") {
+      validationErrors.push(`source approval must be approved, got ${approval.status}.`);
+    }
+    if (approval.targetService !== "agent_config") {
+      validationErrors.push("source approval targetService must be agent_config.");
+    }
+    if (approval.runnerJobId) {
+      validationErrors.push("source approval must not have a Runner job.");
+    }
+  }
+
+  if (!agent) {
+    validationErrors.push("target agent not found.");
+  }
+
+  if (body.secondConfirm !== true) {
+    validationErrors.push("secondConfirm=true is required.");
+  }
+
+  if (!body.confirmText) {
+    validationErrors.push("confirmText is required.");
+  }
+
+  const changedFields = Array.isArray(application?.changes)
+    ? application.changes.map((change) => change?.field).filter(Boolean)
+    : [];
+  const parsedVersion = Number(agent?.configVersion || agent?.versionNumber || "");
+  const currentVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
+  const targetVersion = currentVersion + 1;
+
+  return {
+    ok: false,
+    dryRun: true,
+    applicationId: application?.id || "",
+    approvalId: application?.approvalId || approval?.id || "",
+    agentId: application?.agentId || agent?.id || "",
+    canApply: false,
+    blockedReasons,
+    validationErrors,
+    writePlan: {
+      wouldUpdateAgent: false,
+      wouldCreateVersion: false,
+      wouldWriteRuntimeEvent: false,
+      targetVersion,
+      changedFields,
+    },
+    rollbackPlan: {
+      rollbackRequiresNewApproval: true,
+      wouldRestoreVersion: currentVersion,
+      rollbackAction: "create_new_agent_config_application",
+    },
+    sideEffects: noAgentConfigDryRunSideEffects(),
+  };
+}
+
 function createAgentChangeApproval(agent, body) {
   const now = new Date().toISOString();
   const changeType = body.changeType || "model";
@@ -678,6 +765,41 @@ async function handleAgentConfigApplicationApply(req, res, applicationId) {
     application,
     message: "Mock application status changed to applied. Agent config was not modified.",
   });
+}
+
+async function handleAgentConfigApplicationDryRun(req, res, applicationId) {
+  const body = await readBody(req);
+  const snapshot = sqliteReadEnabled() ? projectSnapshotResponse(() => null) : null;
+  const applications = snapshot?.agentConfigApplications || data.agentConfigApplications;
+  const approvals = snapshot?.approvals || data.approvals;
+  const agents = snapshot?.agents || data.agents;
+  const application = applications.find((item) => item.id === applicationId);
+  const approval = application
+    ? approvals.find((item) => item.id === application.approvalId)
+    : null;
+  const agent = application
+    ? agents.find((item) => item.id === application.agentId)
+    : null;
+
+  if (!application) {
+    sendJson(res, 404, {
+      error: "agent_config_application_not_found",
+      ok: false,
+      dryRun: true,
+      canApply: false,
+      applicationId: "",
+      blockedReasons: ["application_not_found"],
+      sideEffects: noAgentConfigDryRunSideEffects(),
+    });
+    return;
+  }
+
+  sendJson(res, 200, buildAgentConfigApplyDryRun({
+    application,
+    approval,
+    agent,
+    body,
+  }));
 }
 
 async function handleAgentConfigApplicationCancel(req, res, applicationId) {
@@ -928,6 +1050,12 @@ async function handleRequest(req, res) {
   const agentChangeRequest = pathname.match(/^\/api\/agents\/([^/]+)\/change-requests$/);
   if (req.method === "POST" && agentChangeRequest) {
     await handleAgentChangeRequest(req, res, agentChangeRequest[1]);
+    return;
+  }
+
+  const agentConfigApplicationDryRun = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/dry-run$/);
+  if (req.method === "POST" && agentConfigApplicationDryRun) {
+    await handleAgentConfigApplicationDryRun(req, res, agentConfigApplicationDryRun[1]);
     return;
   }
 

@@ -2,7 +2,7 @@
 
 Date: 2026-06-10
 
-Status: specification only. This document does not enable real Agent config writes, Runner execution, model calls, cloud sync, or a broad runtime permission system.
+Status: disabled dry-run endpoint implemented. This document does not enable real Agent config writes, Runner execution, model calls, cloud sync, or a broad runtime permission system.
 
 ## Purpose
 
@@ -30,15 +30,15 @@ Currently forbidden:
 - Reading raw secrets or API keys.
 - Applying rollback without a new approval.
 
-## Planned Dry-Run Endpoint
+## Disabled Dry-Run Endpoint
 
-Future endpoint:
+Current endpoint:
 
 ```text
 POST /api/agent-config-applications/:applicationId/dry-run
 ```
 
-Purpose: validate a pending Agent config application and preview the exact write plan without changing state.
+Purpose: validate a pending Agent config application and preview the exact write plan without changing state. MVP-0.2 always keeps the endpoint blocked with `blockedReasons=["feature_disabled"]`.
 
 Required request shape:
 
@@ -88,7 +88,7 @@ Required response shape:
 }
 ```
 
-MVP-0.2 default must return blocked / feature-disabled behavior. The dry-run may compute a preview from already-approved local state, but it must keep all side effects false until a later implementation commit explicitly changes the feature gate.
+MVP-0.2 returns blocked / feature-disabled behavior. The dry-run computes a preview from already-approved local state, but it keeps all side effects false until a later implementation commit explicitly changes the feature gate.
 
 ## Dry-Run Validation Rules
 

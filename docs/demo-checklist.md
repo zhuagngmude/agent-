@@ -159,6 +159,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
 - Agent 配置审批通过后必须只生成 `pending_apply` 待应用记录，`runnerJobId` 为空，Runner job 队列不得出现对应记录，Mock 应用后也不得真实修改 Agent 配置。
+- Agent 配置 dry-run 必须保持 feature-disabled / blocked，返回 write plan / rollback plan，但所有 sideEffects 为 false，且不得改变待应用状态或 Agent 配置。
 - Agent 配置真实写入前必须先通过 `docs/agent-config-apply-dry-run-spec.md` 定义的 dry-run / rollback 验收；当前本地 Demo 不得写入 `agents` 或 `agent_config_versions`。
 - Agent permission change requests must run mock profile validation before approvals are created. Safe profiles may create pending `agent_config` approvals; forbidden capabilities such as `canExecuteRunnerJob` must return 422 and create no approval/runtime/SQLite write.
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
