@@ -154,6 +154,13 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 
 脚本结束时会重置本地 runtime state 或 SQLite seed 状态，避免留下测试状态。
 
+Model Gateway manual connectivity test is still specification-only:
+
+- No local demo step may call a real OpenAI, Anthropic, Google Gemini, or other provider API yet.
+- No demo script may require real API keys or provider SDKs.
+- Future manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
+- Manual connectivity checks must not create tasks, approvals, Runner jobs, Agent runs, runtime events, model-call records, billing records, prompt logs, or provider response logs.
+
 ## 7. 当前安全边界
 
 当前 Demo 允许：

@@ -1013,3 +1013,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：让用户能在界面上看到“离真实模型还差什么”，同时仍保持禁用态和无副作用边界。
 - 影响模块：`apps/web/app.js`、`apps/web/styles.css`、`scripts/verify-local-ui.ps1`、`scripts/README.md`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前只是只读预览，不新增真实模型调用、API Key 输入、任务/审批/Runner job 创建或 Agent 触发。
+
+## 2026-06-10 变更记录：Model Gateway manual connectivity test 规格
+
+- 改了什么：`docs/api-draft.md` 新增计划中的 `POST /api/model-gateway/connectivity-test` 规格，定义人工真实 provider 连通性测试的请求、响应、sideEffects 和启用前验收条件；`docs/demo-checklist.md`、`scripts/README.md` 和开发路线同步说明当前仍不得真实调用 provider。
+- 为什么改：dry-run 已经能验证请求形状和安全边界，下一阶段需要先把“人工真实连通性测试”写成可验收规格，避免直接接 SDK、发真实请求或把它误当成 Agent/Runner 能力。
+- 影响模块：`docs/api-draft.md`、`docs/demo-checklist.md`、`scripts/README.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是后续实现前的技术规格，不改变当前本地试用能力。当前仍禁止接真实 provider SDK、发真实 OpenAI/Anthropic/Gemini 请求、保存 prompt/result、创建任务/审批/Runner job 或触发 Agent。

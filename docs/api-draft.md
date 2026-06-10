@@ -977,6 +977,78 @@ Later phases, intentionally not part of dry-run:
 3. Agent orchestration: model output can create proposed tasks or approvals through controlled services.
 4. Runner integration: only approved work may create Runner jobs after Runner safety acceptance passes.
 
+### POST /api/model-gateway/connectivity-test
+
+Purpose: planned manual real-provider connectivity test after dry-run is stable.
+
+Current status: specification only. This endpoint is not implemented in MVP-0.2. Do not add provider SDKs, do not make OpenAI/Anthropic/Gemini requests, and do not expose this as an active frontend control until the acceptance rules below are satisfied.
+
+This phase is narrower than general model calling. It only proves that a server-side provider key can reach the provider with a minimal, fixed connectivity check. It is not an Agent run, not a chat/completion feature, not a Runner capability, and not a logged model-call pipeline.
+
+Planned request draft:
+
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "purpose": "manual_connectivity_test",
+  "secondConfirm": true,
+  "confirmText": "I understand this will make one real provider connectivity request.",
+  "requestedBy": "local_user"
+}
+```
+
+Planned response draft:
+
+```json
+{
+  "ok": false,
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "purpose": "manual_connectivity_test",
+  "requestValid": true,
+  "providerSupported": true,
+  "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
+  "keyConfigured": false,
+  "realProviderRequestAttempted": false,
+  "result": "blocked",
+  "errorCategory": "missing_key",
+  "providerResponseStored": false,
+  "sideEffects": {
+    "writesSqlite": false,
+    "writesRuntimeState": false,
+    "createsTasks": false,
+    "createsApprovals": false,
+    "createsRunnerJobs": false,
+    "triggersAgents": false,
+    "executesRunner": false,
+    "logsPromptOrResult": false,
+    "storesProviderResponse": false
+  }
+}
+```
+
+Manual connectivity acceptance rules:
+
+- It must be user-triggered and require an explicit confirmation field; Agents, page load, background jobs, and Runner jobs must not trigger it.
+- It must run only on the backend; the frontend must never send, store, or display API keys.
+- It must use server-side environment variables only and return key presence as booleans; it must never return raw keys, key suffixes, masked key fragments, or authorization headers.
+- It must use a fixed provider-specific minimal ping. It must not accept free-form prompts, system prompts, user content, files, tool calls, function calls, or Agent context.
+- It must not write SQLite or `data/mock/runtime-state.json`.
+- It must not create tasks, approvals, Runner jobs, workflow runs, runtime events, model-call records, or billing records.
+- It must not trigger any Agent and must not execute Runner code.
+- It must not log prompts, model outputs, provider response bodies, request headers, API keys, or raw error bodies.
+- It may return only coarse result fields such as `ok`, `provider`, `model`, `result`, `errorCategory`, and timestamp metadata.
+- It must have a timeout and a small response/body limit before any real provider request is allowed.
+- It must stay disabled by default until verification covers blocked, missing-key, unsupported-provider, timeout, and provider-error cases.
+
+Implementation order before enabling:
+
+1. Add a disabled backend stub that returns `not_implemented` and all side effects false.
+2. Add regression checks proving the stub cannot call providers.
+3. Add a manual feature flag that is disabled by default.
+4. Only then consider adding isolated provider adapters, one provider at a time, with no SDK leakage into UI, Agent, or Runner code.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：
