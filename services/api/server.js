@@ -74,6 +74,56 @@ function modelGatewayStatus() {
   };
 }
 
+function modelGatewayDryRun(request) {
+  const providerId = typeof request.provider === "string" ? request.provider.trim().toLowerCase() : "";
+  const model = typeof request.model === "string" ? request.model.trim() : "";
+  const purpose = typeof request.purpose === "string" ? request.purpose.trim() : "";
+  const provider = modelGatewayProviders.find((item) => item.id === providerId);
+  const validationErrors = [];
+
+  if (!providerId) {
+    validationErrors.push("provider is required.");
+  } else if (!provider) {
+    validationErrors.push("provider is not supported.");
+  }
+
+  if (!model) {
+    validationErrors.push("model is required.");
+  }
+
+  if (purpose !== "connectivity_check") {
+    validationErrors.push("purpose must be connectivity_check.");
+  }
+
+  return {
+    ok: false,
+    dryRun: true,
+    provider: providerId,
+    requestValid: validationErrors.length === 0,
+    validationErrors,
+    providerSupported: Boolean(provider),
+    keyEnvVar: provider?.envVar || "",
+    keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    realModelCallsAllowed: false,
+    wouldCallProvider: false,
+    blockedReasons: [
+      "Dry-run does not call real providers.",
+      "Real model calls are disabled in MVP-0.2.",
+      "Approval, logging, cost tracking, and key-safety rules are not ready.",
+    ],
+    sideEffects: {
+      writesSqlite: false,
+      writesRuntimeState: false,
+      createsTasks: false,
+      createsApprovals: false,
+      createsRunnerJobs: false,
+      triggersAgents: false,
+      callsRealModel: false,
+      logsPromptOrResult: false,
+    },
+  };
+}
+
 function sendJson(res, statusCode, body) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(statusCode, {
@@ -764,6 +814,12 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && pathname === "/api/model-gateway/status") {
     sendJson(res, 200, modelGatewayStatus());
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/model-gateway/dry-run") {
+    const body = await readBody(req);
+    sendJson(res, 200, modelGatewayDryRun(body));
     return;
   }
 

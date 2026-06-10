@@ -911,7 +911,7 @@ Response example:
 
 Purpose: validate the shape and safety boundary of a future model connectivity test without calling a real model provider.
 
-This is a planned next step, not an implemented endpoint yet. The dry-run phase is intentionally narrower than the long-term product. Its "must not" rules apply only to dry-run; they do not mean the final product will never write model logs, create tasks, trigger Agents, or call real models.
+Current MVP-0.2 implementation is disabled and read-only. The dry-run phase is intentionally narrower than the long-term product. Its "must not" rules apply only to dry-run; they do not mean the final product will never write model logs, create tasks, trigger Agents, or call real models.
 
 Request draft:
 
@@ -932,6 +932,8 @@ Response draft:
   "ok": false,
   "dryRun": true,
   "provider": "openai",
+  "requestValid": true,
+  "validationErrors": [],
   "providerSupported": true,
   "keyEnvVar": "AGENT_SWARM_OPENAI_API_KEY",
   "keyConfigured": false,

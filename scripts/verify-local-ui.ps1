@@ -165,6 +165,28 @@ Assert-Equal $gateway.safety.writesDatabase $false "Model Gateway status should 
 Assert-Equal $gateway.safety.createsRunnerJobs $false "Model Gateway status should not create Runner jobs."
 Assert-Equal $gateway.safety.makesNetworkRequests $false "Model Gateway status should not make provider network requests."
 
+$dryRun = Invoke-Json -Method "POST" -Path "/api/model-gateway/dry-run" -Body @{
+  provider = "openai"
+  model = "gpt-4.1-mini"
+  purpose = "connectivity_check"
+  promptPreview = "local smoke dry-run"
+  requestedBy = "local_user"
+}
+Assert-Equal $dryRun.ok $false "Model Gateway dry-run should remain blocked."
+Assert-Equal $dryRun.dryRun $true "Model Gateway dry-run should identify itself as dry-run."
+Assert-Equal $dryRun.requestValid $true "Model Gateway dry-run request should be valid."
+Assert-Equal $dryRun.providerSupported $true "OpenAI provider should be recognized by dry-run."
+Assert-Equal $dryRun.realModelCallsAllowed $false "Model Gateway dry-run should not allow real calls."
+Assert-Equal $dryRun.wouldCallProvider $false "Model Gateway dry-run should not call providers."
+Assert-Equal $dryRun.sideEffects.writesSqlite $false "Model Gateway dry-run should not write SQLite."
+Assert-Equal $dryRun.sideEffects.writesRuntimeState $false "Model Gateway dry-run should not write runtime state."
+Assert-Equal $dryRun.sideEffects.createsTasks $false "Model Gateway dry-run should not create tasks."
+Assert-Equal $dryRun.sideEffects.createsApprovals $false "Model Gateway dry-run should not create approvals."
+Assert-Equal $dryRun.sideEffects.createsRunnerJobs $false "Model Gateway dry-run should not create Runner jobs."
+Assert-Equal $dryRun.sideEffects.triggersAgents $false "Model Gateway dry-run should not trigger Agents."
+Assert-Equal $dryRun.sideEffects.callsRealModel $false "Model Gateway dry-run should not call real models."
+Assert-Equal $dryRun.sideEffects.logsPromptOrResult $false "Model Gateway dry-run should not log prompts or results."
+
 $runner = Invoke-Json -Path "/api/projects/$projectId/runner/status"
 Assert-Equal $runner.permissions.writeFiles "approval_required" "Runner writes should remain approval-gated."
 Assert-Equal $runner.permissions.executeCommands "approval_required" "Runner command execution should remain approval-gated."

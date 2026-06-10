@@ -999,3 +999,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：把“接真实模型前先做什么”拆成更小的后端验证步骤；dry-run 只验证 provider、env var 和安全开关，不发真实模型请求。
 - 影响模块：`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；这是未实现的后端规格，不改变当前本地试用能力。注意：dry-run 禁止写 SQLite、创建任务/审批/Runner job、触发 Agent、调用真实模型、记录 prompt/result，只是 dry-run 阶段限制，不代表长期产品不做这些能力。
+
+## 2026-06-10 变更记录：Model Gateway dry-run 只读接口
+
+- 改了什么：`services/api/server.js` 新增 `POST /api/model-gateway/dry-run`，返回 provider 是否支持、服务端 env var 是否存在、请求体校验结果和 sideEffects；`scripts/verify-local-ui.ps1` 增加 dry-run 验收断言。
+- 为什么改：把真实模型接入前的第一步落成可验证后端接口，确认服务边界和禁用态行为稳定，而不是直接连接 provider SDK。
+- 影响模块：`services/api/server.js`、`scripts/verify-local-ui.ps1`、`scripts/README.md`、`docs/api-draft.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不调用真实模型、不写 SQLite、不创建任务/审批/Runner job、不触发 Agent、不记录 prompt/result。
