@@ -113,6 +113,22 @@ function Assert-AgentConfigDryRunNoSideEffects {
   Assert-Equal $DryRun.sideEffects.readsRawSecrets $false "Agent config dry-run should not read raw secrets."
 }
 
+function Assert-AgentConfigRollbackRequestNoSideEffects {
+  param([object]$RollbackRequest)
+
+  Assert-Equal $RollbackRequest.sideEffects.writesAgents $false "Agent config rollback request should not write Agents."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigVersions $false "Agent config rollback request should not write versions."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigApplications $false "Agent config rollback request should not write applications."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeEvents $false "Agent config rollback request should not write runtime events."
+  Assert-Equal $RollbackRequest.sideEffects.writesSqlite $false "Agent config rollback request should not write SQLite."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeState $false "Agent config rollback request should not write runtime state."
+  Assert-Equal $RollbackRequest.sideEffects.createsApprovals $false "Agent config rollback request should not create approvals."
+  Assert-Equal $RollbackRequest.sideEffects.createsRunnerJobs $false "Agent config rollback request should not create Runner jobs."
+  Assert-Equal $RollbackRequest.sideEffects.executesRunner $false "Agent config rollback request should not execute Runner."
+  Assert-Equal $RollbackRequest.sideEffects.callsRealModel $false "Agent config rollback request should not call models."
+  Assert-Equal $RollbackRequest.sideEffects.readsRawSecrets $false "Agent config rollback request should not read raw secrets."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -302,6 +318,34 @@ try {
   Assert-Equal $appliedDryRun.canApply $false "Applied SQLite Agent config dry-run should not allow apply."
   Assert-TextContains (@($appliedDryRun.validationErrors) -join "`n") "application must be pending_apply" "Applied SQLite Agent config dry-run should reject non-pending state."
   Assert-AgentConfigDryRunNoSideEffects -DryRun $appliedDryRun
+  $rollbackRequest = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/rollback-request" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify sqlite rollback request preview stays blocked."
+    requestedBy = "verify_sqlite_flows"
+    reason = "Verify disabled sqlite rollback request preview."
+  }
+  Assert-Equal $rollbackRequest.rollbackRequest $true "SQLite Agent config rollback request should identify itself."
+  Assert-Equal $rollbackRequest.ok $false "SQLite Agent config rollback request should remain blocked."
+  Assert-Equal $rollbackRequest.requestReady $false "SQLite Agent config rollback request should not be ready without version history."
+  Assert-Equal $rollbackRequest.canCreateApproval $false "SQLite Agent config rollback request should not create approval."
+  Assert-TextContains (@($rollbackRequest.blockedReasons) -join "`n") "feature_disabled" "SQLite Agent config rollback request should report feature disabled."
+  Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "current version is required." "SQLite Agent config rollback request should require current version."
+  Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "restore version is required." "SQLite Agent config rollback request should require restore version."
+  Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $rollbackRequest
+  $missingRollbackRequest = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agent-config-applications/missing_application/rollback-request" -ExpectedStatus 404 -Body @{
+    secondConfirm = $true
+    confirmText = "Verify missing sqlite rollback request stays safe."
+    requestedBy = "verify_sqlite_flows"
+    reason = "Verify missing sqlite rollback request."
+  }
+  Assert-Equal $missingRollbackRequest.error "agent_config_application_not_found" "Missing SQLite Agent config rollback request should return safe not found."
+  Assert-Equal $missingRollbackRequest.rollbackRequest $true "Missing SQLite Agent config rollback request should identify itself."
+  Assert-Equal $missingRollbackRequest.canCreateApproval $false "Missing SQLite Agent config rollback request should not create approval."
+  Assert-TextContains (@($missingRollbackRequest.blockedReasons) -join "`n") "application_not_found" "Missing SQLite Agent config rollback request should report missing application."
+  Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $missingRollbackRequest
+  $applicationsAfterRollbackRequest = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agent-config-applications"
+  $applicationAfterRollbackRequest = @($applicationsAfterRollbackRequest.applications | Where-Object { $_.id -eq $applyApproval.agentConfigApplicationId })[0]
+  Assert-Equal $applicationAfterRollbackRequest.status "applied" "SQLite Agent config rollback request should not change application status."
   $agentsAfterSqliteApply = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
   $reviewerAfterSqliteApply = @($agentsAfterSqliteApply.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
   Assert-Equal (@($reviewerAfterSqliteApply.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "SQLite mock apply should not modify Agent permissions."

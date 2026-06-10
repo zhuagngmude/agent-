@@ -1238,6 +1238,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/agent-config-rollback-request.js`, `scripts/verify-agent-config-rollback-request.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is helper-only rollback request validation and does not create approvals/applications, write Agent config, write `agent_config_versions`, write SQLite/runtime state, create Runner jobs, execute Runner, call models, cloud sync, or change runtime permissions.
 
+## 2026-06-11 Change log: Agent config rollback request disabled route
+
+- What changed: added disabled `POST /api/agent-config-applications/:applicationId/rollback-request`, added a Web UI rollback request precheck button for applied Agent config application records, and expanded Mock/SQLite flow verification for the route.
+- Why: the UI and API need a visible safe boundary before any future rollback approval creation exists. The route proves that current app state lacks real version history and therefore must remain `requestReady=false` and `feature_disabled`.
+- Impacted modules: `services/api/server.js`, `apps/web/app.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/agent-config-rollback-request.js`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `docs/demo-checklist.md`, `scripts/README.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is disabled route/UI preview only and does not create approvals/applications, write Agent config, write `agent_config_versions`, write SQLite/runtime state, create Runner jobs, execute Runner, call models, cloud sync, or change runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

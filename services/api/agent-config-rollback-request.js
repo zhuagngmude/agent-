@@ -15,12 +15,14 @@ function noAgentConfigRollbackRequestSideEffects() {
 }
 
 function versionValue(version = {}) {
-  const parsed = Number(version.version || version.versionNumber || "");
+  const source = version || {};
+  const parsed = Number(source.version || source.versionNumber || "");
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function versionAgentId(version = {}) {
-  return version.agentId || version.agent_id || "";
+  const source = version || {};
+  return source.agentId || source.agent_id || "";
 }
 
 function buildRollbackChanges({ currentVersion, restoreVersion } = {}) {

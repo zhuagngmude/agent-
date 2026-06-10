@@ -66,7 +66,7 @@ sqlite/
 
 `verify-agent-config-transaction-plan.ps1` validates the future real Agent config apply transaction plan helper without starting services. It proves the planned write set would update `agents`, insert `agent_config_versions`, mark the application applied, and insert `runtime_events` in one transaction, while still keeping `canWrite=false` and all side effects false. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
-`verify-agent-config-rollback-request.ps1` validates the helper-only Agent config rollback request contract without starting services. It proves a valid rollback request can draft a future approval/application/version while still keeping `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. It covers applied original application, approved `agent_config` source approval, no Runner job, version ownership/order, second confirmation, requester, reason, changed fields, and rollback rules.
+`verify-agent-config-rollback-request.ps1` validates the direct helper Agent config rollback request contract without starting services. It proves a valid helper input can draft a future approval/application/version while still keeping `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. Mock and SQLite flow scripts cover the disabled HTTP route, which stays `requestReady=false` until real version history exists.
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -165,7 +165,8 @@ This script is acceptance verification, not a real connectivity test. It must no
 
 `verify-agent-config-rollback-request.ps1` is the dedicated Agent config rollback request contract check.
 
-- `services/api/agent-config-rollback-request.js` owns the helper-only rollback request draft for a later rollback flow.
+- `services/api/agent-config-rollback-request.js` owns the disabled rollback request draft for a later rollback flow.
 - A valid request may return `requestReady=true`, but must still return `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
 - The helper requires an applied original application, approved `agent_config` source approval without Runner job, target Agent, current/restore versions that belong to the target Agent, restore version older than current version, second confirmation, requester, reason, and at least one changed field.
-- Rollback must draft a new approval, new application, and future new version. It must not delete or overwrite version history, directly update `agents`, create Runner jobs, execute Runner, call models, write SQLite/runtime state, or read raw secrets.
+- `POST /api/agent-config-applications/:applicationId/rollback-request` is a disabled preview route covered by `verify-mock-flows.ps1` and `verify-sqlite-flows.ps1`; normal route calls stay `requestReady=false` until real version history exists.
+- Rollback must draft a new approval, new application, and future new version. It must not delete or overwrite version history, directly update `agents`, create approvals, create applications, create Runner jobs, execute Runner, call models, write SQLite/runtime state, or read raw secrets.

@@ -20,6 +20,10 @@ const {
 const {
   buildAgentConfigApplyTransactionPlan,
 } = require("./agent-config-transaction-plan");
+const {
+  buildAgentConfigRollbackRequest,
+  noAgentConfigRollbackRequestSideEffects,
+} = require("./agent-config-rollback-request");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -1002,6 +1006,44 @@ async function handleAgentConfigApplicationDryRun(req, res, applicationId) {
   }));
 }
 
+async function handleAgentConfigRollbackRequest(req, res, applicationId) {
+  const body = await readBody(req);
+  const snapshot = sqliteReadEnabled() ? projectSnapshotResponse(() => null) : null;
+  const applications = snapshot?.agentConfigApplications || data.agentConfigApplications;
+  const approvals = snapshot?.approvals || data.approvals;
+  const agents = snapshot?.agents || data.agents;
+  const application = applications.find((item) => item.id === applicationId);
+  const approval = application
+    ? approvals.find((item) => item.id === application.approvalId)
+    : null;
+  const agent = application
+    ? agents.find((item) => item.id === application.agentId)
+    : null;
+
+  if (!application) {
+    sendJson(res, 404, {
+      error: "agent_config_application_not_found",
+      ok: false,
+      rollbackRequest: true,
+      requestReady: false,
+      canCreateApproval: false,
+      applicationId: "",
+      blockedReasons: ["application_not_found"],
+      sideEffects: noAgentConfigRollbackRequestSideEffects(),
+    });
+    return;
+  }
+
+  sendJson(res, 200, buildAgentConfigRollbackRequest({
+    originalApplication: application,
+    sourceApproval: approval,
+    agent,
+    currentVersion: null,
+    restoreVersion: null,
+    body,
+  }));
+}
+
 async function handleAgentConfigApplicationCancel(req, res, applicationId) {
   const body = await readBody(req);
   if (sqliteReadEnabled()) {
@@ -1259,6 +1301,12 @@ async function handleRequest(req, res) {
     return;
   }
 
+  const agentConfigRollbackRequest = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/rollback-request$/);
+  if (req.method === "POST" && agentConfigRollbackRequest) {
+    await handleAgentConfigRollbackRequest(req, res, agentConfigRollbackRequest[1]);
+    return;
+  }
+
   const agentConfigApplicationApply = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/apply$/);
   if (req.method === "POST" && agentConfigApplicationApply) {
     await handleAgentConfigApplicationApply(req, res, agentConfigApplicationApply[1]);
@@ -1381,6 +1429,8 @@ module.exports = {
   buildAgentConfigRealApplyGate,
   buildAgentConfigApplyDryRun,
   buildAgentConfigApplyTransactionPlan,
+  buildAgentConfigRollbackRequest,
   noAgentConfigApplyGateSideEffects,
   noAgentConfigDryRunSideEffects,
+  noAgentConfigRollbackRequestSideEffects,
 };

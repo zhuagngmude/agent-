@@ -223,7 +223,15 @@ Current executable helper:
 buildAgentConfigRollbackRequest(...)
 ```
 
-Current status: helper-only and feature-disabled. A valid rollback request may return `requestReady=true`, but it must still return `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, draft-only approval/application objects, and all-false side effects.
+Current status: disabled HTTP preview route plus helper. A direct helper call with valid version inputs may return `requestReady=true`, but it must still return `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, draft-only approval/application objects, and all-false side effects.
+
+Current route:
+
+```text
+POST /api/agent-config-applications/:applicationId/rollback-request
+```
+
+The route reads application, source approval, and target Agent only. Since MVP-0.2 does not write or read real `agent_config_versions` through the app flow yet, normal Mock/SQLite route calls return `requestReady=false` with current/restore version validation errors while still keeping all side effects false.
 
 The helper is covered by:
 
@@ -270,7 +278,9 @@ Before any real apply endpoint can be enabled:
 - Transaction plan helper exists and is covered by `scripts/verify-agent-config-transaction-plan.ps1`.
 - Transaction plan stays `canWrite=false` / `feature_disabled` while proving the future write set and rollback-on-failure guards.
 - Rollback request helper exists and is covered by `scripts/verify-agent-config-rollback-request.ps1`.
+- Disabled rollback request route exists and is covered by Mock and SQLite verification.
 - Rollback request can report `requestReady=true` for valid input while still keeping `ok=false`, `canCreateApproval=false`, and `feature_disabled`.
+- Mock/SQLite rollback request route calls stay `requestReady=false` until real version history exists.
 - Rollback request rejects non-applied original application, unapproved source approval, source approval with Runner job, wrong target service, wrong Agent version ownership, restore version not older than current version, missing confirmation/requester/reason, and no changed fields.
 - Rollback request drafts a new approval, new application, and future new version without creating them.
 - Dry-run blocked state keeps all side effects false.

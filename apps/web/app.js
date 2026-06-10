@@ -15,6 +15,7 @@ let taskActionRunning = false;
 let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
+let agentConfigRollbackRequestRunning = false;
 
 function pendingApprovalRequests() {
   return (appData.approvalRequests || []).filter((item) => item.status === "pending");
@@ -294,6 +295,13 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
     mockCancelButton.disabled = agentConfigCancelRunning || !canMockCancelAgentConfigApplication(application);
     mockCancelButton.onclick = () => runAgentConfigApplicationCancel();
   }
+
+  const rollbackRequestButton = document.querySelector("#previewAgentConfigRollbackRequest");
+  if (rollbackRequestButton) {
+    const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+    rollbackRequestButton.disabled = agentConfigRollbackRequestRunning || application?.status !== "applied";
+    rollbackRequestButton.onclick = () => runAgentConfigRollbackRequestPreview();
+  }
 }
 
 function normalizeDashboard(apiData) {
@@ -509,6 +517,20 @@ async function postAgentConfigApplicationApply(applicationId, body = {}) {
 
 async function postAgentConfigApplicationCancel(applicationId, body = {}) {
   const response = await fetch(`${apiBase}/api/agent-config-applications/${applicationId}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postAgentConfigRollbackRequest(applicationId, body = {}) {
+  const response = await fetch(`${apiBase}/api/agent-config-applications/${applicationId}/rollback-request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -866,6 +888,7 @@ function renderAgentConfigApplications(agent) {
         <div class="agent-change-submit">
           <button class="neutral-action" id="mockApplyAgentConfigApplication">模拟应用状态</button>
           <button class="danger-action" id="mockCancelAgentConfigApplication">模拟取消应用</button>
+          <button class="neutral-action" id="previewAgentConfigRollbackRequest">回滚请求预检查</button>
         </div>
         <small>Mock 状态流转：只更新待应用记录状态，不会写入 Agent 配置，也不会生成 Runner job。</small>
       </div>
@@ -923,6 +946,33 @@ async function runAgentConfigApplicationCancel() {
     setAgentChangeFeedback(`Mock 取消失败：${error.message}`, "error");
   } finally {
     agentConfigCancelRunning = false;
+    renderAgentsPage(selectedAgentIndex);
+  }
+}
+
+async function runAgentConfigRollbackRequestPreview() {
+  const application = (appData.agentConfigApplications || []).find((item) => item.id === selectedAgentConfigApplicationId);
+  if (!application || application.status !== "applied" || agentConfigRollbackRequestRunning) return;
+
+  agentConfigRollbackRequestRunning = true;
+  setAgentChangeFeedback("正在预检查回滚请求...");
+  renderAgentsPage(selectedAgentIndex);
+
+  try {
+    const result = await postAgentConfigRollbackRequest(application.id, {
+      secondConfirm: true,
+      confirmText: "rollback request preview only",
+      requestedBy: "local_user",
+      reason: "preview rollback request without creating approval",
+    });
+    const errors = Array.isArray(result.validationErrors) && result.validationErrors.length > 0
+      ? `；${result.validationErrors.join(" / ")}`
+      : "";
+    setAgentChangeFeedback(`回滚请求仍是禁用预检查：canCreateApproval=${result.canCreateApproval}${errors}`, "success");
+  } catch (error) {
+    setAgentChangeFeedback(`回滚请求预检查失败：${error.message}`, "error");
+  } finally {
+    agentConfigRollbackRequestRunning = false;
     renderAgentsPage(selectedAgentIndex);
   }
 }

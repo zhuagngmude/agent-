@@ -112,6 +112,22 @@ function Assert-AgentConfigDryRunNoSideEffects {
   Assert-Equal $DryRun.sideEffects.readsRawSecrets $false "Agent config dry-run should not read raw secrets."
 }
 
+function Assert-AgentConfigRollbackRequestNoSideEffects {
+  param([object]$RollbackRequest)
+
+  Assert-Equal $RollbackRequest.sideEffects.writesAgents $false "Agent config rollback request should not write Agents."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigVersions $false "Agent config rollback request should not write versions."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigApplications $false "Agent config rollback request should not write applications."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeEvents $false "Agent config rollback request should not write runtime events."
+  Assert-Equal $RollbackRequest.sideEffects.writesSqlite $false "Agent config rollback request should not write SQLite."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeState $false "Agent config rollback request should not write runtime state."
+  Assert-Equal $RollbackRequest.sideEffects.createsApprovals $false "Agent config rollback request should not create approvals."
+  Assert-Equal $RollbackRequest.sideEffects.createsRunnerJobs $false "Agent config rollback request should not create Runner jobs."
+  Assert-Equal $RollbackRequest.sideEffects.executesRunner $false "Agent config rollback request should not execute Runner."
+  Assert-Equal $RollbackRequest.sideEffects.callsRealModel $false "Agent config rollback request should not call models."
+  Assert-Equal $RollbackRequest.sideEffects.readsRawSecrets $false "Agent config rollback request should not read raw secrets."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -299,6 +315,34 @@ try {
   Assert-Equal $appliedDryRun.canApply $false "Applied Agent config dry-run should not allow apply."
   Assert-TextContains (@($appliedDryRun.validationErrors) -join "`n") "application must be pending_apply" "Applied Agent config dry-run should reject non-pending state."
   Assert-AgentConfigDryRunNoSideEffects -DryRun $appliedDryRun
+  $rollbackRequest = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($applyApproval.agentConfigApplicationId)/rollback-request" -Body @{
+    secondConfirm = $true
+    confirmText = "Verify rollback request preview stays blocked."
+    requestedBy = "verify_mock_flows"
+    reason = "Verify disabled rollback request preview."
+  }
+  Assert-Equal $rollbackRequest.rollbackRequest $true "Agent config rollback request should identify itself."
+  Assert-Equal $rollbackRequest.ok $false "Agent config rollback request should remain blocked."
+  Assert-Equal $rollbackRequest.requestReady $false "Agent config rollback request should not be ready without version history."
+  Assert-Equal $rollbackRequest.canCreateApproval $false "Agent config rollback request should not create approval."
+  Assert-TextContains (@($rollbackRequest.blockedReasons) -join "`n") "feature_disabled" "Agent config rollback request should report feature disabled."
+  Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "current version is required." "Agent config rollback request should require current version."
+  Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "restore version is required." "Agent config rollback request should require restore version."
+  Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $rollbackRequest
+  $missingRollbackRequest = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agent-config-applications/missing_application/rollback-request" -ExpectedStatus 404 -Body @{
+    secondConfirm = $true
+    confirmText = "Verify missing rollback request stays safe."
+    requestedBy = "verify_mock_flows"
+    reason = "Verify missing rollback request."
+  }
+  Assert-Equal $missingRollbackRequest.error "agent_config_application_not_found" "Missing Agent config rollback request should return safe not found."
+  Assert-Equal $missingRollbackRequest.rollbackRequest $true "Missing Agent config rollback request should identify itself."
+  Assert-Equal $missingRollbackRequest.canCreateApproval $false "Missing Agent config rollback request should not create approval."
+  Assert-TextContains (@($missingRollbackRequest.blockedReasons) -join "`n") "application_not_found" "Missing Agent config rollback request should report missing application."
+  Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $missingRollbackRequest
+  $applicationsAfterRollbackRequest = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agent-config-applications"
+  $applicationAfterRollbackRequest = @($applicationsAfterRollbackRequest.applications | Where-Object { $_.id -eq $applyApproval.agentConfigApplicationId })[0]
+  Assert-Equal $applicationAfterRollbackRequest.status "applied" "Agent config rollback request should not change application status."
   $agentsAfterMockApply = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agents"
   $reviewerAfterMockApply = @($agentsAfterMockApply.agents | Where-Object { $_.id -eq "agent_reviewer" })[0]
   Assert-Equal (@($reviewerAfterMockApply.permissions) -join "`n") $reviewerPermissionsBeforeApplyRequest "Mock apply should not modify Agent permissions."
