@@ -1224,6 +1224,13 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `services/api/agent-config-fields.js`, `services/api/server.js`, `scripts/verify-agent-config-fields.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is helper-only field validation and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
+## 2026-06-10 Change log: Agent config transaction plan helper
+
+- What changed: added `services/api/agent-config-transaction-plan.js` and `scripts/verify-agent-config-transaction-plan.ps1`, and exposed a no-write `transactionPlan` preview from `buildAgentConfigRealApplyGate(...)`.
+- Why: before any real SQLite write exists, the future apply path needs an executable transaction contract covering `agents`, `agent_config_versions`, `agent_config_applications`, `runtime_events`, version increment, duplicate-apply guard, and rollback-on-any-failure behavior.
+- Impacted modules: `services/api/agent-config-transaction-plan.js`, `services/api/server.js`, `scripts/verify-agent-config-transaction-plan.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
+- Human docs sync: not required; this is helper-only transaction planning and does not enable real Agent config writes, `agent_config_versions` writes, SQLite/runtime-state writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.

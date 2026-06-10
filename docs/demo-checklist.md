@@ -151,6 +151,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-agent-permissions.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-fields.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-dry-run.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-apply-gate.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-transaction-plan.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 ```
 
@@ -166,6 +167,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - `verify-agent-config-fields.ps1` 会独立覆盖未来 Agent config 真实写入字段白名单：允许 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`，拒绝 API key、raw secret、provider header/response、prompt、本地私有路径、Runner/tool/command/file/Git/network 字段、父子/汇报关系越权字段、`all=true` 和 forbidden capabilities。
 - `verify-agent-config-dry-run.ps1` 会独立覆盖 Agent config dry-run helper 的反向用例：缺少二次确认、缺少确认文本、非 `pending_apply`、未批准来源审批、来源审批带 Runner job、错误 target service、缺少目标 Agent 和全 false sideEffects。
 - `verify-agent-config-apply-gate.ps1` 会独立覆盖未来真实 apply 前置闸门：即使 dry-run、二次确认、requestedBy、Git checkpoint 和 rollback acceptance 都满足，也只能返回 `preconditionsReady=true`，但 `gateReady=false`、`canApply=false`、`feature_disabled` 和全 false sideEffects 必须保持不变。
+- `verify-agent-config-transaction-plan.ps1` 会独立覆盖未来真实写入事务计划：计划写入集必须是同一事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`，但当前仍只能 `canWrite=false`、`feature_disabled` 和全 false sideEffects。
 - Agent 配置真实写入前必须先通过 `docs/agent-config-apply-dry-run-spec.md` 定义的 dry-run / rollback 验收；当前本地 Demo 不得写入 `agents` 或 `agent_config_versions`。
 - Agent permission change requests must run mock profile validation before approvals are created. Safe profiles may create pending `agent_config` approvals; forbidden capabilities such as `canExecuteRunnerJob` must return 422 and create no approval/runtime/SQLite write.
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。

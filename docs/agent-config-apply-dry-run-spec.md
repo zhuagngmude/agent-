@@ -163,6 +163,34 @@ Required gate inputs before any future real write can be considered:
 - Request includes `gitCheckpoint.created=true` and a checkpoint commit id.
 - Request includes `rollbackPlanAccepted=true`.
 
+## Transaction Plan
+
+Current executable helper:
+
+```text
+buildAgentConfigApplyTransactionPlan(...)
+```
+
+Current status: helper-only and feature-disabled. A valid plan may return `planReady=true`, but it must still return `ok=false`, `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
+
+The future real write set must be one transaction:
+
+1. Update `agents` current state.
+2. Insert one `agent_config_versions` row.
+3. Mark the `agent_config_applications` row as applied.
+4. Insert one `runtime_events` audit row.
+
+Transaction guards:
+
+- Application must still be `pending_apply` at write time.
+- Source approval must still be `approved`, target `agent_config`, and have no Runner job.
+- Target Agent row must exist.
+- Target version must equal current Agent config version + 1.
+- `agent_id + version` must not already exist in `agent_config_versions`.
+- All writes must commit together or roll back together.
+- Runtime event insert must be part of the same transaction.
+- The transaction plan must not create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
+
 It must:
 
 - Add an explicit feature flag separate from Model Gateway and Runner flags.
@@ -218,6 +246,8 @@ Before any real apply endpoint can be enabled:
 - Real apply gate rejects missing requestedBy, missing Git checkpoint, missing rollback acceptance, missing or mismatched dry-run proof, dry-run validation errors, dry-run side effects, and source approval with Runner job.
 - Field whitelist helper exists and is covered by `scripts/verify-agent-config-fields.ps1`.
 - Dry-run and real apply gate both reject unsupported fields, forbidden fields, forbidden values, `all=true`, and forbidden Agent capabilities.
+- Transaction plan helper exists and is covered by `scripts/verify-agent-config-transaction-plan.ps1`.
+- Transaction plan stays `canWrite=false` / `feature_disabled` while proving the future write set and rollback-on-failure guards.
 - Dry-run blocked state keeps all side effects false.
 - Invalid application ID returns a safe error.
 - Non-`pending_apply` application is rejected.

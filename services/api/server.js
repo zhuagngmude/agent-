@@ -17,6 +17,9 @@ const {
 const {
   validateAgentConfigChangePlan,
 } = require("./agent-config-fields");
+const {
+  buildAgentConfigApplyTransactionPlan,
+} = require("./agent-config-transaction-plan");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -599,7 +602,7 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
   const targetVersion = Number(dryRun?.writePlan?.targetVersion) || currentVersion + 1;
   const preconditionsReady = validationErrors.length === 0;
 
-  return {
+  const result = {
     ok: false,
     realApplyGate: true,
     gateReady: false,
@@ -634,6 +637,19 @@ function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, b
     changePlanValidation: localChangePlanValidation,
     sideEffects: noAgentConfigApplyGateSideEffects(),
   };
+  result.transactionPlan = buildAgentConfigApplyTransactionPlan({
+    application,
+    approval,
+    agent,
+    dryRun,
+    gate: result,
+    body: {
+      secondConfirm: body.secondConfirm,
+      confirmText: body.confirmText,
+      appliedBy: body.requestedBy || body.appliedBy || "",
+    },
+  });
+  return result;
 }
 
 function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }) {
@@ -1364,6 +1380,7 @@ if (require.main === module) {
 module.exports = {
   buildAgentConfigRealApplyGate,
   buildAgentConfigApplyDryRun,
+  buildAgentConfigApplyTransactionPlan,
   noAgentConfigApplyGateSideEffects,
   noAgentConfigDryRunSideEffects,
 };

@@ -483,6 +483,14 @@ Current status: helper-only, no HTTP route, no real write.
 
 `POST /api/agent-config-applications/:applicationId/dry-run` and `buildAgentConfigRealApplyGate(...)` include the helper result as `changePlanValidation`. This only tightens the disabled safety boundary; it does not enable Agent config writes.
 
+### Agent config real-write transaction plan helper
+
+Current status: helper-only, no HTTP route, no SQLite write.
+
+`services/api/agent-config-transaction-plan.js` exports `buildAgentConfigApplyTransactionPlan(...)`. The helper previews the future real-write transaction: update `agents`, insert `agent_config_versions`, mark `agent_config_applications` applied, and insert `runtime_events` in one transaction.
+
+Even when the plan is valid, MVP-0.2 must return `ok=false`, `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. The helper must not call SQLite, write runtime state, create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks
