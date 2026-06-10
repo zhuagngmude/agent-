@@ -14,6 +14,7 @@ secrets.local.*
 
 # Local internal notes and private project material
 _internal/
+design/image2/
 
 # Generated artifacts
 node_modules/
@@ -23,6 +24,7 @@ build/
 coverage/
 __pycache__/
 *.pyc
+.playwright-cli/
 
 # Local runner state
 .runner/
