@@ -17,6 +17,7 @@
 - Runner 不能自己决定是否可以执行。
 - 所有本地写文件、删文件、执行命令、网络请求、Git 操作都必须先创建 ApprovalRequest。
 - API Key 不允许明文返回，不允许出现在日志里。
+- Agent “全权限”必须按 `docs/agent-permission-contract.md` 拆成 planning / orchestration / request / approval / execution / secret access，不得用一个布尔值表示。
 
 ## 状态码约定
 
@@ -54,6 +55,47 @@ waiting
 failed
 disabled
 ```
+
+## Agent Permission Contract
+
+Agent 权限契约见：
+
+```text
+docs/agent-permission-contract.md
+```
+
+API 层必须区分以下能力：
+
+```text
+planning
+orchestration
+request
+approval
+execution
+secret_access
+```
+
+后续即使支持 `architect_admin` 或 `all_agents_full_management`，也只能表示广义的规划、编排和申请权限。它不得自动包含：
+
+```text
+canApproveHighRisk
+canApproveOwnRequest
+canExecuteRunnerJob
+canWriteFiles
+canDeleteFiles
+canExecuteCommands
+canModifyGit
+canMakeNetworkRequests
+canAccessRawSecrets
+```
+
+不可绕过规则：
+
+- Agent 可以发起 Approval Request，但不能批准自己的请求。
+- Runner 只能执行已批准的 Runner job。
+- 真实文件写入、命令执行、网络请求和 Git 操作仍必须走 Approval Service、二次确认和 Git checkpoint。
+- Model Gateway 真实 provider 请求仍必须后端、手动、固定最小 ping，并等待单独 feature flag contract 改变。
+- API 只能返回密钥是否配置等非敏感布尔值，不得返回 raw key、key suffix、masked fragment、authorization header、provider body、prompt 或 result。
 
 ## Dashboard
 
@@ -152,6 +194,8 @@ disabled
 暂时只读字段：Agent ID、角色类型、父 Agent、派生深度、汇总目标、创建来源
 禁止子 Agent 修改：自己的权限、父 Agent、汇总目标、API Key、Runner 执行权限、其他 Agent 的配置
 ```
+
+`permissions` 后续不得只保存 `all=true` 这类粗粒度值；必须保存明确能力或 profile，并按 `docs/agent-permission-contract.md` 展开。`architect_admin` 可以拥有最高规划、编排和申请权限，但仍不能自批、自执行或访问原始密钥。
 
 当前前端仅实现变更请求预览，不会调用 PATCH 接口，也不会写入 Mock 状态。预览对象至少包含：
 

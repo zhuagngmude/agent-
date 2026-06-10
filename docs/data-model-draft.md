@@ -26,6 +26,7 @@
 - 状态字段统一命名为 `status`。
 - 时间字段统一使用 ISO datetime，字段名为 `created_at`、`updated_at`、`approved_at`。
 - 可变结构先用 JSON 字段承接，例如 `permissions`、`changes`、`diff_preview`。
+- Agent 权限 JSON 必须遵守 `docs/agent-permission-contract.md`，不能用单个 `all=true` 表示规划、审批、执行和密钥访问。
 
 暂定数据库类型映射：
 
@@ -89,7 +90,7 @@ projects
 | model | TEXT | 否 | 当前模型标识 |
 | can_spawn_sub_agents | BOOLEAN | 是 | 是否允许创建子 Agent |
 | max_sub_agents | INTEGER | 是 | 最大子 Agent 数 |
-| permissions | JSON | 是 | 权限列表 |
+| permissions | JSON | 是 | 权限列表或 profile 展开结果，必须区分 planning / orchestration / request / approval / execution / secret access |
 | created_at | TEXT | 是 | 创建时间 |
 | updated_at | TEXT | 是 | 更新时间 |
 
@@ -98,6 +99,13 @@ projects
 - `idx_agents_project_id`
 - `idx_agents_role`
 - `idx_agents_status`
+
+权限字段约束：
+
+- `permissions` 可以包含 `architect_admin`、`executor_agent`、`reviewer_agent` 等 profile 名称，但应用层必须按 `docs/agent-permission-contract.md` 展开成明确能力。
+- `architect_admin` 只能代表最高规划、编排和申请权限，不能隐含 `canApproveHighRisk`、`canApproveOwnRequest`、`canExecuteRunnerJob`、`canAccessRawSecrets`。
+- 如果后续新增 `all_agents_full_management`，它也只能表示广义管理权限，不能代表自批、自执行、写文件、跑命令、改 Git、发网络请求或读取原始密钥。
+- 任何包含审批、执行或密钥相关能力的变更都必须走 Approval Service，并写入 `approvals` / `agent_config_applications` / `runtime_events`。
 
 ### agent_relationships
 

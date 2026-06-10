@@ -23,6 +23,7 @@
 - Runner 发起网络请求。
 - Runner 修改 Git。
 - Runner 自己决定是否可以执行。
+- Agent 通过“全权限”绕过 Approval Service、Runner job、Git checkpoint 或文件范围锁定。
 
 只要本文任一 P0 条件未满足，真实 Runner 执行功能不得实现或开启。
 
@@ -44,12 +45,14 @@ P2：后续增强项，不阻塞第一版真实 Runner。
 - Runner job 只能由已批准的 Runner 审批生成。
 - Runner Service 不能自己创建审批、批准审批或绕过审批。
 - `targetService=agent_config` 的审批不得生成 Runner job。
+- Agent 权限 profile 不能绕过 Approval Service。即使是 `architect_admin` 或后续的 `all_agents_full_management`，也只能发起或建议审批，不能自批、自执行或直接创建可执行 Runner job。
 
 验收方式：
 
 - 代码中不存在 Runner 直接执行未审批 action 的入口。
 - `approval.targetService !== "runner"` 时不得进入 Runner 执行队列。
 - Mock 回归脚本继续验证 Agent 配置审批不会生成 Runner job。
+- 权限映射必须遵守 `docs/agent-permission-contract.md`，不能把 `all=true` 当成执行授权。
 
 ### P0-2 审批必须包含完整执行计划
 

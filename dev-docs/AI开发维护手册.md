@@ -1153,3 +1153,10 @@ docs/runner-safety-acceptance.md
 - Why: after the dedicated Model Gateway verification script existed, duplicating backend helper/preflight/adapter assertions inside the browser UI script made the UI smoke path too broad and slower to reason about.
 - Impacted modules: `scripts/verify-local-ui.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`.
 - Human docs sync: not required; this is test-script scope cleanup and does not enable real provider calls, provider SDKs, Runner execution, cloud sync, or permission changes.
+
+## 2026-06-10 Change log: Agent permission contract
+
+- What changed: added `docs/agent-permission-contract.md` and linked it from API, data model, Runner safety, demo, roadmap, and handoff docs.
+- Why: future requests such as giving an architect Agent or all Agents "full permissions" need an explicit capability split so planning/orchestration/request rights cannot be confused with self-approval, direct execution, or raw secret access.
+- Impacted modules: `docs/agent-permission-contract.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/runner-safety-acceptance.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`, `dev-docs/新窗口交接说明.md`.
+- Human docs sync: not required; this is a technical permission contract and does not enable real permissions, Runner execution, real provider calls, cloud sync, or secret access.

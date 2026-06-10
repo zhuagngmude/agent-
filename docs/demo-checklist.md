@@ -185,8 +185,16 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - 不会让 Runner 写文件、删文件、执行命令、发起网络请求或修改 Git。
 - 不会调用真实模型 API。
 - 不会连接真实数据库或云同步。
+- 不会因为 Agent 标记为 `architect_admin` 或“全权限”而绕过 Approval Service、Runner 安全检查、Model Gateway 禁用态或密钥边界。
 
 如果后续要开放真实 Runner 或真实 Agent 配置写入，必须先补 Approval Service、二次确认、Git checkpoint 和回滚策略。
+
+## Agent Permission Contract
+
+- Agent 权限分层契约见 `docs/agent-permission-contract.md`。
+- “全权限”只能表示广义规划、编排和申请权限；不得表示自批、自执行、写文件、跑命令、改 Git、发网络请求或访问原始密钥。
+- `architect_admin` 可以作为未来最高管理型 Agent profile，但仍必须通过 Approval Service、Runner job、Model Gateway feature flag contract 和密钥服务边界。
+- Demo 验证不应把权限 profile 当成真实执行授权；当前仍停留在 Mock / disabled / read-only 阶段。
 
 ## Model Gateway Relay Interface Checkpoint
 
