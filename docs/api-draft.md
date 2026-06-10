@@ -1243,6 +1243,16 @@ OpenAI-compatible relay first-provider candidate plan:
 - The first relay verification must pass without real credentials by covering `feature_disabled`, `missing_key`, `missing_base_url`, `unsupported_provider`, `unsupported_model`, `timeout`, `provider_error`, invalid base URL, and no-side-effect cases.
 - A real credential run, if ever performed manually, must be a separate operator action with the server env vars set outside Git and with logs checked for absence of key, base URL secrets, prompt, result, provider body, headers, token usage, and cost.
 
+OpenAI-compatible relay disabled preflight implementation:
+
+- `openai_compat` is now a Model Gateway provider metadata entry, but it is still disabled and cannot make network requests.
+- `GET /api/model-gateway/status` may expose `openai_compat` with `keyEnvVar=AGENT_SWARM_OPENAI_COMPAT_API_KEY`, `baseUrlEnvVar=AGENT_SWARM_OPENAI_COMPAT_BASE_URL`, and boolean key/base-url presence only.
+- `services/api/model-gateway-adapters.js` includes `openai_compat_disabled_connectivity_adapter`; this is metadata only and must still return blocked behavior.
+- `modelGatewayConnectivityPreflight(...)` checks relay base URL presence and safe shape without returning the URL value.
+- A relay base URL is considered unsafe when it is missing, not parseable, not `https:`, points to localhost, or points to common private IPv4 ranges.
+- The HTTP API must not accept relay base URL overrides. Test-only base URL injection is limited to direct backend helper calls from regression scripts.
+- `scripts/verify-local-ui.ps1` must cover `missing_base_url`, `invalid_base_url`, safe-shape-but-feature-disabled, and all-false side effects for `openai_compat`.
+
 ## 2026-06-08 实现备注：工作流只读接口
 
 当前 Mock API 已实现工作流只读数据：

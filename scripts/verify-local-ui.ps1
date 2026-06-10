@@ -264,6 +264,10 @@ Assert-Equal $gateway.safety.createsRunnerJobs $false "Model Gateway status shou
 Assert-Equal $gateway.safety.makesNetworkRequests $false "Model Gateway status should not make provider network requests."
 Assert-ModelGatewayFeatureFlags -FeatureFlags $gateway.featureFlags -Prefix "Model Gateway status feature flags"
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai" }).providerAdapterId) "openai_disabled_connectivity_adapter" "OpenAI status should expose disabled adapter id."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).providerAdapterId) "openai_compat_disabled_connectivity_adapter" "OpenAI-compatible relay status should expose disabled adapter id."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).keyEnvVar) "AGENT_SWARM_OPENAI_COMPAT_API_KEY" "OpenAI-compatible relay should use a dedicated key env var."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).baseUrlEnvVar) "AGENT_SWARM_OPENAI_COMPAT_BASE_URL" "OpenAI-compatible relay should use a dedicated base URL env var."
+Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "openai_compat" }).baseUrlRequired) $true "OpenAI-compatible relay should require a server-side base URL."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "anthropic" }).providerAdapterId) "anthropic_disabled_connectivity_adapter" "Anthropic status should expose disabled adapter id."
 Assert-Equal (($gateway.providers | Where-Object { $_.id -eq "google" }).providerAdapterId) "google_disabled_connectivity_adapter" "Google status should expose disabled adapter id."
 foreach ($provider in $gateway.providers) {
@@ -341,6 +345,13 @@ const base = {
   secondConfirm: true,
   confirmText: 'local preflight acceptance'
 };
+const relayBase = {
+  provider: 'openai_compat',
+  model: 'openai-compatible-relay-model',
+  purpose: 'manual_connectivity_test',
+  secondConfirm: true,
+  confirmText: 'local relay preflight acceptance'
+};
 const cases = {
   featureDisabled: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true }),
   missingKey: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: false }),
@@ -348,7 +359,10 @@ const cases = {
   unsupportedModel: gateway.modelGatewayConnectivityPreflight({ ...base, model: 'not-a-connectivity-model' }, { acceptanceOnlyKeyConfigured: true }),
   invalidPurpose: gateway.modelGatewayConnectivityPreflight({ ...base, purpose: 'chat_completion' }, { acceptanceOnlyKeyConfigured: true }),
   timeout: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'timeout' }),
-  providerError: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'provider_error' })
+  providerError: gateway.modelGatewayConnectivityPreflight(base, { acceptanceOnlyKeyConfigured: true, acceptanceSimulation: 'provider_error' }),
+  relayMissingBaseUrl: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: '' }),
+  relayInvalidBaseUrl: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'http://127.0.0.1:8787/v1' }),
+  relayValidBaseUrlBlocked: gateway.modelGatewayConnectivityPreflight(relayBase, { acceptanceOnlyKeyConfigured: true, acceptanceOnlyBaseUrl: 'https://relay.example.test/v1' })
 };
 process.stdout.write(JSON.stringify(cases));
 "@
@@ -384,7 +398,26 @@ Assert-Equal $preflightCases.providerError.result "blocked" "Provider-error pref
 Assert-TextContains (@($preflightCases.providerError.blockingCategories) -join "`n") "provider_error" "Preflight should report provider error."
 Assert-PreflightNoSideEffects -Preflight $preflightCases.providerError -Prefix "Provider-error preflight"
 
+Assert-Equal $preflightCases.relayMissingBaseUrl.result "blocked" "Relay missing-base-url preflight should remain blocked."
+Assert-Equal $preflightCases.relayMissingBaseUrl.baseUrlRequired $true "Relay missing-base-url preflight should require base URL."
+Assert-Equal $preflightCases.relayMissingBaseUrl.baseUrlConfigured $false "Relay missing-base-url preflight should report missing base URL."
+Assert-TextContains (@($preflightCases.relayMissingBaseUrl.blockingCategories) -join "`n") "missing_base_url" "Relay preflight should report missing base URL."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.relayMissingBaseUrl -Prefix "Relay missing-base-url preflight"
+
+Assert-Equal $preflightCases.relayInvalidBaseUrl.result "blocked" "Relay invalid-base-url preflight should remain blocked."
+Assert-Equal $preflightCases.relayInvalidBaseUrl.baseUrlConfigured $true "Relay invalid-base-url preflight should report configured base URL."
+Assert-Equal $preflightCases.relayInvalidBaseUrl.baseUrlValid $false "Relay invalid-base-url preflight should reject unsafe base URL."
+Assert-TextContains (@($preflightCases.relayInvalidBaseUrl.blockingCategories) -join "`n") "invalid_base_url" "Relay preflight should report invalid base URL."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.relayInvalidBaseUrl -Prefix "Relay invalid-base-url preflight"
+
+Assert-Equal $preflightCases.relayValidBaseUrlBlocked.result "blocked" "Relay valid-base-url preflight should still remain blocked."
+Assert-Equal $preflightCases.relayValidBaseUrlBlocked.baseUrlConfigured $true "Relay valid-base-url preflight should report configured base URL."
+Assert-Equal $preflightCases.relayValidBaseUrlBlocked.baseUrlValid $true "Relay valid-base-url preflight should accept safe URL shape."
+Assert-TextContains (@($preflightCases.relayValidBaseUrlBlocked.blockingCategories) -join "`n") "feature_disabled" "Relay valid-base-url preflight should remain feature-disabled."
+Assert-PreflightNoSideEffects -Preflight $preflightCases.relayValidBaseUrlBlocked -Prefix "Relay valid-base-url preflight"
+
 $providerAdapterCases = @(
+  @{ Provider = "openai_compat"; Model = "openai-compatible-relay-model"; AdapterId = "openai_compat_disabled_connectivity_adapter" },
   @{ Provider = "anthropic"; Model = "claude-3-5-haiku-latest"; AdapterId = "anthropic_disabled_connectivity_adapter" },
   @{ Provider = "google"; Model = "gemini-1.5-flash"; AdapterId = "google_disabled_connectivity_adapter" }
 )

@@ -10,6 +10,15 @@ const disabledProviderAdapterRegistry = {
     maxTimeoutMs: 5000,
     maxResponseBodyLimitBytes: 4096,
   },
+  openai_compat: {
+    providerAdapterId: "openai_compat_disabled_connectivity_adapter",
+    provider: "openai_compat",
+    providerLabel: "OpenAI-compatible Relay",
+    mode: "disabled",
+    connectivityTestModel: "openai-compatible-relay-model",
+    maxTimeoutMs: 5000,
+    maxResponseBodyLimitBytes: 4096,
+  },
   anthropic: {
     providerAdapterId: "anthropic_disabled_connectivity_adapter",
     provider: "anthropic",

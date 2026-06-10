@@ -165,6 +165,8 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - Provider adapter verification currently covers only the disabled adapter registry and stub; demo verification must not import provider SDKs, make provider requests, require real keys, store responses, or report raw provider errors.
 - Future real manual connectivity checks must be user-triggered, backend-only, fixed-prompt/minimal-ping, and disabled by default.
 - An OpenAI-compatible relay is the first planned real-provider candidate, but this checklist still forbids real relay or official OpenAI requests until a later explicit implementation commit changes the feature-flag boundary and passes blocked/missing-key/missing-base-url/invalid-base-url/no-side-effect verification.
+- `openai_compat` may appear in Model Gateway status as disabled metadata only. The UI and scripts may show `AGENT_SWARM_OPENAI_COMPAT_API_KEY` and `AGENT_SWARM_OPENAI_COMPAT_BASE_URL` env var names, but must never show their values.
+- Relay preflight may validate missing or unsafe base URL shape, but it must not make network requests and must keep all side effects false.
 
 ## 7. 当前安全边界
 

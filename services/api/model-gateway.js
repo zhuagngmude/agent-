@@ -5,6 +5,13 @@ const {
 
 const modelGatewayProviders = [
   { id: "openai", label: "OpenAI", envVar: "AGENT_SWARM_OPENAI_API_KEY" },
+  {
+    id: "openai_compat",
+    label: "OpenAI-compatible Relay",
+    envVar: "AGENT_SWARM_OPENAI_COMPAT_API_KEY",
+    baseUrlEnvVar: "AGENT_SWARM_OPENAI_COMPAT_BASE_URL",
+    requiresBaseUrl: true,
+  },
   { id: "anthropic", label: "Anthropic", envVar: "AGENT_SWARM_ANTHROPIC_API_KEY" },
   { id: "google", label: "Google Gemini", envVar: "AGENT_SWARM_GOOGLE_API_KEY" },
 ];
@@ -39,6 +46,56 @@ function parsePositiveInteger(value, fallback) {
   return parsed;
 }
 
+function baseUrlStatus(provider, options = {}) {
+  if (!provider?.requiresBaseUrl) {
+    return {
+      required: false,
+      envVar: "",
+      configured: false,
+      valid: true,
+      validationError: "",
+    };
+  }
+
+  const rawBaseUrl = options.acceptanceOnlyBaseUrl !== undefined
+    ? parseString(options.acceptanceOnlyBaseUrl)
+    : parseString(process.env[provider.baseUrlEnvVar]);
+  const configured = Boolean(rawBaseUrl);
+
+  if (!configured) {
+    return {
+      required: true,
+      envVar: provider.baseUrlEnvVar,
+      configured: false,
+      valid: false,
+      validationError: "base URL is required.",
+    };
+  }
+
+  try {
+    const parsedUrl = new URL(rawBaseUrl);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    const isPrivateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
+    const valid = parsedUrl.protocol === "https:" && !isLocalhost && !isPrivateIpv4;
+    return {
+      required: true,
+      envVar: provider.baseUrlEnvVar,
+      configured: true,
+      valid,
+      validationError: valid ? "" : "base URL must be https and must not target localhost or private networks.",
+    };
+  } catch {
+    return {
+      required: true,
+      envVar: provider.baseUrlEnvVar,
+      configured: true,
+      valid: false,
+      validationError: "base URL is invalid.",
+    };
+  }
+}
+
 function modelGatewaySideEffects() {
   return {
     writesSqlite: false,
@@ -67,6 +124,8 @@ function preflightErrorCategory(blockingCategories) {
   if (blockingCategories.includes("unsupported_provider")) return "unsupported_provider";
   if (blockingCategories.includes("unsupported_model")) return "unsupported_model";
   if (blockingCategories.includes("missing_key")) return "missing_key";
+  if (blockingCategories.includes("missing_base_url")) return "invalid_request";
+  if (blockingCategories.includes("invalid_base_url")) return "invalid_request";
   if (blockingCategories.includes("timeout")) return "timeout";
   if (blockingCategories.includes("provider_error")) return "provider_unavailable";
   if (blockingCategories.includes("response_body_limit")) return "invalid_request";
@@ -86,6 +145,9 @@ function modelGatewayStatus() {
       label: provider.label,
       keyEnvVar: provider.envVar,
       configured: Boolean(process.env[provider.envVar]),
+      baseUrlEnvVar: provider.baseUrlEnvVar || "",
+      baseUrlConfigured: provider.requiresBaseUrl ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
+      baseUrlRequired: provider.requiresBaseUrl === true,
       providerAdapterId: disabledProviderAdapterRegistry[provider.id]?.providerAdapterId || "",
       providerAdapterMode: disabledProviderAdapterRegistry[provider.id]?.mode || "disabled",
       connectivityTestModel: disabledProviderAdapterRegistry[provider.id]?.connectivityTestModel || "",
@@ -131,6 +193,7 @@ function modelGatewayConnectivityPreflight(request, options = {}) {
   const blockingCategories = [];
   const featureFlags = modelGatewayFeatureFlags();
   const acceptanceSimulation = parseString(options.acceptanceSimulation);
+  const relayBaseUrl = baseUrlStatus(provider, options);
   const keyConfigured = provider
     ? options.acceptanceOnlyKeyConfigured === true
       ? true
@@ -182,6 +245,12 @@ function modelGatewayConnectivityPreflight(request, options = {}) {
     blockingCategories.push("missing_key");
   }
 
+  if (relayBaseUrl.required && !relayBaseUrl.configured) {
+    blockingCategories.push("missing_base_url");
+  } else if (relayBaseUrl.required && !relayBaseUrl.valid) {
+    blockingCategories.push("invalid_base_url");
+  }
+
   if (!featureFlags.manualConnectivityTestActive || !featureFlags.realProviderRequestsAllowed) {
     blockingCategories.push("feature_disabled");
   }
@@ -207,6 +276,11 @@ function modelGatewayConnectivityPreflight(request, options = {}) {
     modelSupported,
     keyEnvVar: provider?.envVar || "",
     keyConfigured,
+    baseUrlEnvVar: relayBaseUrl.envVar,
+    baseUrlConfigured: relayBaseUrl.configured,
+    baseUrlRequired: relayBaseUrl.required,
+    baseUrlValid: relayBaseUrl.valid,
+    baseUrlValidationError: relayBaseUrl.validationError,
     featureFlags,
     timeoutMs,
     responseBodyLimitBytes,
@@ -224,6 +298,8 @@ function modelGatewayConnectivityPreflight(request, options = {}) {
       featureEnabled: featureFlags.manualConnectivityTestActive === true,
       realProviderRequestsAllowed: featureFlags.realProviderRequestsAllowed === true,
       keyConfigured,
+      baseUrlConfigured: relayBaseUrl.configured,
+      baseUrlValid: relayBaseUrl.valid,
       timeoutWithinLimit,
       responseBodyLimitWithinLimit,
     },
@@ -264,6 +340,9 @@ function modelGatewayDryRun(request) {
     providerSupported: Boolean(provider),
     keyEnvVar: provider?.envVar || "",
     keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    baseUrlEnvVar: provider?.baseUrlEnvVar || "",
+    baseUrlConfigured: provider?.requiresBaseUrl ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
+    baseUrlRequired: provider?.requiresBaseUrl === true,
     featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
     wouldCallProvider: false,
@@ -309,6 +388,10 @@ function modelGatewayConnectivityTest(request) {
     modelSupported: preflight.modelSupported,
     keyEnvVar: provider?.envVar || "",
     keyConfigured: preflight.keyConfigured,
+    baseUrlEnvVar: preflight.baseUrlEnvVar,
+    baseUrlConfigured: preflight.baseUrlConfigured,
+    baseUrlRequired: preflight.baseUrlRequired,
+    baseUrlValid: preflight.baseUrlValid,
     featureFlags: modelGatewayFeatureFlags(),
     preflight,
     realModelCallsAllowed: false,

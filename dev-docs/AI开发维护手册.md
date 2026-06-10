@@ -1090,3 +1090,10 @@ docs/runner-safety-acceptance.md
 - 为什么改：用户说明没有官方 OpenAI key，只有中转 key；为了避免官方 OpenAI 与中转 provider 混用，必须把 provider id、key env var 和 base URL 边界拆开记录。
 - 影响模块：`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
 - 是否需要同步人类说明书：暂不需要；当前仍未实现真实 relay 或官方 OpenAI 请求，官方 OpenAI、Anthropic 和 Google Gemini 也继续保持 disabled adapter。
+
+## 2026-06-10 变更记录：Model Gateway OpenAI-compatible relay disabled preflight
+
+- 改了什么：新增 `openai_compat` 禁用 provider 元数据和 `openai_compat_disabled_connectivity_adapter`；`modelGatewayConnectivityPreflight(...)` 增加 relay 专用 key/base URL 存在性与安全形状检查；`verify-local-ui.ps1` 覆盖 `missing_base_url`、`invalid_base_url`、安全 URL 但 feature disabled、disabled adapter 和 no-side-effect 断言。
+- 为什么改：在接中转真实请求前，先固定 relay 与官方 OpenAI 的隔离边界，确认 base URL 只能来自服务端 env，且不会被前端或请求体覆盖。
+- 影响模块：`services/api/model-gateway.js`、`services/api/model-gateway-adapters.js`、`scripts/verify-local-ui.ps1`、`docs/api-draft.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；当前仍不接 relay SDK/HTTP 请求，不读取或保存真实 key/base URL 值，不写 SQLite/runtime state，不创建任务/审批/Runner job，不触发 Agent，不保存 prompt/result/provider body。
