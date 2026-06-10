@@ -132,6 +132,8 @@ projects
 
 用途：记录 Agent 配置真实写入后的版本历史。第一版真实应用配置时，必须在同一事务内更新 `agents` 当前态并写入版本记录。
 
+真实写入前必须先通过 `docs/agent-config-apply-dry-run-spec.md` 中的 dry-run 验收。MVP-0.2 当前不会写入该表；`agent_config_applications.status = applied` 仍只代表 Mock 状态流转。
+
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | id | TEXT | 是 | 版本记录 ID |
@@ -152,6 +154,7 @@ projects
 - `agent_id + version` 应唯一。
 - `config_snapshot` 不得包含 API Key、模型 Key 明文或本地敏感路径。
 - 回滚不得直接删除版本记录；必须重新创建审批和新的版本。
+- 真实写入必须和 `agents` 当前态更新处于同一事务；失败时不得产生半写入版本。
 
 ### tasks
 
@@ -273,6 +276,7 @@ projects
 - 只能由 `target_service=agent_config` 且已批准的审批生成。
 - 当前 `applied` 只表示 Mock 状态流转，不代表 Agent 配置真实写入。
 - 真正回滚必须重新创建审批申请，不能直接改 Agent 配置。
+- 真实写入前必须先通过 Agent config apply dry-run；dry-run 规格见 `docs/agent-config-apply-dry-run-spec.md`。
 
 ### workflows
 

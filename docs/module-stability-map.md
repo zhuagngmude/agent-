@@ -33,6 +33,7 @@ docs/data-model-draft.md
 docs/sqlite-seed-plan.md
 docs/runner-safety-acceptance.md
 docs/agent-permission-contract.md
+docs/agent-config-apply-dry-run-spec.md
 docs/module-stability-map.md
 services/api/server.js
 services/api/model-gateway.js

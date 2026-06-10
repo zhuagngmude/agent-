@@ -9,6 +9,7 @@
 - `dev-docs/README.md`：开发过程资料目录说明。
 - `docs/tech-stack-notes.md`：当前技术栈、SQLite 本地路径和未来生产栈方向说明。
 - `docs/module-stability-map.md`：模块稳定性、可删除/不可删除、可重构和受保护目录清单。
+- `docs/agent-config-apply-dry-run-spec.md`：Agent 配置真实写入前的 dry-run、版本记录和回滚准入规则。
 
 ## 当前定位
 
@@ -105,6 +106,7 @@ _internal/
 - `docs/tech-stack-notes.md`
 - `docs/runner-safety-acceptance.md`
 - `docs/module-stability-map.md`
+- `docs/agent-config-apply-dry-run-spec.md`
 
 下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先修复前端中文编码、抽出 mock 数据模型，并重点打磨审批与确认页面。
 

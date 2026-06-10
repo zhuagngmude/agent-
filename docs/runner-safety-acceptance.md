@@ -201,6 +201,8 @@ git push --force
 
 真实回滚不是简单执行 `git reset`。
 
+Agent 配置回滚也不是直接改数据库。Agent 配置真实写入前的 dry-run 和回滚准入见 `docs/agent-config-apply-dry-run-spec.md`；在该规格通过前，Agent 配置只能停留在 Mock 应用/取消状态流转。
+
 回滚前必须满足：
 
 - 有原始审批 ID。
@@ -225,6 +227,13 @@ git push --force
 3. 创建新的回滚审批。
 4. 用户二次确认。
 5. Runner 只执行已批准的回滚 job。
+
+Agent 配置回滚的差异：
+
+1. 回滚必须创建新的 `agent_config` 审批。
+2. 回滚不得创建 Runner job。
+3. 回滚不得删除 `agent_config_versions` 历史。
+4. 回滚应用后应写入新的版本记录，而不是覆盖旧版本。
 
 ## 5. P1 应满足项
 

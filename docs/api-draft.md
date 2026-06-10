@@ -343,6 +343,8 @@ Permission changes are mock-validated before an approval is created:
 
 当前状态：Mock 状态流转已实现。MVP-0.2 只会把 `agentConfigApplications.status` 从 `pending_apply` 改为 `applied`，记录确认信息，不会修改 Agent 配置，也不会生成 Runner job。
 
+真实写入前置规格见 `docs/agent-config-apply-dry-run-spec.md`。后续必须先实现 dry-run，证明待应用记录、来源审批、权限变更、版本写入计划和回滚计划都满足验收，才能在单独提交里开放真实写入。当前 `apply` 仍不得写入 `agents` 或 `agent_config_versions`。
+
 必须满足：
 - 来源审批状态必须是 `approved`。
 - 来源审批 `targetService` 必须是 `agent_config`。
@@ -404,6 +406,17 @@ Permission changes are mock-validated before an approval is created:
   "message": "Mock application status changed to cancelled. Agent config was not modified."
 }
 ```
+
+### POST /api/agent-config-applications/:applicationId/dry-run
+
+用途：规划中的真实 Agent 配置写入前 dry-run。当前尚未实现，规格见 `docs/agent-config-apply-dry-run-spec.md`。
+
+MVP-0.2 约束：
+
+- 即使后续新增该接口，默认也必须保持 feature-disabled / blocked。
+- dry-run 可以返回 write plan 和 rollback plan，但不得写 `agents`、`agent_config_versions`、SQLite/runtime state、审批、Runner job 或 runtime event。
+- dry-run 不得执行 Runner、调用真实模型、读取 raw secret、接受前端传入的任意 Agent config JSON 或 `all=true` 权限。
+- 所有真实写入必须等 dry-run 验收和回滚审批策略通过后，再由单独提交打开。
 
 ## Tasks
 
