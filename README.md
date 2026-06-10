@@ -8,6 +8,7 @@
 - `dev-docs/AI开发维护手册.md`：给 AI 编程工具看的开发规格、架构约束、升级路线和变更记录规则。
 - `dev-docs/README.md`：开发过程资料目录说明。
 - `docs/tech-stack-notes.md`：当前技术栈、SQLite 本地路径和未来生产栈方向说明。
+- `docs/module-stability-map.md`：模块稳定性、可删除/不可删除、可重构和受保护目录清单。
 
 ## 当前定位
 
@@ -103,6 +104,7 @@ _internal/
 - `docs/sqlite-seed-plan.md`
 - `docs/tech-stack-notes.md`
 - `docs/runner-safety-acceptance.md`
+- `docs/module-stability-map.md`
 
 下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先修复前端中文编码、抽出 mock 数据模型，并重点打磨审批与确认页面。
 

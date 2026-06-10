@@ -1160,3 +1160,10 @@ docs/runner-safety-acceptance.md
 - Why: future requests such as giving an architect Agent or all Agents "full permissions" need an explicit capability split so planning/orchestration/request rights cannot be confused with self-approval, direct execution, or raw secret access.
 - Impacted modules: `docs/agent-permission-contract.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/runner-safety-acceptance.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`, `dev-docs/新窗口交接说明.md`.
 - Human docs sync: not required; this is a technical permission contract and does not enable real permissions, Runner execution, real provider calls, cloud sync, or secret access.
+
+## 2026-06-10 Change log: Module stability map
+
+- What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
+- Why: the project skeleton is stable enough for small verified iteration, but future deletion/refactor work needs a clear map of P0 anchors, contracts, refactorable areas, runtime state, and protected paths.
+- Impacted modules: `docs/module-stability-map.md`, `README.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`, `dev-docs/新窗口交接说明.md`.
+- Human docs sync: not required; this is a maintenance map and does not change runtime behavior, enable Runner execution, enable real provider calls, or change permissions.

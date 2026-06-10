@@ -189,6 +189,13 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 
 如果后续要开放真实 Runner 或真实 Agent 配置写入，必须先补 Approval Service、二次确认、Git checkpoint 和回滚策略。
 
+## Module Stability Map
+
+- 模块稳定性、可删除/不可删除、可重构和受保护目录清单见 `docs/module-stability-map.md`。
+- 后续删除或移动 tracked 文件前，应先用 `rg` 查引用，更新相关 docs/scripts，并跑对应验收脚本。
+- `design/image2/`、`_internal/`、`data/local/`、`logs/`、`.playwright-cli/` 和 `data/mock/runtime-state.json` 仍属于受保护或运行态范围，不得误提交。
+- P0 anchor 文件不能作为普通清理目标；如果确实要改，必须同步合同文档和验收脚本。
+
 ## Agent Permission Contract
 
 - Agent 权限分层契约见 `docs/agent-permission-contract.md`。
