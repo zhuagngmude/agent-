@@ -467,6 +467,14 @@ MVP-0.2 约束：
 }
 ```
 
+### Agent config real apply gate helper
+
+Current status: helper-only, no HTTP route, no real write.
+
+`services/api/server.js` exports `buildAgentConfigRealApplyGate(...)` for future real-apply contract verification. This helper checks the dry-run proof, source approval, target Agent, second confirmation, requestedBy, Git checkpoint, rollback acceptance, and all-false side effects.
+
+Even when all preconditions are present, MVP-0.2 must return `preconditionsReady=true` but keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. A later real apply implementation must be a separate feature-flagged commit and must not reuse this helper as permission to write `agents` or `agent_config_versions` by itself.
+
 ## Tasks
 
 ### GET /api/projects/:projectId/tasks

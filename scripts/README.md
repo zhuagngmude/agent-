@@ -24,6 +24,7 @@ verify-sqlite-flows.ps1
 verify-model-gateway.ps1
 verify-agent-permissions.ps1
 verify-agent-config-dry-run.ps1
+verify-agent-config-apply-gate.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -55,6 +56,8 @@ sqlite/
 `verify-agent-permissions.ps1` validates the local Agent permission profile helper. It expands mock profiles, rejects `all=true`, rejects unknown capabilities, rejects forbidden Agent capabilities, and checks all validation side effects stay false. It does not start local services, change Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `verify-agent-config-dry-run.ps1` validates the local Agent config dry-run helper without starting services. It covers blocked preview, missing second confirmation, missing confirm text, non-`pending_apply` application, unapproved source approval, source approval with a Runner job, wrong target service, missing target Agent, and all-false side effects. It does not write Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+
+`verify-agent-config-apply-gate.ps1` validates the future real Agent config apply gate helper without starting services. It proves that all real-apply preconditions can be checked while the feature gate remains closed: even valid inputs keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -118,3 +121,13 @@ This script is acceptance verification, not a real connectivity test. It must no
 - Valid pending applications must still return `ok=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
 - Invalid dry-run inputs must be reported without side effects: missing second confirmation, missing confirm text, non-pending application, unapproved approval, approval with Runner job, wrong target service, and missing target Agent.
 - The helper check does not start local services, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+
+## verify-agent-config-apply-gate.ps1
+
+`verify-agent-config-apply-gate.ps1` is the dedicated future real-apply gate contract check.
+
+- `services/api/server.js` exports `buildAgentConfigRealApplyGate(...)` for local helper verification without starting the API server.
+- Valid preconditions may return `preconditionsReady=true`, but must still return `ok=false`, `gateReady=false`, `canApply=false`, and `blockedReasons=["feature_disabled"]`.
+- The gate requires a matching no-side-effect dry-run result, approved `agent_config` source approval, no Runner job, target Agent, second confirmation, requestedBy, Git checkpoint, and rollback-plan acceptance.
+- Invalid gate inputs must be reported without side effects: missing requestedBy, missing Git checkpoint, missing rollback acceptance, missing dry-run proof, mismatched dry-run proof, dry-run validation errors, dry-run side effects, and source approval with Runner job.
+- The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.

@@ -32,6 +32,8 @@ model-gateway-adapters.js
 
 `POST /api/agent-config-applications/:applicationId/dry-run` is implemented as a disabled Agent config apply preview. It reads the current application, source approval, and target Agent, then returns `dryRun=true`, `canApply=false`, `blockedReasons=["feature_disabled"]`, write/rollback plans, and all-false side effects. It must not write `agents`, `agent_config_versions`, SQLite/runtime state, approvals, Runner jobs, runtime events, call models, execute Runner, or read raw secrets.
 
+`buildAgentConfigRealApplyGate(...)` is a helper-only future real-apply gate. It can prove that dry-run proof, source approval, target Agent, second confirmation, requestedBy, Git checkpoint, and rollback acceptance are present, but MVP-0.2 must still return `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not be wired to real Agent config writes until a later explicit feature-flagged commit.
+
 `model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. `model-gateway-adapters.js` owns the disabled provider adapter registry and stub for OpenAI, Anthropic, and Google Gemini. These modules must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 
 `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is currently a visible request flag only. Even when that environment variable is `true`, MVP-0.2 must keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.

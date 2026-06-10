@@ -458,6 +458,171 @@ function noAgentConfigDryRunSideEffects() {
   };
 }
 
+function noAgentConfigApplyGateSideEffects() {
+  return {
+    writesAgents: false,
+    writesAgentConfigVersions: false,
+    writesRuntimeEvents: false,
+    writesSqlite: false,
+    writesRuntimeState: false,
+    createsApprovals: false,
+    createsRunnerJobs: false,
+    executesRunner: false,
+    callsRealModel: false,
+    readsRawSecrets: false,
+  };
+}
+
+function allAgentConfigSideEffectsFalse(sideEffects = {}) {
+  return [
+    "writesAgents",
+    "writesAgentConfigVersions",
+    "writesRuntimeEvents",
+    "writesSqlite",
+    "writesRuntimeState",
+    "createsApprovals",
+    "createsRunnerJobs",
+    "executesRunner",
+    "callsRealModel",
+    "readsRawSecrets",
+  ].every((key) => sideEffects[key] === false);
+}
+
+function buildAgentConfigRealApplyGate({ application, approval, agent, dryRun, body = {} }) {
+  const blockedReasons = ["feature_disabled"];
+  const validationErrors = [];
+  const requiredChecks = {
+    applicationExists: Boolean(application),
+    applicationPending: application?.status === "pending_apply",
+    sourceApprovalExists: Boolean(approval),
+    sourceApprovalApproved: approval?.status === "approved",
+    sourceApprovalTargetsAgentConfig: approval?.targetService === "agent_config",
+    sourceApprovalHasNoRunnerJob: Boolean(approval) && !approval.runnerJobId,
+    targetAgentExists: Boolean(agent),
+    secondConfirm: body.secondConfirm === true,
+    confirmText: Boolean(body.confirmText),
+    requestedBy: Boolean(body.requestedBy),
+    gitCheckpointPresent: body.gitCheckpoint?.created === true && Boolean(body.gitCheckpoint?.commit),
+    rollbackPlanAccepted: body.rollbackPlanAccepted === true,
+    dryRunResultProvided: Boolean(dryRun),
+    dryRunMatchesApplication: dryRun?.applicationId === application?.id,
+    dryRunMatchesApproval: dryRun?.approvalId === application?.approvalId,
+    dryRunMatchesAgent: dryRun?.agentId === application?.agentId,
+    dryRunValidationPassed: Array.isArray(dryRun?.validationErrors) && dryRun.validationErrors.length === 0,
+    dryRunIsDisabledPreview: dryRun?.dryRun === true
+      && dryRun?.ok === false
+      && dryRun?.canApply === false
+      && Array.isArray(dryRun?.blockedReasons)
+      && dryRun.blockedReasons.includes("feature_disabled"),
+    dryRunHasNoSideEffects: allAgentConfigSideEffectsFalse(dryRun?.sideEffects),
+  };
+
+  if (!requiredChecks.applicationExists) {
+    validationErrors.push("application not found.");
+  }
+  if (application && !requiredChecks.applicationPending) {
+    validationErrors.push(`application must be pending_apply, got ${application.status}.`);
+  }
+  if (!requiredChecks.sourceApprovalExists) {
+    validationErrors.push("source approval not found.");
+  }
+  if (approval && !requiredChecks.sourceApprovalApproved) {
+    validationErrors.push(`source approval must be approved, got ${approval.status}.`);
+  }
+  if (approval && !requiredChecks.sourceApprovalTargetsAgentConfig) {
+    validationErrors.push("source approval targetService must be agent_config.");
+  }
+  if (approval && !requiredChecks.sourceApprovalHasNoRunnerJob) {
+    validationErrors.push("source approval must not have a Runner job.");
+  }
+  if (!requiredChecks.targetAgentExists) {
+    validationErrors.push("target agent not found.");
+  }
+  if (!requiredChecks.secondConfirm) {
+    validationErrors.push("secondConfirm=true is required.");
+  }
+  if (!requiredChecks.confirmText) {
+    validationErrors.push("confirmText is required.");
+  }
+  if (!requiredChecks.requestedBy) {
+    validationErrors.push("requestedBy is required.");
+  }
+  if (!requiredChecks.gitCheckpointPresent) {
+    validationErrors.push("gitCheckpoint.created=true and gitCheckpoint.commit are required.");
+  }
+  if (!requiredChecks.rollbackPlanAccepted) {
+    validationErrors.push("rollbackPlanAccepted=true is required.");
+  }
+  if (!requiredChecks.dryRunResultProvided) {
+    validationErrors.push("dryRun result is required before real apply.");
+  }
+  if (dryRun) {
+    if (!requiredChecks.dryRunMatchesApplication) {
+      validationErrors.push("dryRun applicationId must match application.");
+    }
+    if (!requiredChecks.dryRunMatchesApproval) {
+      validationErrors.push("dryRun approvalId must match source approval.");
+    }
+    if (!requiredChecks.dryRunMatchesAgent) {
+      validationErrors.push("dryRun agentId must match target Agent.");
+    }
+    if (!requiredChecks.dryRunValidationPassed) {
+      validationErrors.push("dryRun must have no validation errors.");
+    }
+    if (!requiredChecks.dryRunIsDisabledPreview) {
+      validationErrors.push("dryRun must be the current feature-disabled preview.");
+    }
+    if (!requiredChecks.dryRunHasNoSideEffects) {
+      validationErrors.push("dryRun side effects must all be false.");
+    }
+  }
+
+  const changedFields = Array.isArray(dryRun?.writePlan?.changedFields)
+    ? dryRun.writePlan.changedFields
+    : Array.isArray(application?.changes)
+      ? application.changes.map((change) => change?.field).filter(Boolean)
+      : [];
+  const parsedVersion = Number(agent?.configVersion || agent?.versionNumber || "");
+  const currentVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
+  const targetVersion = Number(dryRun?.writePlan?.targetVersion) || currentVersion + 1;
+  const preconditionsReady = validationErrors.length === 0;
+
+  return {
+    ok: false,
+    realApplyGate: true,
+    gateReady: false,
+    preconditionsReady,
+    canApply: false,
+    blockedReasons,
+    validationErrors,
+    requiredChecks,
+    applicationId: application?.id || "",
+    approvalId: application?.approvalId || approval?.id || "",
+    agentId: application?.agentId || agent?.id || "",
+    writePlan: {
+      wouldUpdateAgent: false,
+      wouldCreateVersion: false,
+      wouldWriteRuntimeEvent: false,
+      transactionRequired: true,
+      targetVersion,
+      changedFields,
+    },
+    rollbackPlan: {
+      rollbackRequiresNewApproval: true,
+      rollbackAction: "create_new_agent_config_application",
+      wouldRestoreVersion: currentVersion,
+    },
+    auditPlan: {
+      requiresRequestedBy: true,
+      requiresConfirmText: true,
+      requiresGitCheckpoint: true,
+      storesRawSecrets: false,
+      createsRunnerJob: false,
+    },
+    sideEffects: noAgentConfigApplyGateSideEffects(),
+  };
+}
+
 function buildAgentConfigApplyDryRun({ application, approval, agent, body = {} }) {
   const blockedReasons = ["feature_disabled"];
   const validationErrors = [];
@@ -1178,6 +1343,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildAgentConfigRealApplyGate,
   buildAgentConfigApplyDryRun,
+  noAgentConfigApplyGateSideEffects,
   noAgentConfigDryRunSideEffects,
 };

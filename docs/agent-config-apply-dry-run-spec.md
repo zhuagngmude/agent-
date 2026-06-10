@@ -113,6 +113,27 @@ The dry-run must reject or block when any condition is false:
 
 The first real Agent config apply implementation must be a separate commit after dry-run is stable.
 
+Current executable gate helper:
+
+```text
+buildAgentConfigRealApplyGate(...)
+```
+
+Current status: helper-only and feature-disabled. It may prove future preconditions with `preconditionsReady=true`, but it must still return `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
+
+Required gate inputs before any future real write can be considered:
+
+- Matching dry-run result for the same application, approval, and target Agent.
+- Dry-run result is the current feature-disabled preview: `dryRun=true`, `ok=false`, `canApply=false`, and `blockedReasons` includes `feature_disabled`.
+- Dry-run result has no validation errors.
+- Dry-run result has all side effects false.
+- Application exists and remains `pending_apply`.
+- Source approval exists, is `approved`, targets `agent_config`, and has no Runner job.
+- Target Agent exists.
+- Request includes `secondConfirm=true`, non-empty `confirmText`, and non-empty `requestedBy`.
+- Request includes `gitCheckpoint.created=true` and a checkpoint commit id.
+- Request includes `rollbackPlanAccepted=true`.
+
 It must:
 
 - Add an explicit feature flag separate from Model Gateway and Runner flags.
@@ -163,6 +184,9 @@ Before any real apply endpoint can be enabled:
 
 - Dry-run endpoint exists and is covered by Mock and SQLite verification.
 - Helper-level regression covers preconditions that normal HTTP flow cannot create, including unapproved source approval and source approval with a Runner job.
+- Real apply gate helper exists and is covered by `scripts/verify-agent-config-apply-gate.ps1`.
+- Real apply gate can report `preconditionsReady=true` for valid input while still keeping `gateReady=false`, `canApply=false`, and `feature_disabled`.
+- Real apply gate rejects missing requestedBy, missing Git checkpoint, missing rollback acceptance, missing or mismatched dry-run proof, dry-run validation errors, dry-run side effects, and source approval with Runner job.
 - Dry-run blocked state keeps all side effects false.
 - Invalid application ID returns a safe error.
 - Non-`pending_apply` application is rejected.
