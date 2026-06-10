@@ -139,6 +139,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 ```
 
 脚本会验证：

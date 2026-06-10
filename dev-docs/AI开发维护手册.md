@@ -986,3 +986,9 @@ docs/runner-safety-acceptance.md
 - 为什么改：减少页面加载前的误导信息，让控制台更像当前项目真实状态。
 - 影响模块：`apps/web/index.html`。
 - 是否需要同步人类说明书：暂不需要；这是前端原型文案收敛。
+## 2026-06-10 变更记录：本地 UI 自动冒烟脚本
+
+- 改了什么：新增 `scripts/verify-local-ui.ps1`，用于检查当前运行中的本地 SQLite 试用版 API、runtime safety、Model Gateway 禁用状态、Runner 安全边界，并通过 Microsoft Edge + Playwright CLI 冒烟首页、任务、审批、运行、设置和集成页。
+- 为什么改：把前面手工浏览器验收固化成一条可重复命令，减少后续每次小修时漏看控制台错误、假按钮或安全边界文案的风险。
+- 影响模块：`scripts/verify-local-ui.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`。
+- 是否需要同步人类说明书：暂不需要；这是开发验收脚本，不新增真实模型调用、Runner 执行、云同步或权限能力。
