@@ -5,7 +5,7 @@ This is the short operating guide for `agent-swarm`.
 ## Current Stage
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.5.
+- Current stage: MVP-0.3.
 - Web App first, desktop later.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.

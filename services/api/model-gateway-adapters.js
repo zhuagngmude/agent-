@@ -62,7 +62,7 @@ function disabledProviderConnectivityAdapter(request) {
     durationMs: 0,
     redactionApplied: true,
     blockedReasons: [
-      "Provider adapter is disabled in MVP-0.5.",
+      "Provider adapter is disabled in MVP-0.2.",
       "Real provider requests are blocked by the Model Gateway feature flag boundary.",
     ],
   };
@@ -264,7 +264,7 @@ function openAiCompatRelayConnectivityAdapter(request) {
     blockedReasons: [
       "OpenAI-compatible relay adapter is interface-only in this checkpoint.",
       "Relay endpoint shape and model name must be confirmed before any real request.",
-      "Real provider requests remain blocked by the MVP-0.5 Model Gateway feature flag boundary.",
+      "Real provider requests remain blocked by the Model Gateway feature flag boundary.",
     ],
   };
 }

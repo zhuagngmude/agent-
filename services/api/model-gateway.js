@@ -170,7 +170,7 @@ function modelGatewayStatus() {
       makesNetworkRequests: false,
     },
     blockedReasons: [
-      "Real model calls are disabled in MVP-0.5.",
+      "Real model calls are disabled in MVP-0.2.",
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
       "This endpoint only reports provider configuration boundaries.",
     ],
@@ -350,7 +350,7 @@ function modelGatewayDryRun(request) {
     wouldCallProvider: false,
     blockedReasons: [
       "Dry-run does not call real providers.",
-      "Real model calls are disabled in MVP-0.5.",
+      "Real model calls are disabled in MVP-0.2.",
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
     ],
     sideEffects: {
@@ -407,7 +407,7 @@ function modelGatewayConnectivityTest(request) {
     durationMs: adapterResult.durationMs,
     redactionApplied: adapterResult.redactionApplied,
     blockedReasons: [
-      "Manual connectivity test is specification-only in MVP-0.5.",
+      "Manual connectivity test is specification-only in MVP-0.2.",
       "Provider SDKs are not loaded and provider network requests are disabled.",
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
     ],

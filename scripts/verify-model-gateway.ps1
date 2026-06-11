@@ -72,8 +72,8 @@ function Assert-ModelGatewayFeatureFlags {
 
   Assert-Equal $FeatureFlags.manualConnectivityTestEnvVar "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST" "$Prefix should expose the manual connectivity env var name."
   Assert-True (($FeatureFlags.manualConnectivityTestRequested -eq $true) -or ($FeatureFlags.manualConnectivityTestRequested -eq $false)) "$Prefix should report the requested flag as a boolean."
-  Assert-Equal $FeatureFlags.manualConnectivityTestActive $false "$Prefix should not be active in MVP-0.5."
-  Assert-Equal $FeatureFlags.realProviderRequestsAllowed $false "$Prefix should not allow provider requests in MVP-0.5."
+  Assert-Equal $FeatureFlags.manualConnectivityTestActive $false "$Prefix should not be active in MVP-0.2."
+  Assert-Equal $FeatureFlags.realProviderRequestsAllowed $false "$Prefix should not allow provider requests in MVP-0.2."
 }
 
 function Assert-DryRunNoSideEffects {
@@ -572,8 +572,8 @@ process.stdout.write(JSON.stringify(cases));
     $flagBoundaryJson = node -e "const gateway = require('./services/api/model-gateway'); process.stdout.write(JSON.stringify(gateway.modelGatewayConnectivityTest({provider:'openai',model:'gpt-4.1-mini',purpose:'manual_connectivity_test',secondConfirm:true,confirmText:'local feature flag boundary'})));"
     $flagBoundary = $flagBoundaryJson | ConvertFrom-Json
     Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
-    Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.5."
-    Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.5."
+    Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.2."
+    Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.2."
     Assert-DisabledConnectivityAdapter -ConnectivityTest $flagBoundary -ExpectedProviderAdapterId "openai_disabled_connectivity_adapter" -Prefix "Manual connectivity env var boundary"
     Assert-ConnectivityTestNoSideEffects -ConnectivityTest $flagBoundary -Prefix "Manual connectivity env var boundary"
   } finally {
