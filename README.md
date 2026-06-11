@@ -20,7 +20,7 @@
 
 在 MVP-0.4 中，execution request 审查视图、生命周期流转和 runtime events 审计闭环已经完成。Mock / SQLite flow 都覆盖该链路。
 
-阶段 2 当前只进入准入设计：`model_calls` 记录结构已有草案，但仍不建表、不接 provider、不调用真实模型。
+阶段 2 当前只进入准入设计：`model_calls` 记录结构和 Model Gateway 未来正式入口已有草案，但仍不建表、不接 provider、不调用真实模型。
 
 这些链路仍然不调用真实模型，不执行真实 Runner，不写本地项目文件，不改 Git。
 

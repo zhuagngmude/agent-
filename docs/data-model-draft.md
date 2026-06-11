@@ -160,7 +160,10 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 - `cloud_sync_jobs`
 - `runner_execution_logs`
 
-说明：`model_calls` 已进入阶段 2 结构草案，但 SQLite 建表、Mock / SQLite 写入、真实 provider 调用和 token usage 独立事件表仍暂缓。
+说明：
+
+- `model_calls` 已进入阶段 2 结构草案，但 SQLite 建表、Mock / SQLite 写入、真实 provider 调用和 token usage 独立事件表仍暂缓。
+- `api_keys` 仍暂缓；阶段 2 第一版只允许 server env 读取 API key，不在 SQLite、Mock runtime state、前端 storage 或日志中保存 key。
 
 ## 迁移顺序
 

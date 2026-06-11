@@ -11,6 +11,7 @@ Development notes, handoffs, and current working guidance.
 - [MVP-0.4验收记录.md](./MVP-0.4验收记录.md): acceptance snapshot for the completed MVP-0.4 local loop.
 - [应用真正可用落地计划.md](./应用真正可用落地计划.md): staged path from the completed MVP-0.4 local loop to a truly usable application.
 - [真实模型接入准入规格.md](./真实模型接入准入规格.md): internal gate for entering the first real model-call design without enabling providers.
+- [Model Gateway正式入口设计.md](./Model%20Gateway正式入口设计.md): Stage 2 draft for the future model-call entrypoint, provider config, and key-storage boundary.
 - [UI第一版验收建议.md](./UI第一版验收建议.md): UI acceptance notes.
 - [前端交互反推架构调整.md](./前端交互反推架构调整.md): frontend-driven architecture notes.
 

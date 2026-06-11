@@ -10,7 +10,7 @@
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
-- 阶段 2 当前只完成 `model_calls` 结构草案；未建表、未新增 route、未导入 SDK、未发 provider 请求。
+- 阶段 2 当前已完成 `model_calls` 结构草案和 `Model Gateway正式入口设计.md`；未建表、未新增 route、未导入 SDK、未读取 raw key、未发 provider 请求。
 
 ## 先读顺序
 
@@ -22,6 +22,7 @@
 6. `dev-docs/新窗口交接说明.md`
 7. `dev-docs/应用真正可用落地计划.md`
 8. `dev-docs/真实模型接入准入规格.md`
+9. `dev-docs/Model Gateway正式入口设计.md`
 
 ## 维护原则
 

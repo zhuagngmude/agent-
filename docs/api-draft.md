@@ -73,6 +73,14 @@
 - `openai_compat` 只能作为禁用态 relay 元数据出现。
 - `services/api/model-gateway-project-plan.js` 只是 helper-only 的 `project_plan_generation` 准入构造器，不接 route，不写状态，不调用 provider。
 
+阶段 2 未来入口草案：
+
+- 候选 route：`POST /api/projects/:projectId/project-plan-model-requests`
+- 当前状态：未实现。
+- 未来行为：只能通过后端 Model Gateway 生成 `project_plan_generation` 模型调用，并且只把结构化结果写入 `project_plan` 审批草案。
+- 禁止：客户端 API key、base URL、headers、provider body、prompt template、system prompt、stream、tools、files、Runner job id。
+- Provider 配置只允许后端配置来源；状态响应不得返回 key、key suffix、masked key fragment 或 base URL 原文。
+
 ## 常规只读路由
 
 当前实现里还保留这些读取/展示路由：

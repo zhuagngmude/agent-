@@ -10,7 +10,7 @@ This is the short operating guide for `agent-swarm`.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.
 - MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented and accepted.
-- Stage 2 currently only has a `model_calls` data-model draft and admission boundaries; no table, route, provider SDK, or real provider request is enabled.
+- Stage 2 currently has a `model_calls` data-model draft plus a future Model Gateway entrypoint / provider config / key-storage design; no table, route, raw-key read, provider SDK, or real provider request is enabled.
 
 ## Read First
 
