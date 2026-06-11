@@ -16,6 +16,7 @@ let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
 let agentConfigRollbackRequestRunning = false;
+const agentConfigVersionHistoryByAgentId = new Map();
 
 function pendingApprovalRequests() {
   return (appData.approvalRequests || []).filter((item) => item.status === "pending");
@@ -220,6 +221,9 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
   `).join("");
 
   const agent = agents[selectedAgentIndex] || agents[0];
+  if (!agentConfigVersionHistoryByAgentId.has(agent.id)) {
+    void refreshAgentConfigVersionHistory(agent.id);
+  }
   const parentAgent = agentById.get(agent.parentAgentId);
   const reportAgent = agentById.get(agent.reportsToAgentId);
   if (detailStatus) {
@@ -250,6 +254,7 @@ function renderAgentsPage(selectedIndex = selectedAgentIndex) {
       <h3>权限</h3>
       <ul>${(agent.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("") || "<li>暂无权限</li>"}</ul>
     </div>
+    ${renderAgentConfigVersionHistory(agent)}
   `;
 
   board.querySelectorAll("[data-agent-index]").forEach((card) => {
@@ -547,6 +552,147 @@ async function postAgentConfigRollbackRequest(applicationId, body = {}) {
   return result;
 }
 
+async function requestAgentConfigVersionHistory(agentId) {
+  const response = await fetch(`${apiBase}/api/agents/${encodeURIComponent(agentId)}/config-version-history`);
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function refreshAgentConfigVersionHistory(agentId, options = {}) {
+  const current = agentConfigVersionHistoryByAgentId.get(agentId);
+  if (!agentId || current?.loading || (current?.history && !options.force)) return;
+
+  agentConfigVersionHistoryByAgentId.set(agentId, { loading: true });
+  try {
+    const history = await requestAgentConfigVersionHistory(agentId);
+    agentConfigVersionHistoryByAgentId.set(agentId, { loading: false, history });
+  } catch (error) {
+    agentConfigVersionHistoryByAgentId.set(agentId, { loading: false, error: error.message });
+  }
+
+  const selectedAgent = appData.agents?.[selectedAgentIndex];
+  if (selectedAgent?.id === agentId) {
+    renderAgentsPage(selectedAgentIndex);
+  }
+}
+
+function refreshSelectedAgentConfigVersionHistory(options = {}) {
+  const selectedAgent = appData.agents?.[selectedAgentIndex];
+  if (selectedAgent?.id) {
+    void refreshAgentConfigVersionHistory(selectedAgent.id, options);
+  }
+}
+
+function formatConfigValue(value) {
+  if (Array.isArray(value)) return value.length > 0 ? value.join(" / ") : "空";
+  if (value === true) return "是";
+  if (value === false) return "否";
+  if (value === null || value === undefined || value === "") return "未记录";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function versionLabel(version) {
+  if (!version) return "无";
+  const time = version.appliedAt || version.createdAt || "未记录时间";
+  const approval = version.approvalId ? ` · 审批 ${version.approvalId}` : "";
+  return `v${version.version || "?"} · ${time}${approval}`;
+}
+
+function renderConfigSnapshot(snapshot = {}) {
+  const entries = Object.entries(snapshot || {});
+  if (entries.length === 0) return "<li>暂无快照字段</li>";
+  return entries
+    .map(([field, value]) => `<li><b>${escapeHtml(field)}</b><span>${escapeHtml(formatConfigValue(value))}</span></li>`)
+    .join("");
+}
+
+function renderVersionChanges(version) {
+  const changes = Array.isArray(version?.changes) ? version.changes : [];
+  if (changes.length === 0) return "<li>暂无版本变更明细</li>";
+  return changes.map((change) => {
+    if (Array.isArray(change)) {
+      const [field, before, after] = change;
+      return `<li>${escapeHtml(field || "field")}：${escapeHtml(formatConfigValue(before))} -> ${escapeHtml(formatConfigValue(after))}</li>`;
+    }
+    return `<li>${escapeHtml(change.field || "field")}：${escapeHtml(formatConfigValue(change.before))} -> ${escapeHtml(formatConfigValue(change.after))}</li>`;
+  }).join("");
+}
+
+function renderAgentConfigVersionHistory(agent) {
+  const state = agentConfigVersionHistoryByAgentId.get(agent.id);
+  if (!state || state.loading) {
+    return `
+      <div class="task-files">
+        <h3>配置版本历史</h3>
+        <ul><li>正在读取版本历史，只读查询不会写入配置或创建 Runner job。</li></ul>
+      </div>
+    `;
+  }
+  if (state.error) {
+    return `
+      <div class="task-files">
+        <h3>配置版本历史</h3>
+        <ul><li>读取失败：${escapeHtml(state.error)}</li></ul>
+      </div>
+    `;
+  }
+
+  const history = state.history || {};
+  const versions = Array.isArray(history.versions) ? history.versions : [];
+  const candidates = Array.isArray(history.restoreCandidates) ? history.restoreCandidates : [];
+  return `
+    <div class="task-files">
+      <h3>配置版本历史</h3>
+      <ul>
+        <li><b>当前版本</b>：${escapeHtml(versionLabel(history.currentVersion))}</li>
+        <li><b>默认回滚来源</b>：${escapeHtml(versionLabel(history.restoreVersion))}</li>
+        <li><b>可回退版本</b>：${escapeHtml(candidates.length)} 个</li>
+        <li><b>回滚来源就绪</b>：${history.rollbackSourceReady ? "是" : "否"}</li>
+        <li><b>只读保护</b>：${history.readOnly && history.canWrite === false ? "已确认" : "未确认"}</li>
+        ${versions.length === 0 ? "<li>暂无真实版本记录；SQLite 真实应用成功后才会生成版本。</li>" : ""}
+      </ul>
+    </div>
+  `;
+}
+
+function renderAgentConfigRollbackVersionDetails(versionHistoryState) {
+  if (!versionHistoryState || versionHistoryState.loading) {
+    return `<p class="muted">正在读取 Agent 配置版本历史，回滚来源暂不可确认。</p>`;
+  }
+  if (versionHistoryState.error) {
+    return `<p class="muted">版本历史读取失败：${escapeHtml(versionHistoryState.error)}</p>`;
+  }
+
+  const history = versionHistoryState.history || {};
+  const candidates = Array.isArray(history.restoreCandidates) ? history.restoreCandidates : [];
+  const currentVersion = history.currentVersion;
+  const restoreVersion = history.restoreVersion;
+  return `
+    <div class="task-files">
+      <h3>当前版本快照</h3>
+      <ul>${renderConfigSnapshot(currentVersion?.configSnapshot || {})}</ul>
+    </div>
+    <div class="task-files">
+      <h3>默认回滚来源快照</h3>
+      <ul>${renderConfigSnapshot(restoreVersion?.configSnapshot || {})}</ul>
+    </div>
+    <div class="task-files">
+      <h3>当前版本变更</h3>
+      <ul>${renderVersionChanges(currentVersion)}</ul>
+    </div>
+    <div class="task-files">
+      <h3>可回退版本</h3>
+      <ul>
+        ${candidates.map((version) => `<li>${escapeHtml(versionLabel(version))}</li>`).join("") || "<li>暂无可回退版本</li>"}
+      </ul>
+    </div>
+  `;
+}
+
 async function requestRuntimeState(method, path = "/api/runtime-state") {
   const response = await fetch(`${apiBase}${path}`, { method });
   const result = await response.json().catch(() => ({}));
@@ -837,13 +983,20 @@ function renderAgentConfigApplicationAudit(application, approval) {
   `).join("");
 }
 
-function renderAgentConfigRollbackReview(application, approval) {
+function renderAgentConfigRollbackReview(application, approval, versionHistoryState) {
+  const history = versionHistoryState?.history || {};
+  const historyLoading = !versionHistoryState || versionHistoryState.loading;
+  const historyError = versionHistoryState?.error || "";
+  const rollbackSourceReady = Boolean(history.rollbackSourceReady);
+  const versions = Array.isArray(history.versions) ? history.versions : [];
+  const restoreCandidates = Array.isArray(history.restoreCandidates) ? history.restoreCandidates : [];
   const canReviewRollback = application.status === "applied"
     && Boolean(application.appliedAt)
     && Array.isArray(application.changes)
     && application.changes.length > 0
     && approval?.targetService === "agent_config"
-    && !approval?.runnerJobId;
+    && !approval?.runnerJobId
+    && rollbackSourceReady;
   const review = [
     ["回滚入口", "当前未开放；必须重新创建 Agent 配置审批"],
     ["应用状态", application.status === "applied" ? "已应用，可进入回滚前审查" : "尚未应用，不需要回滚"],
@@ -851,7 +1004,12 @@ function renderAgentConfigRollbackReview(application, approval) {
     ["来源审批", approval?.targetService === "agent_config" ? "可追溯到 agent_config 审批" : "需先确认来源审批"],
     ["Runner job", approval?.runnerJobId ? `异常：${approval.runnerJobId}` : "未生成 Runner job"],
     ["字段差异", application.changes?.length ? `可基于 ${application.changes.length} 个字段生成反向变更草案` : "缺少字段差异"],
-    ["当前结论", canReviewRollback ? "可展示回滚前审查；仍不执行真实回滚" : "暂不满足回滚前审查条件"],
+    ["版本历史", historyLoading ? "读取中" : historyError ? `读取失败：${historyError}` : `${versions.length} 个版本记录`],
+    ["当前版本", history.currentVersion ? versionLabel(history.currentVersion) : "暂无当前版本"],
+    ["默认回滚来源", history.restoreVersion ? versionLabel(history.restoreVersion) : "暂无可用来源"],
+    ["可回退版本", `${restoreCandidates.length} 个`],
+    ["回滚来源就绪", rollbackSourceReady ? "是" : "否"],
+    ["当前结论", canReviewRollback ? "可展示完整回滚前审查；仍不执行真实回滚" : "暂不满足回滚前审查条件"],
   ];
 
   return review.map(([label, value]) => `
@@ -876,6 +1034,7 @@ function renderAgentConfigApplications(agent) {
 
   const selectedApplication = applications.find((item) => item.id === selectedAgentConfigApplicationId) || applications[0];
   const selectedApproval = approvalStatusForApplication(selectedApplication);
+  const versionHistoryState = agentConfigVersionHistoryByAgentId.get(agent.id);
 
   return `
     <div class="application-review-layout">
@@ -916,8 +1075,9 @@ function renderAgentConfigApplications(agent) {
         </div>
         <div class="application-checklist">
           <h3>回滚前审查</h3>
-          <ul>${renderAgentConfigRollbackReview(selectedApplication, selectedApproval)}</ul>
+          <ul>${renderAgentConfigRollbackReview(selectedApplication, selectedApproval, versionHistoryState)}</ul>
         </div>
+        ${renderAgentConfigRollbackVersionDetails(versionHistoryState)}
         <div class="task-files">
           <h3>字段变更</h3>
           <ul>
@@ -954,6 +1114,7 @@ async function runAgentConfigApplicationApply() {
     });
     appData = await loadDashboardFromApi();
     selectedAgentConfigApplicationId = result.application?.id || selectedAgentConfigApplicationId;
+    refreshSelectedAgentConfigVersionHistory({ force: true });
     renderDashboard();
     renderAgentsPage(selectedAgentIndex);
     setAgentChangeFeedback("已标记为已应用；Agent 配置未被修改。", "success");
@@ -980,6 +1141,7 @@ async function runAgentConfigApplicationCancel() {
     });
     appData = await loadDashboardFromApi();
     selectedAgentConfigApplicationId = result.application?.id || selectedAgentConfigApplicationId;
+    refreshSelectedAgentConfigVersionHistory({ force: true });
     renderDashboard();
     renderAgentsPage(selectedAgentIndex);
     setAgentChangeFeedback("已标记为已取消；Agent 配置未被修改。", "success");
@@ -1030,6 +1192,7 @@ async function runAgentChangeRequest() {
     const body = agentChangeRequestBody(agent, selectedAgentChangeType);
     const result = await postAgentChangeRequest(agent.id, body);
     appData = await loadDashboardFromApi();
+    refreshSelectedAgentConfigVersionHistory({ force: true });
     renderDashboard();
     renderAgentsPage(selectedAgentIndex);
     renderApprovalPage(selectedApprovalIndex);
@@ -1633,6 +1796,7 @@ async function runApprovalAction(action) {
     await postApprovalAction(item.id, action, body);
     appData = await loadDashboardFromApi();
     selectedApprovalIndex = Math.min(selectedApprovalIndex, Math.max(pendingApprovalRequests().length - 1, 0));
+    refreshSelectedAgentConfigVersionHistory({ force: true });
     renderDashboard();
     renderAgentsPage();
     renderWorkflowPage();
@@ -1671,6 +1835,7 @@ async function runTaskAction(action) {
     if (!taskHasEnabledAction(tasks[selectedTaskIndex])) {
       selectedTaskIndex = defaultTaskIndex(tasks);
     }
+    refreshSelectedAgentConfigVersionHistory({ force: true });
     renderDashboard();
     renderAgentsPage();
     renderWorkflowPage();
@@ -1742,6 +1907,7 @@ async function runRuntimeStateAction(action) {
     } else if (action === "reset") {
       await requestRuntimeState("POST", "/api/runtime-state/reset");
       appData = await loadDashboardFromApi();
+      refreshSelectedAgentConfigVersionHistory({ force: true });
       renderDashboard();
       renderAgentsPage();
       renderWorkflowPage();
@@ -1752,6 +1918,7 @@ async function runRuntimeStateAction(action) {
     } else if (action === "clear") {
       await requestRuntimeState("DELETE");
       appData = await loadDashboardFromApi();
+      refreshSelectedAgentConfigVersionHistory({ force: true });
       renderDashboard();
       renderAgentsPage();
       renderWorkflowPage();
