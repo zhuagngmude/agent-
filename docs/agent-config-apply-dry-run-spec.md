@@ -232,7 +232,7 @@ buildAgentConfigVersionHistory(...)
 POST /api/agent-config-applications/:applicationId/rollback-request
 ```
 
-该路由只读取 application、来源审批和目标 Agent。由于 MVP-0.2 还没有在 app flow 中写入或读取真实 `agent_config_versions`，普通 Mock/SQLite 路由调用会返回 `requestReady=false`，带 current/restore version 验证错误，同时仍保持所有 sideEffects 为 false。
+该路由只读取 application、来源审批、目标 Agent 和只读版本历史。Mock 或无版本历史的 SQLite flow 会返回 `requestReady=false`，带 current/restore version 验证错误，同时仍保持所有 sideEffects 为 false。若 feature-gated SQLite real apply 已产生至少两个安全版本，路由会复用 `buildAgentConfigVersionHistory(...)` 选择 current/restore 版本，并返回 `restoreDiff` / `rollbackPreview.diff`，每项包含 `field`、`current`、`restore` 和 `action=restore`；它仍保持 `ok=false`、`canCreateApproval=false` 和 `feature_disabled`。
 
 helper 覆盖脚本：
 
@@ -242,6 +242,8 @@ scripts/verify-agent-config-version-history.ps1
 ```
 
 `buildAgentConfigVersionHistory(...)` 是回滚来源选择的只读 source helper。`GET /api/agents/:agentId/config-version-history` 是对应只读 HTTP route：Mock 模式返回空历史，SQLite 模式从 snapshot 只读 `agent_config_versions` 后交给 helper 规范化。它支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，选择 current version 和 restore candidates，并保持全 false sideEffects。它不创建回滚请求，不写 SQLite，不写版本。
+
+版本历史和回滚预览只允许暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`。如果 snapshot 或 changes 中出现 secret/API key/token/provider/prompt/local path/Runner/tool/command/file/Git/network/workspace 等禁止字段或值，helper 必须报 validation error；禁止值必须以固定 redaction 占位返回，不能原样进入 UI 或路由响应。
 
 回滚必须：
 
@@ -287,6 +289,8 @@ scripts/verify-agent-config-version-history.ps1
 - 禁用态回滚请求路由已存在，并由 Mock 和 SQLite 验证覆盖。
 - 回滚请求可以对有效输入报告 `requestReady=true`，同时仍保持 `ok=false`、`canCreateApproval=false` 和 `feature_disabled`。
 - Mock/SQLite 回滚请求路由在真实版本历史存在前保持 `requestReady=false`。
+- feature-gated SQLite real apply 产生两个版本后，回滚请求路由可以返回 `requestReady=true` 和 read-only restore diff，但仍必须保持 `ok=false`、`canCreateApproval=false` 和全 false sideEffects。
+- 回滚 diff 每项必须包含 `field`、`current`、`restore` 和 `action=restore`，并且只能来自允许的 Agent config 字段。
 - 回滚请求会拒绝非 applied 原 application、未批准来源审批、来源审批带 Runner job、错误 target service、错误 Agent 版本归属、restore version 不早于 current version、缺少 confirmation/requester/reason、没有变更字段。
 - 回滚请求只起草新的审批、新 application 和未来新版本，不实际创建。
 - 版本历史来源 helper 会拒绝 wrong-Agent 版本、重复或缺失版本号、禁止 snapshot 字段、禁止 snapshot 值、非法 restore target，并且没有 sideEffects。

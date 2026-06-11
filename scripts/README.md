@@ -68,11 +68,11 @@ sqlite/
 
 `verify-agent-config-transaction-plan.ps1` 验证未来真实写入的事务计划 helper。它证明计划写入集将来必须在一个事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`，但当前仍保持 `canWrite=false` 和全 false sideEffects。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-rollback-request.ps1` 验证直接 helper 级别的 Agent 配置回滚请求契约。它证明有效输入可以起草未来的审批/application/版本，但当前仍必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。Mock 和 SQLite flow 脚本会覆盖禁用态 HTTP 路由；在真实版本历史接入前，该路由保持 `requestReady=false`。
+`verify-agent-config-rollback-request.ps1` 验证直接 helper 级别的 Agent 配置回滚请求契约。它证明有效输入可以起草未来的审批/application/版本并生成 restore diff，但当前仍必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。Mock 和 SQLite flow 脚本会覆盖无版本历史时的禁用态 HTTP 路由；`verify-agent-config-real-apply-sqlite.ps1` 会覆盖真实版本历史存在后路由返回 read-only current/restore diff。
 
 `verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。Mock/SQLite flow 脚本还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-real-apply-sqlite.ps1` 验证受 feature flag 控制的 SQLite Agent 配置真实 apply。默认关闭时，`POST /api/agent-config-applications/:applicationId/apply` 仍只做状态流转，不修改 `agents`，不写 `agent_config_versions`。当 API 进程显式设置 `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`，并且请求体携带 dry-run proof、二次确认、`requestedBy`、Git checkpoint acknowledgement 和 rollback acceptance 时，脚本验证一次 SQLite 事务会同时更新 `agents`、插入 `agent_config_versions`、标记 application applied、写 runtime event，并继续禁止创建 Runner job、执行 Runner、调用模型或读取 raw secret。脚本使用隔离端口 `8790`，不得占用人类本地试用端口 `8787`。
+`verify-agent-config-real-apply-sqlite.ps1` 验证受 feature flag 控制的 SQLite Agent 配置真实 apply。默认关闭时，`POST /api/agent-config-applications/:applicationId/apply` 仍只做状态流转，不修改 `agents`，不写 `agent_config_versions`。当 API 进程显式设置 `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`，并且请求体携带 dry-run proof、二次确认、`requestedBy`、Git checkpoint acknowledgement 和 rollback acceptance 时，脚本验证 SQLite 事务会更新 `agents`、插入 `agent_config_versions`、标记 application applied、写 runtime event；两个真实版本存在后，它还验证 rollback-request preview 会读取版本历史并返回 read-only restore diff。脚本继续禁止创建 Runner job、执行 Runner、调用模型或读取 raw secret，并使用隔离端口 `8790`，不得占用人类本地试用端口 `8787`。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -174,7 +174,7 @@ This script is acceptance verification, not a real connectivity test. It must no
 - `services/api/agent-config-rollback-request.js` 负责后续回滚 flow 的禁用态回滚请求草稿。
 - 有效请求可以返回 `requestReady=true`，但仍必须返回 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。
 - helper 要求原 application 已 applied、来源 `agent_config` 审批已批准且没有 Runner job、目标 Agent 存在、current/restore 版本属于目标 Agent、restore 版本早于 current 版本、二次确认、requester、reason，以及至少一个变更字段。
-- `POST /api/agent-config-applications/:applicationId/rollback-request` 是禁用态预览路由，由 `verify-mock-flows.ps1` 和 `verify-sqlite-flows.ps1` 覆盖；真实版本历史存在前，普通路由调用保持 `requestReady=false`。
+- `POST /api/agent-config-applications/:applicationId/rollback-request` 是禁用态预览路由，由 `verify-mock-flows.ps1` 和 `verify-sqlite-flows.ps1` 覆盖无版本历史路径；真实版本历史存在后，它可以返回 `requestReady=true` 和只读 restore diff，但仍不能创建审批。
 - 回滚必须起草新的审批、新 application 和未来新版本。它不得删除或覆盖版本历史、直接更新 `agents`、创建审批、创建 application、创建 Runner job、执行 Runner、调用模型、写 SQLite/runtime state 或读取 raw secret。
 
 ## verify-agent-config-version-history.ps1
@@ -194,4 +194,4 @@ This script is acceptance verification, not a real connectivity test. It must no
 - 开关打开时，真实 apply 只允许 SQLite 模式，并要求 dry-run proof、`secondConfirm=true`、确认文本、`requestedBy`、Git checkpoint acknowledgement 和 `rollbackPlanAccepted=true`。
 - 成功写入必须在一个 SQLite transaction 内完成：更新 `agents` 当前态、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`。
 - 该脚本继续断言不创建审批、不创建 Runner job、不执行 Runner、不调用真实模型、不读取 raw secret。
-- 这个 helper 检查不会启动本地服务、直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。
+- 两个真实版本存在后，脚本会调用禁用态 rollback-request 路由，确认它返回 current/restore 版本和 restore diff，但仍不创建审批、application 或 Runner job。

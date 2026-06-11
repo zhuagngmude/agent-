@@ -147,6 +147,26 @@ const cases = {
       configSnapshot: { permissions: ['read_project'], model: 'prompt override' },
       changes: []
     }]
+  }),
+  forbiddenChangeField: buildAgentConfigVersionHistory({
+    agent,
+    versions: [{
+      id: 'version_forbidden_change_field',
+      agentId: 'agent_reviewer',
+      version: 1,
+      configSnapshot: { permissions: ['read_project'], model: 'gpt-low' },
+      changes: [{ field: 'apiKey', before: '', after: 'hidden' }]
+    }]
+  }),
+  forbiddenChangeValue: buildAgentConfigVersionHistory({
+    agent,
+    versions: [{
+      id: 'version_forbidden_change_value',
+      agentId: 'agent_reviewer',
+      version: 1,
+      configSnapshot: { permissions: ['read_project'], model: 'gpt-low' },
+      changes: [{ field: 'model', before: 'gpt-low', after: 'prompt override' }]
+    }]
   })
 };
 
@@ -204,7 +224,18 @@ process.stdout.write(JSON.stringify(cases));
 
   Assert-Equal $cases.forbiddenSnapshotValue.ok $false "Forbidden snapshot value should fail."
   Assert-TextContains (@($cases.forbiddenSnapshotValue.validationErrors) -join "`n") "forbidden Agent config snapshot value in field: model" "Forbidden snapshot value should be reported."
+  Assert-Equal $cases.forbiddenSnapshotValue.currentVersion.configSnapshot.model "[redacted_forbidden_value]" "Forbidden snapshot value should be redacted from returned history."
   Assert-NoSideEffects -Result $cases.forbiddenSnapshotValue -Prefix "Forbidden snapshot value history"
+
+  Assert-Equal $cases.forbiddenChangeField.ok $false "Forbidden change field should fail."
+  Assert-TextContains (@($cases.forbiddenChangeField.validationErrors) -join "`n") "forbidden Agent config change field: apiKey" "Forbidden change field should be reported."
+  Assert-Equal @($cases.forbiddenChangeField.currentVersion.changes).Count 0 "Forbidden change field should not be returned."
+  Assert-NoSideEffects -Result $cases.forbiddenChangeField -Prefix "Forbidden change field history"
+
+  Assert-Equal $cases.forbiddenChangeValue.ok $false "Forbidden change value should fail."
+  Assert-TextContains (@($cases.forbiddenChangeValue.validationErrors) -join "`n") "forbidden Agent config change value in field: model" "Forbidden change value should be reported."
+  Assert-Equal $cases.forbiddenChangeValue.currentVersion.changes[0].after "[redacted_forbidden_value]" "Forbidden change value should be redacted."
+  Assert-NoSideEffects -Result $cases.forbiddenChangeValue -Prefix "Forbidden change value history"
 
   Write-Step "Agent config version history checks passed."
 } finally {

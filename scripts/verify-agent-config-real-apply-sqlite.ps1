@@ -66,6 +66,22 @@ function Assert-TextContains {
   }
 }
 
+function Assert-AgentConfigRollbackRequestNoSideEffects {
+  param([object]$RollbackRequest)
+
+  Assert-Equal $RollbackRequest.sideEffects.writesAgents $false "Agent config rollback request should not write Agents."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigVersions $false "Agent config rollback request should not write versions."
+  Assert-Equal $RollbackRequest.sideEffects.writesAgentConfigApplications $false "Agent config rollback request should not write applications."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeEvents $false "Agent config rollback request should not write runtime events."
+  Assert-Equal $RollbackRequest.sideEffects.writesSqlite $false "Agent config rollback request should not write SQLite."
+  Assert-Equal $RollbackRequest.sideEffects.writesRuntimeState $false "Agent config rollback request should not write runtime state."
+  Assert-Equal $RollbackRequest.sideEffects.createsApprovals $false "Agent config rollback request should not create approvals."
+  Assert-Equal $RollbackRequest.sideEffects.createsRunnerJobs $false "Agent config rollback request should not create Runner jobs."
+  Assert-Equal $RollbackRequest.sideEffects.executesRunner $false "Agent config rollback request should not execute Runner."
+  Assert-Equal $RollbackRequest.sideEffects.callsRealModel $false "Agent config rollback request should not call models."
+  Assert-Equal $RollbackRequest.sideEffects.readsRawSecrets $false "Agent config rollback request should not read raw secrets."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -143,6 +159,34 @@ function New-ApprovedAgentConfigApplication {
   Assert-Equal $approval.status "approved" "Agent config approval should be approved."
   Assert-Equal $approval.runnerJobId "" "Agent config approval should not create Runner job."
   Assert-True ($approval.agentConfigApplicationId -like "agent_config_application_*") "Approval should create Agent config application."
+
+  return @{
+    approvalId = $request.approval.id
+    applicationId = $approval.agentConfigApplicationId
+  }
+}
+
+function New-ApprovedAgentConfigModelApplication {
+  $request = Invoke-Json -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -Body @{
+    changeType = "model"
+    riskLevel = "medium"
+    reason = "Verify rollback preview can compare two real Agent config versions."
+    changes = @(
+      @{
+        field = "model"
+        before = "gemini-long-context"
+        after = "gpt-rollback-preview"
+      }
+    )
+  }
+
+  $approval = Invoke-Json -Method "POST" -Path "/api/approvals/$($request.approval.id)/approve" -Body @{
+    secondConfirm = $true
+    confirmText = "Approve second Agent config application for rollback preview verification."
+  }
+  Assert-Equal $approval.status "approved" "Second Agent config approval should be approved."
+  Assert-Equal $approval.runnerJobId "" "Second Agent config approval should not create Runner job."
+  Assert-True ($approval.agentConfigApplicationId -like "agent_config_application_*") "Second approval should create Agent config application."
 
   return @{
     approvalId = $request.approval.id
@@ -245,6 +289,41 @@ try {
     Assert-Equal $history.currentVersion.version 1 "Current version should be version 1."
     Assert-TextContains (@($history.currentVersion.configSnapshot.permissions) -join "`n") "canReviewApproval" "Version snapshot should store expanded permissions."
     Assert-Equal $history.rollbackSourceReady $false "Single-version history should not be rollback-source ready."
+
+    $secondIds = New-ApprovedAgentConfigModelApplication
+    $secondBody = New-ApplyProof -ApplicationId $secondIds.applicationId
+    $secondApplied = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($secondIds.applicationId)/apply" -Body $secondBody
+    Assert-Equal $secondApplied.application.status "applied" "Second real apply should mark application applied."
+    Assert-Equal $secondApplied.version.version 2 "Second real apply should create version 2."
+    Assert-Equal $secondApplied.version.configSnapshot.model "gpt-rollback-preview" "Second real apply should update model in snapshot."
+
+    $historyAfterSecondApply = Invoke-Json -Method "GET" -Path "/api/agents/agent_reviewer/config-version-history"
+    Assert-Equal @($historyAfterSecondApply.versions).Count 2 "Two real applies should create two versions."
+    Assert-Equal $historyAfterSecondApply.currentVersion.version 2 "Version 2 should be current."
+    Assert-Equal $historyAfterSecondApply.restoreVersion.version 1 "Default restore version should be version 1."
+    Assert-Equal $historyAfterSecondApply.rollbackSourceReady $true "Two-version history should be rollback-source ready."
+
+    $rollbackPreview = Invoke-Json -Method "POST" -Path "/api/agent-config-applications/$($secondIds.applicationId)/rollback-request" -Body @{
+      secondConfirm = $true
+      confirmText = "Verify rollback request preview only."
+      requestedBy = "verify_agent_config_real_apply_sqlite"
+      reason = "Verify read-only rollback preview diff."
+    }
+    Assert-Equal $rollbackPreview.rollbackRequest $true "Rollback preview should identify itself."
+    Assert-Equal $rollbackPreview.ok $false "Rollback preview should remain feature-disabled."
+    Assert-Equal $rollbackPreview.requestReady $true "Rollback preview should be ready when version history has current and restore."
+    Assert-Equal $rollbackPreview.canCreateApproval $false "Rollback preview should not create approval."
+    Assert-Equal $rollbackPreview.currentVersion 2 "Rollback preview should use current version 2."
+    Assert-Equal $rollbackPreview.restoreVersion 1 "Rollback preview should default restore to version 1."
+    Assert-Equal $rollbackPreview.versionHistory.rollbackSourceReady $true "Rollback preview should expose rollback source readiness."
+    Assert-Equal $rollbackPreview.rollbackPreview.fieldCount 1 "Rollback preview should produce one model diff."
+    Assert-TextContains (@($rollbackPreview.restoreDiff.field) -join "`n") "model" "Rollback diff should include model field."
+    Assert-TextContains (@($rollbackPreview.restoreDiff.current) -join "`n") "gpt-rollback-preview" "Rollback diff should include current model."
+    Assert-TextContains (@($rollbackPreview.restoreDiff.restore) -join "`n") "gemini-long-context" "Rollback diff should include restore model."
+    Assert-TextContains (@($rollbackPreview.restoreDiff.action) -join "`n") "restore" "Rollback diff should include restore action."
+    Assert-TextContains (@($rollbackPreview.blockedReasons) -join "`n") "feature_disabled" "Rollback preview should remain feature-disabled."
+    Assert-Equal @($rollbackPreview.validationErrors).Count 0 "Rollback preview should have no validation errors with two versions."
+    Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $rollbackPreview
 
     $jobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
     $agentConfigJobs = @($jobs.jobs | Where-Object { $_.approvalId -eq $ids.approvalId })

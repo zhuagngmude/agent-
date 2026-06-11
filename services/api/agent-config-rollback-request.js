@@ -14,6 +14,35 @@ function noAgentConfigRollbackRequestSideEffects() {
   };
 }
 
+const SNAPSHOT_FIELDS = ["permissions", "model", "status", "maxSubAgents", "canSpawnSubAgents"];
+const FORBIDDEN_FIELD_PATTERNS = [
+  /api.?key/i,
+  /secret/i,
+  /token/i,
+  /authorization/i,
+  /provider.?header/i,
+  /provider.?response/i,
+  /prompt/i,
+  /runner/i,
+  /command/i,
+  /file/i,
+  /git/i,
+  /network/i,
+  /workspace/i,
+  /parentAgentId/i,
+  /reportsToAgentId/i,
+];
+const FORBIDDEN_VALUE_PATTERNS = [
+  /api[_-]?key/i,
+  /secret/i,
+  /token=/i,
+  /authorization:\s*bearer/i,
+  /prompt/i,
+  /^[a-zA-Z]:[\\/]/,
+  /\/Users\//,
+  /\\Users\\/,
+];
+
 function versionValue(version = {}) {
   const source = version || {};
   const parsed = Number(source.version || source.versionNumber || "");
@@ -25,17 +54,93 @@ function versionAgentId(version = {}) {
   return source.agentId || source.agent_id || "";
 }
 
+function hasForbiddenValue(value) {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.some(hasForbiddenValue);
+  if (typeof value === "object") return Object.values(value).some(hasForbiddenValue);
+  return FORBIDDEN_VALUE_PATTERNS.some((pattern) => pattern.test(String(value)));
+}
+
+function snapshotValidationErrors(snapshot = {}, label) {
+  const errors = [];
+  for (const field of Object.keys(snapshot || {})) {
+    if (FORBIDDEN_FIELD_PATTERNS.some((pattern) => pattern.test(field))) {
+      errors.push(`${label} snapshot contains forbidden field: ${field}`);
+    }
+  }
+  for (const field of SNAPSHOT_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(snapshot, field) && hasForbiddenValue(snapshot[field])) {
+      errors.push(`${label} snapshot contains forbidden value in field: ${field}`);
+    }
+  }
+  return errors;
+}
+
+function safeDiffValue(value) {
+  return hasForbiddenValue(value) ? "[redacted_forbidden_value]" : value;
+}
+
+function safeChangeForResponse(change) {
+  const source = Array.isArray(change)
+    ? { field: change[0], before: change[1], after: change[2] }
+    : change;
+  const field = typeof source?.field === "string" ? source.field : "";
+  if (!SNAPSHOT_FIELDS.includes(field) || FORBIDDEN_FIELD_PATTERNS.some((pattern) => pattern.test(field))) {
+    return null;
+  }
+
+  return {
+    field,
+    before: safeDiffValue(source.before),
+    after: safeDiffValue(source.after),
+  };
+}
+
+function safeChangesForResponse(changes) {
+  if (!Array.isArray(changes)) return [];
+  return changes
+    .map(safeChangeForResponse)
+    .filter(Boolean);
+}
+
+function safeVersionForResponse(version) {
+  if (!version) return null;
+  const rawSnapshot = version.configSnapshot || version.config_snapshot || {};
+  const configSnapshot = {};
+  for (const field of SNAPSHOT_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(rawSnapshot, field)) {
+      configSnapshot[field] = safeDiffValue(rawSnapshot[field]);
+    }
+  }
+
+  return {
+    id: version.id || "",
+    projectId: version.projectId || version.project_id || "",
+    agentId: versionAgentId(version),
+    version: versionValue(version),
+    approvalId: version.approvalId || version.approval_id || "",
+    applicationId: version.applicationId || version.application_id || "",
+    configSnapshot,
+    changes: safeChangesForResponse(version.changes),
+    appliedBy: version.appliedBy || version.applied_by || "",
+    appliedAt: version.appliedAt || version.applied_at || "",
+    createdAt: version.createdAt || version.created_at || "",
+  };
+}
+
 function buildRollbackChanges({ currentVersion, restoreVersion } = {}) {
   const currentSnapshot = currentVersion?.configSnapshot || currentVersion?.config_snapshot || {};
   const restoreSnapshot = restoreVersion?.configSnapshot || restoreVersion?.config_snapshot || {};
-  const fields = ["permissions", "model", "status", "maxSubAgents", "canSpawnSubAgents"];
 
-  return fields
+  return SNAPSHOT_FIELDS
     .filter((field) => JSON.stringify(currentSnapshot[field]) !== JSON.stringify(restoreSnapshot[field]))
     .map((field) => ({
       field,
-      before: currentSnapshot[field],
-      after: restoreSnapshot[field],
+      before: safeDiffValue(currentSnapshot[field]),
+      after: safeDiffValue(restoreSnapshot[field]),
+      current: safeDiffValue(currentSnapshot[field]),
+      restore: safeDiffValue(restoreSnapshot[field]),
+      action: "restore",
     }));
 }
 
@@ -95,6 +200,12 @@ function buildAgentConfigRollbackRequest({
   if (currentVersionNumber > 0 && restoreVersionNumber > 0 && restoreVersionNumber >= currentVersionNumber) {
     validationErrors.push("restore version must be older than current version.");
   }
+  validationErrors.push(
+    ...snapshotValidationErrors(currentVersion?.configSnapshot || currentVersion?.config_snapshot || {}, "current version")
+  );
+  validationErrors.push(
+    ...snapshotValidationErrors(restoreVersion?.configSnapshot || restoreVersion?.config_snapshot || {}, "restore version")
+  );
   if (body.secondConfirm !== true) {
     validationErrors.push("secondConfirm=true is required.");
   }
@@ -134,6 +245,16 @@ function buildAgentConfigRollbackRequest({
     currentVersion: currentVersionNumber,
     restoreVersion: restoreVersionNumber,
     futureVersion,
+    versionHistory: {
+      rollbackSourceReady: Boolean(currentVersion && restoreVersion && currentVersionNumber > 0 && restoreVersionNumber > 0),
+      currentVersion: safeVersionForResponse(currentVersion),
+      restoreVersion: safeVersionForResponse(restoreVersion),
+    },
+    restoreDiff: rollbackChanges,
+    rollbackPreview: {
+      fieldCount: rollbackChanges.length,
+      diff: rollbackChanges,
+    },
     approvalDraft: {
       id: rollbackApprovalId,
       targetService: "agent_config",

@@ -69,6 +69,63 @@ function hasForbiddenValue(value) {
   return FORBIDDEN_VALUE_PATTERNS.some((pattern) => pattern.test(String(value)));
 }
 
+function safeSnapshotValue(value) {
+  return hasForbiddenValue(value) ? "[redacted_forbidden_value]" : value;
+}
+
+function normalizeChange(change, index) {
+  const validationErrors = [];
+  const source = Array.isArray(change)
+    ? { field: change[0], before: change[1], after: change[2] }
+    : change;
+
+  if (!source || typeof source !== "object") {
+    return {
+      change: null,
+      validationErrors: [`change ${index} must be an object or tuple.`],
+    };
+  }
+
+  const field = typeof source.field === "string" ? source.field : "";
+  if (!SNAPSHOT_FIELDS.includes(field) || FORBIDDEN_FIELD_PATTERNS.some((pattern) => pattern.test(field))) {
+    return {
+      change: null,
+      validationErrors: [`forbidden Agent config change field: ${field || "unknown"}`],
+    };
+  }
+
+  if (hasForbiddenValue(source.before) || hasForbiddenValue(source.after)) {
+    validationErrors.push(`forbidden Agent config change value in field: ${field}`);
+  }
+
+  return {
+    change: {
+      field,
+      before: safeSnapshotValue(source.before),
+      after: safeSnapshotValue(source.after),
+    },
+    validationErrors,
+  };
+}
+
+function normalizeChanges(changes) {
+  if (!Array.isArray(changes)) {
+    return { changes: [], validationErrors: [] };
+  }
+
+  const normalized = [];
+  const validationErrors = [];
+  changes.forEach((change, index) => {
+    const result = normalizeChange(change, index);
+    validationErrors.push(...result.validationErrors);
+    if (result.change) {
+      normalized.push(result.change);
+    }
+  });
+
+  return { changes: normalized, validationErrors };
+}
+
 function normalizeSnapshot(snapshot = {}) {
   const normalized = {};
   const validationErrors = [];
@@ -84,7 +141,7 @@ function normalizeSnapshot(snapshot = {}) {
       if (hasForbiddenValue(snapshot[field])) {
         validationErrors.push(`forbidden Agent config snapshot value in field: ${field}`);
       }
-      normalized[field] = snapshot[field];
+      normalized[field] = safeSnapshotValue(snapshot[field]);
     }
   }
 
@@ -94,6 +151,7 @@ function normalizeSnapshot(snapshot = {}) {
 function normalizeVersionRow(row = {}) {
   const rawSnapshot = parseJsonLike(row.configSnapshot || row.config_snapshot, {});
   const { snapshot, validationErrors } = normalizeSnapshot(rawSnapshot);
+  const changesResult = normalizeChanges(parseJsonLike(row.changes, []));
   return {
     id: row.id || "",
     projectId: row.projectId || row.project_id || "",
@@ -102,11 +160,11 @@ function normalizeVersionRow(row = {}) {
     approvalId: row.approvalId || row.approval_id || "",
     applicationId: row.applicationId || row.application_id || "",
     configSnapshot: snapshot,
-    changes: parseJsonLike(row.changes, []),
+    changes: changesResult.changes,
     appliedBy: row.appliedBy || row.applied_by || "",
     appliedAt: row.appliedAt || row.applied_at || "",
     createdAt: row.createdAt || row.created_at || "",
-    validationErrors,
+    validationErrors: [...validationErrors, ...changesResult.validationErrors],
   };
 }
 

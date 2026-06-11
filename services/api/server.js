@@ -1079,6 +1079,7 @@ async function handleAgentConfigRollbackRequest(req, res, applicationId) {
   const applications = snapshot?.agentConfigApplications || data.agentConfigApplications;
   const approvals = snapshot?.approvals || data.approvals;
   const agents = snapshot?.agents || data.agents;
+  const versions = snapshot?.agentConfigVersions || [];
   const application = applications.find((item) => item.id === applicationId);
   const approval = application
     ? approvals.find((item) => item.id === application.approvalId)
@@ -1101,14 +1102,40 @@ async function handleAgentConfigRollbackRequest(req, res, applicationId) {
     return;
   }
 
-  sendJson(res, 200, buildAgentConfigRollbackRequest({
+  const versionHistory = buildAgentConfigVersionHistory({
+    agent,
+    versions,
+    restoreVersion: body.restoreVersion,
+  });
+  const rollbackRequest = buildAgentConfigRollbackRequest({
     originalApplication: application,
     sourceApproval: approval,
     agent,
-    currentVersion: null,
-    restoreVersion: null,
+    currentVersion: versionHistory.currentVersion,
+    restoreVersion: versionHistory.restoreVersion,
     body,
-  }));
+  });
+  const validationErrors = [
+    ...versionHistory.validationErrors,
+    ...rollbackRequest.validationErrors,
+  ];
+
+  sendJson(res, 200, {
+    ...rollbackRequest,
+    requestReady: rollbackRequest.requestReady && versionHistory.rollbackSourceReady,
+    validationErrors: [...new Set(validationErrors)],
+    versionHistory: {
+      ...rollbackRequest.versionHistory,
+      readOnly: versionHistory.readOnly,
+      canWrite: versionHistory.canWrite,
+      rollbackSourceReady: versionHistory.rollbackSourceReady,
+      validationErrors: versionHistory.validationErrors,
+      currentVersion: versionHistory.currentVersion,
+      restoreVersion: versionHistory.restoreVersion,
+      restoreCandidates: versionHistory.restoreCandidates,
+      versions: versionHistory.versions,
+    },
+  });
 }
 
 function handleAgentConfigVersionHistory(res, agentId, restoreVersion) {

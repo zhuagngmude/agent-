@@ -170,8 +170,8 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - `verify-agent-config-dry-run.ps1` 会独立覆盖 Agent config dry-run helper 的反向用例：缺少二次确认、缺少确认文本、非 `pending_apply`、未批准来源审批、来源审批带 Runner job、错误 target service、缺少目标 Agent 和全 false sideEffects。
 - `verify-agent-config-apply-gate.ps1` 会独立覆盖未来真实 apply 前置闸门：即使 dry-run、二次确认、requestedBy、Git checkpoint 和 rollback acceptance 都满足，也只能返回 `preconditionsReady=true`，但 `gateReady=false`、`canApply=false`、`feature_disabled` 和全 false sideEffects 必须保持不变。
 - `verify-agent-config-transaction-plan.ps1` 会独立覆盖未来真实写入事务计划：计划写入集必须是同一事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`，但当前仍只能 `canWrite=false`、`feature_disabled` 和全 false sideEffects。
-- `verify-agent-config-rollback-request.ps1` 会独立覆盖直接 helper 级别的 Agent 配置回滚请求契约；Mock 和 SQLite flow 脚本也会覆盖禁用态 `POST /api/agent-config-applications/:applicationId/rollback-request` 路由。在真实版本历史存在前，该路由必须保持 `requestReady=false`。
-- `verify-agent-config-version-history.ps1` 会独立覆盖只读 Agent 配置版本历史来源 helper：只规范化已经加载好的版本行，验证目标 Agent 过滤、版本排序、current/restore 选择、snapshot 字段白名单、禁止字段/值和全 false sideEffects。Mock/SQLite flow 还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由；该路由不得写版本、创建回滚审批、执行 Runner、调用模型或读取密钥。
+- `verify-agent-config-rollback-request.ps1` 会独立覆盖直接 helper 级别的 Agent 配置回滚请求契约；Mock 和 SQLite flow 脚本也会覆盖无版本历史时的禁用态 `POST /api/agent-config-applications/:applicationId/rollback-request` 路由。在真实版本历史存在前，该路由必须保持 `requestReady=false`；真实版本存在后只能返回 read-only restore diff，仍不得创建审批。
+- `verify-agent-config-version-history.ps1` 会独立覆盖只读 Agent 配置版本历史来源 helper：只规范化已经加载好的版本行，验证目标 Agent 过滤、版本排序、current/restore 选择、snapshot/change 字段白名单、禁止字段/值、禁止值 redaction 和全 false sideEffects。Mock/SQLite flow 还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由；该路由不得写版本、创建回滚审批、执行 Runner、调用模型或读取密钥。
 - Agent 配置真实写入前必须先通过 `docs/agent-config-apply-dry-run-spec.md` 定义的 dry-run / rollback 验收；当前本地 Demo 不得写入 `agents` 或 `agent_config_versions`。
 - Agent permission change request 必须在创建审批前先运行 mock profile 验证。安全 profile 可以创建 pending `agent_config` 审批；`canExecuteRunnerJob` 等禁止 capability 必须返回 422，并且不得创建审批、写 runtime 或写 SQLite。
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。
@@ -253,5 +253,6 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - With `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY` absent, apply remains status-only and must not write `agents` or `agent_config_versions`.
 - With `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`, real apply still requires SQLite mode, dry-run proof, second confirmation, `requestedBy`, Git checkpoint acknowledgement, and rollback acceptance.
 - A successful real apply must update `agents`, insert `agent_config_versions`, mark the application applied, and write a runtime event in one SQLite transaction.
+- After two real applies, rollback-request preview must read current/restore versions and return a read-only restore diff while keeping approval/application creation disabled.
 - Real apply must not create Runner jobs, execute Runner, call models, create approvals, modify files/Git, or read raw secrets.
 - The verification script uses isolated port `8790`; automated checks must not occupy the human local trial port `8787`.

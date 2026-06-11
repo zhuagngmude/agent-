@@ -144,6 +144,22 @@ const cases = {
     restoreVersion,
     body: { secondConfirm: false }
   }),
+  missingCurrentVersion: buildAgentConfigRollbackRequest({
+    originalApplication,
+    sourceApproval,
+    agent,
+    currentVersion: null,
+    restoreVersion,
+    body
+  }),
+  missingRestoreVersion: buildAgentConfigRollbackRequest({
+    originalApplication,
+    sourceApproval,
+    agent,
+    currentVersion,
+    restoreVersion: null,
+    body
+  }),
   restoreNotOlder: buildAgentConfigRollbackRequest({
     originalApplication,
     sourceApproval,
@@ -158,6 +174,22 @@ const cases = {
     agent,
     currentVersion,
     restoreVersion: { ...restoreVersion, agent_id: 'agent_other' },
+    body
+  }),
+  sensitiveCurrentSnapshot: buildAgentConfigRollbackRequest({
+    originalApplication,
+    sourceApproval,
+    agent,
+    currentVersion: { ...currentVersion, configSnapshot: { ...currentVersion.configSnapshot, model: 'prompt override' } },
+    restoreVersion,
+    body
+  }),
+  sensitiveRestoreSnapshot: buildAgentConfigRollbackRequest({
+    originalApplication,
+    sourceApproval,
+    agent,
+    currentVersion,
+    restoreVersion: { ...restoreVersion, config_snapshot: { ...restoreVersion.config_snapshot, model: 'Authorization: Bearer abc' } },
     body
   }),
   noChangedFields: buildAgentConfigRollbackRequest({
@@ -193,6 +225,11 @@ process.stdout.write(JSON.stringify(cases));
   Assert-TextContains (@($cases.validRequest.applicationDraft.changes.field) -join "`n") "model" "Rollback changes should include model diff."
   Assert-TextContains (@($cases.validRequest.applicationDraft.changes.field) -join "`n") "maxSubAgents" "Rollback changes should include maxSubAgents diff."
   Assert-TextContains (@($cases.validRequest.applicationDraft.changes.field) -join "`n") "canSpawnSubAgents" "Rollback changes should include canSpawnSubAgents diff."
+  Assert-Equal $cases.validRequest.rollbackPreview.fieldCount 4 "Rollback preview should count changed fields."
+  Assert-TextContains (@($cases.validRequest.restoreDiff.action) -join "`n") "restore" "Rollback diff should include restore actions."
+  Assert-TextContains (@($cases.validRequest.restoreDiff.current) -join "`n") "gpt-high" "Rollback diff should expose current value."
+  Assert-TextContains (@($cases.validRequest.restoreDiff.restore) -join "`n") "gpt-low" "Rollback diff should expose restore value."
+  Assert-Equal $cases.validRequest.versionHistory.rollbackSourceReady $true "Rollback request should expose version history readiness."
   Assert-NoSideEffects -Result $cases.validRequest -Prefix "Valid rollback request"
 
   Write-Step "Verify rollback rules."
@@ -229,6 +266,14 @@ process.stdout.write(JSON.stringify(cases));
   Assert-TextContains (@($cases.missingConfirmation.validationErrors) -join "`n") "rollback reason is required." "Missing rollback reason should be reported."
   Assert-NoSideEffects -Result $cases.missingConfirmation -Prefix "Missing confirmation rollback request"
 
+  Assert-Equal $cases.missingCurrentVersion.requestReady $false "Missing current version should not be ready."
+  Assert-TextContains (@($cases.missingCurrentVersion.validationErrors) -join "`n") "current version is required." "Missing current version should be reported."
+  Assert-NoSideEffects -Result $cases.missingCurrentVersion -Prefix "Missing current version rollback request"
+
+  Assert-Equal $cases.missingRestoreVersion.requestReady $false "Missing restore version should not be ready."
+  Assert-TextContains (@($cases.missingRestoreVersion.validationErrors) -join "`n") "restore version is required." "Missing restore version should be reported."
+  Assert-NoSideEffects -Result $cases.missingRestoreVersion -Prefix "Missing restore version rollback request"
+
   Assert-Equal $cases.restoreNotOlder.requestReady $false "Restore version must be older."
   Assert-TextContains (@($cases.restoreNotOlder.validationErrors) -join "`n") "restore version must be older than current version." "Restore version ordering should be reported."
   Assert-NoSideEffects -Result $cases.restoreNotOlder -Prefix "Restore-not-older rollback request"
@@ -236,6 +281,16 @@ process.stdout.write(JSON.stringify(cases));
   Assert-Equal $cases.wrongAgentVersion.requestReady $false "Wrong Agent version should not be ready."
   Assert-TextContains (@($cases.wrongAgentVersion.validationErrors) -join "`n") "restore version must belong to target Agent." "Wrong Agent version should be reported."
   Assert-NoSideEffects -Result $cases.wrongAgentVersion -Prefix "Wrong-Agent rollback request"
+
+  Assert-Equal $cases.sensitiveCurrentSnapshot.requestReady $false "Sensitive current snapshot should not be ready."
+  Assert-TextContains (@($cases.sensitiveCurrentSnapshot.validationErrors) -join "`n") "current version snapshot contains forbidden value in field: model" "Sensitive current value should be reported."
+  Assert-TextContains ($cases.sensitiveCurrentSnapshot | ConvertTo-Json -Depth 20) "[redacted_forbidden_value]" "Sensitive current diff value should be redacted."
+  Assert-NoSideEffects -Result $cases.sensitiveCurrentSnapshot -Prefix "Sensitive current snapshot rollback request"
+
+  Assert-Equal $cases.sensitiveRestoreSnapshot.requestReady $false "Sensitive restore snapshot should not be ready."
+  Assert-TextContains (@($cases.sensitiveRestoreSnapshot.validationErrors) -join "`n") "restore version snapshot contains forbidden value in field: model" "Sensitive restore value should be reported."
+  Assert-TextContains ($cases.sensitiveRestoreSnapshot | ConvertTo-Json -Depth 20) "[redacted_forbidden_value]" "Sensitive restore diff value should be redacted."
+  Assert-NoSideEffects -Result $cases.sensitiveRestoreSnapshot -Prefix "Sensitive restore snapshot rollback request"
 
   Assert-Equal $cases.noChangedFields.requestReady $false "No changed fields should not be ready."
   Assert-TextContains (@($cases.noChangedFields.validationErrors) -join "`n") "rollback must include at least one changed field." "No changed fields should be reported."

@@ -17,6 +17,7 @@ let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
 let agentConfigRollbackRequestRunning = false;
 const agentConfigVersionHistoryByAgentId = new Map();
+const agentConfigRollbackPreviewByApplicationId = new Map();
 
 function pendingApprovalRequests() {
   return (appData.approvalRequests || []).filter((item) => item.status === "pending");
@@ -618,7 +619,9 @@ function renderVersionChanges(version) {
       const [field, before, after] = change;
       return `<li>${escapeHtml(field || "field")}：${escapeHtml(formatConfigValue(before))} -> ${escapeHtml(formatConfigValue(after))}</li>`;
     }
-    return `<li>${escapeHtml(change.field || "field")}：${escapeHtml(formatConfigValue(change.before))} -> ${escapeHtml(formatConfigValue(change.after))}</li>`;
+    const before = change.before !== undefined ? change.before : change.current;
+    const after = change.after !== undefined ? change.after : change.restore;
+    return `<li>${escapeHtml(change.field || "field")}：${escapeHtml(formatConfigValue(before))} -> ${escapeHtml(formatConfigValue(after))}</li>`;
   }).join("");
 }
 
@@ -1017,6 +1020,69 @@ function renderAgentConfigRollbackReview(application, approval, versionHistorySt
   `).join("");
 }
 
+function renderAgentConfigRollbackRequestPreview(application) {
+  const state = agentConfigRollbackPreviewByApplicationId.get(application.id);
+  if (!state) {
+    return "";
+  }
+  if (state.loading) {
+    return `
+      <div class="application-checklist">
+        <h3>回滚请求预检查结果</h3>
+        <ul><li><b>状态</b><span>正在读取版本历史并生成只读 diff</span></li></ul>
+      </div>
+    `;
+  }
+  if (state.error) {
+    return `
+      <div class="application-checklist">
+        <h3>回滚请求预检查结果</h3>
+        <ul><li><b>状态</b><span>预检查失败：${escapeHtml(state.error)}</span></li></ul>
+      </div>
+    `;
+  }
+
+  const result = state.result || {};
+  const history = result.versionHistory || {};
+  const currentVersion = history.currentVersion;
+  const restoreVersion = history.restoreVersion;
+  const restoreDiff = Array.isArray(result.restoreDiff)
+    ? result.restoreDiff
+    : Array.isArray(result.rollbackPreview?.diff)
+      ? result.rollbackPreview.diff
+      : [];
+  const fieldCount = result.rollbackPreview?.fieldCount ?? restoreDiff.length;
+  const validationErrors = Array.isArray(result.validationErrors) ? result.validationErrors : [];
+  const summary = [
+    ["当前版本", currentVersion ? versionLabel(currentVersion) : `v${result.currentVersion || "无"}`],
+    ["恢复版本", restoreVersion ? versionLabel(restoreVersion) : `v${result.restoreVersion || "无"}`],
+    ["restore diff 字段", `${fieldCount} 个`],
+    ["回滚来源就绪", history.rollbackSourceReady ? "是" : "否"],
+    ["canCreateApproval", result.canCreateApproval === true ? "true" : "false"],
+    ["requestReady", result.requestReady === true ? "true" : "false"],
+  ];
+
+  return `
+    <div class="application-checklist">
+      <h3>回滚请求预检查结果</h3>
+      <ul>
+        ${summary.map(([label, value]) => `<li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>`).join("")}
+        ${validationErrors.map((error) => `<li><b>校验</b><span>${escapeHtml(error)}</span></li>`).join("")}
+      </ul>
+    </div>
+    <div class="task-files">
+      <h3>restore diff</h3>
+      <ul>
+        ${restoreDiff.map((change) => {
+          const current = change.current !== undefined ? change.current : change.before;
+          const restore = change.restore !== undefined ? change.restore : change.after;
+          return `<li>${escapeHtml(change.field || "field")}：${escapeHtml(formatConfigValue(current))} -> ${escapeHtml(formatConfigValue(restore))}<small>${escapeHtml(change.action || "restore")}</small></li>`;
+        }).join("") || "<li>暂无可展示字段变化</li>"}
+      </ul>
+    </div>
+  `;
+}
+
 function renderAgentConfigApplications(agent) {
   const applications = (appData.agentConfigApplications || [])
     .filter((item) => item.agentId === agent.id);
@@ -1077,6 +1143,7 @@ function renderAgentConfigApplications(agent) {
           <h3>回滚前审查</h3>
           <ul>${renderAgentConfigRollbackReview(selectedApplication, selectedApproval, versionHistoryState)}</ul>
         </div>
+        ${renderAgentConfigRollbackRequestPreview(selectedApplication)}
         ${renderAgentConfigRollbackVersionDetails(versionHistoryState)}
         <div class="task-files">
           <h3>字段变更</h3>
@@ -1158,6 +1225,7 @@ async function runAgentConfigRollbackRequestPreview() {
   if (!application || application.status !== "applied" || agentConfigRollbackRequestRunning) return;
 
   agentConfigRollbackRequestRunning = true;
+  agentConfigRollbackPreviewByApplicationId.set(application.id, { loading: true });
   setAgentChangeFeedback("正在预检查回滚请求...");
   renderAgentsPage(selectedAgentIndex);
 
@@ -1168,11 +1236,14 @@ async function runAgentConfigRollbackRequestPreview() {
       requestedBy: "local_user",
       reason: "preview rollback request without creating approval",
     });
+    agentConfigRollbackPreviewByApplicationId.set(application.id, { result });
     const errors = Array.isArray(result.validationErrors) && result.validationErrors.length > 0
       ? `；${result.validationErrors.join(" / ")}`
       : "";
-    setAgentChangeFeedback(`回滚请求仍是禁用预检查：canCreateApproval=${result.canCreateApproval}${errors}`, "success");
+    const diffCount = result.rollbackPreview?.fieldCount ?? (result.restoreDiff || []).length;
+    setAgentChangeFeedback(`回滚请求仍是禁用预检查：canCreateApproval=${result.canCreateApproval}，restore diff=${diffCount} 个字段${errors}`, "success");
   } catch (error) {
+    agentConfigRollbackPreviewByApplicationId.set(application.id, { error: error.message });
     setAgentChangeFeedback(`回滚请求预检查失败：${error.message}`, "error");
   } finally {
     agentConfigRollbackRequestRunning = false;

@@ -497,9 +497,49 @@ MVP-0.2 约束：
 
 `services/api/agent-config-rollback-request.js` 导出 `buildAgentConfigRollbackRequest(...)`。这个 helper 会根据已 applied 的原 application、已批准且没有 Runner job 的 `agent_config` 来源审批、目标 Agent、属于该 Agent 的 current/restore 版本、restore 版本顺序、二次确认、requester、reason 和变更字段来验证未来回滚请求。
 
-`POST /api/agent-config-applications/:applicationId/rollback-request` 是针对当前 selected applied application 的禁用态预览路由。MVP-0.2 中，这个路由只读取 application、来源审批和目标 Agent。由于真实 `agent_config_versions` 还没有写入，普通 Mock/SQLite 路由调用必须返回 `requestReady=false`，带 current/restore 版本缺失的验证错误，同时仍报告 `feature_disabled`。
+`POST /api/agent-config-applications/:applicationId/rollback-request` 是针对当前 selected applied application 的禁用态预览路由。它只读 application、来源审批、目标 Agent 和只读版本历史，不创建审批或 application。Mock 或无版本历史的 SQLite flow 会返回 `requestReady=false`，带 current/restore 版本缺失的验证错误；当 feature-gated SQLite real apply 已产生至少两个安全版本时，路由会从 `agent_config_versions` 选择 current/restore 版本并返回只读 restore diff。
 
-即使直接 helper 测试传入有效版本，MVP-0.2 也必须返回 `ok=false`、`requestReady=true`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]`、只作为草稿的 approval/application 对象、rollback rules 和全 false sideEffects。helper 和路由不得创建审批、创建 application、写 `agents`、写 `agent_config_versions`、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型、读取 raw secret、修改文件或修改 Git。
+回滚预览响应会包含：
+
+```json
+{
+  "ok": false,
+  "rollbackRequest": true,
+  "requestReady": true,
+  "canCreateApproval": false,
+  "blockedReasons": ["feature_disabled"],
+  "currentVersion": 2,
+  "restoreVersion": 1,
+  "rollbackPreview": {
+    "fieldCount": 1,
+    "diff": [
+      {
+        "field": "model",
+        "current": "gpt-rollback-preview",
+        "restore": "gemini-long-context",
+        "action": "restore"
+      }
+    ]
+  },
+  "restoreDiff": [
+    {
+      "field": "model",
+      "before": "gpt-rollback-preview",
+      "after": "gemini-long-context",
+      "current": "gpt-rollback-preview",
+      "restore": "gemini-long-context",
+      "action": "restore"
+    }
+  ],
+  "versionHistory": {
+    "readOnly": true,
+    "canWrite": false,
+    "rollbackSourceReady": true
+  }
+}
+```
+
+即使版本有效，MVP-0.2 也必须返回 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]`、只作为草稿的 approval/application 对象、rollback rules 和全 false sideEffects。helper 和路由不得创建审批、创建 application、写 `agents`、写 `agent_config_versions`、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型、读取 raw secret、修改文件或修改 Git。
 
 ### GET /api/agents/:agentId/config-version-history
 
@@ -518,7 +558,7 @@ Query：
 
 `services/api/agent-config-version-history.js` 导出 `buildAgentConfigVersionHistory(...)`。这个 helper 只接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON 形式的 `config_snapshot` / `changes`，按目标 Agent 过滤，按版本号倒序排列，选择当前版本，并选择请求指定的恢复版本或默认选择最新的旧版本作为回滚来源。
 
-这个 helper 只暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents` 这几个 `configSnapshot` 字段。它会拒绝 secret/API key/provider/prompt/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值。接口和 helper 都不得创建回滚审批/application、写 `agents`、写 `agent_config_versions`、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取 raw secret。
+这个 helper 只暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents` 这几个 `configSnapshot` 字段和同样白名单内的 `changes` 字段。它会拒绝 secret/API key/provider/prompt/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值，并对禁止值返回固定 redaction 占位。接口和 helper 都不得创建回滚审批/application、写 `agents`、写 `agent_config_versions`、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取 raw secret。
 
 ## Tasks
 

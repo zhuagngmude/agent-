@@ -1252,6 +1252,13 @@ docs/runner-safety-acceptance.md
 - 影响模块：`services/api/agent-config-version-history.js`、`scripts/verify-agent-config-version-history.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`docs/data-model-draft.md`、`services/api/README.md`、路线、维护和交接文档。
 - 人类文档同步：不需要；这是 helper-only 来源验证，不直接读 SQLite，不暴露路由，不创建审批/application，不写 Agent 配置，不写 `agent_config_versions`，不写 SQLite/runtime state，不创建 Runner job，不执行 Runner，不调用模型，不启用云同步或改变运行时权限。
 
+## 2026-06-11 变更记录：Agent 配置回滚 dry-run 闭环
+
+- 改了什么：`POST /api/agent-config-applications/:applicationId/rollback-request` 改为从只读版本历史 helper 获取 current/restore 版本，并返回 `restoreDiff` / `rollbackPreview.diff`；Web UI 展示回滚请求预检查结果；验证脚本覆盖无版本历史路径和两个真实版本后的 read-only diff 路径。
+- 为什么：真实回滚写入之前，用户和后续 AI 需要先能看到可审查的 current -> restore 字段差异，同时继续证明该接口不会创建审批、写版本或触发 Runner。
+- 影响模块：`services/api/server.js`、`services/api/agent-config-rollback-request.js`、`services/api/agent-config-version-history.js`、`apps/web/app.js`、`scripts/verify-agent-config-rollback-request.ps1`、`scripts/verify-agent-config-version-history.ps1`、`scripts/verify-mock-flows.ps1`、`scripts/verify-sqlite-flows.ps1`、`scripts/verify-agent-config-real-apply-sqlite.ps1`、API/规格/验收/交接文档。
+- 人类文档同步：不需要；这是禁用态 dry-run 预览增强，不启用真实回滚，不创建审批/application，不写 Agent 配置，不写 `agent_config_versions`，不写 SQLite/runtime state，不创建 Runner job，不执行 Runner，不调用模型，不读取 raw secret。
+
 ## 2026-06-10 Change log: Module stability map
 
 - What changed: added `docs/module-stability-map.md` and linked it from `README.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
