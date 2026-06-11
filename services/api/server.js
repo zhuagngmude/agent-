@@ -56,6 +56,12 @@ function localTrialInfo() {
       runnerWritesFiles: false,
       realModelCalls: false,
       cloudSync: false,
+      agentConfigRealApplyEnabled,
+      agentConfigRealApplyDefaultOff: true,
+      agentConfigRealApplyRequiresSqlite: true,
+      agentConfigRealApplyRequiresDryRunProof: true,
+      agentConfigRealApplyRequiresGitCheckpoint: true,
+      agentConfigRealApplyRequiresRollbackAcceptance: true,
     },
   };
 }
@@ -101,15 +107,28 @@ function withProject(pathname, suffix) {
 }
 
 function dashboardResponse() {
+  const withFeatureFlags = (payload) => ({
+    ...payload,
+    featureFlags: {
+      ...(payload.featureFlags || {}),
+      agentConfigRealApplyEnabled,
+      agentConfigRealApplyDefaultOff: true,
+      agentConfigRealApplyRequiresSqlite: true,
+      agentConfigRealApplyRequiresDryRunProof: true,
+      agentConfigRealApplyRequiresGitCheckpoint: true,
+      agentConfigRealApplyRequiresRollbackAcceptance: true,
+    },
+  });
+
   if (dashboardSource !== "sqlite") {
-    return data.dashboard();
+    return withFeatureFlags(data.dashboard());
   }
 
   try {
-    return readDashboardFromSqlite(data.projectId);
+    return withFeatureFlags(readDashboardFromSqlite(data.projectId));
   } catch (error) {
     console.warn(`[sqlite-dashboard] ${error.message}. Falling back to mock dashboard.`);
-    return data.dashboard();
+    return withFeatureFlags(data.dashboard());
   }
 }
 

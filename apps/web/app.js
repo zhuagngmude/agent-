@@ -323,6 +323,10 @@ function normalizeDashboard(apiData) {
       phase: apiData.project?.phase || fallback.project?.phase || "MVP-0.2",
       description: apiData.project?.description || fallback.project?.description || "",
     },
+    featureFlags: {
+      ...(fallback.featureFlags || {}),
+      ...(apiData.featureFlags || {}),
+    },
     dashboardMetrics: [
       { label: "活跃智能体", value: apiData.metrics?.activeAgents ?? "-", note: "来自本地 API", tone: "purple", icon: "A" },
       { label: "待确认事项", value: apiData.metrics?.pendingApprovals ?? "-", note: "Runner 审批优先", tone: "orange", icon: "!" },
@@ -782,6 +786,39 @@ function renderAgentConfigManualApplyConditions(application, approval) {
   `).join("");
 }
 
+function renderAgentConfigRealApplyGate(application, approval) {
+  const flags = appData.featureFlags || {};
+  const enabled = flags.agentConfigRealApplyEnabled === true;
+  const sqliteRequired = flags.agentConfigRealApplyRequiresSqlite !== false;
+  const gateReady = enabled && canMockApplyAgentConfigApplication(application, approval);
+  const requirements = [
+    ["API feature flag", enabled ? "AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true" : "off by default"],
+    ["Storage mode", sqliteRequired ? "SQLite only" : "not restricted"],
+    ["Dry-run proof", "required and must match this application"],
+    ["Second confirmation", "required"],
+    ["Operator identity", "requestedBy required"],
+    ["Git checkpoint", "acknowledgement required"],
+    ["Rollback plan", "acceptance required"],
+    ["Runner/model/secret side effects", "must remain blocked"],
+  ];
+
+  return `
+    <div class="real-apply-gate ${enabled ? "enabled" : "disabled"}">
+      <div class="real-apply-gate-head">
+        <strong>SQLite real apply gate</strong>
+        <span class="badge ${enabled ? "green" : "orange"}">${enabled ? "flag enabled" : "flag off"}</span>
+      </div>
+      <p>${enabled
+        ? "This API process can accept a guarded real-apply request, but the web UI does not submit it directly."
+        : "Default UI path stays status-only. Real Agent config writes require an operator-started API feature flag and a verified request body."}</p>
+      <ul>${requirements.map(([label, value]) => `
+        <li><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></li>
+      `).join("")}</ul>
+      <button type="button" class="neutral-action" disabled>${gateReady ? "Real apply requires operator request body" : "Real apply unavailable in UI"}</button>
+    </div>
+  `;
+}
+
 function renderAgentConfigApplicationAudit(application, approval) {
   const audit = [
     ["应用时间", application.appliedAt || "尚未应用"],
@@ -827,7 +864,10 @@ function renderAgentConfigApplications(agent) {
     .filter((item) => item.agentId === agent.id);
 
   if (applications.length === 0) {
-    return `<p class="muted">当前 Agent 暂无待应用配置变更。审批通过后会先出现在这里，不会直接修改 Agent 配置。</p>`;
+    return `
+      <p class="muted">当前 Agent 暂无待应用配置变更。审批通过后会先出现在这里，不会直接修改 Agent 配置。</p>
+      ${renderAgentConfigRealApplyGate(null, null)}
+    `;
   }
 
   if (!applications.some((item) => item.id === selectedAgentConfigApplicationId)) {
@@ -869,6 +909,7 @@ function renderAgentConfigApplications(agent) {
           <h3>人工应用确认条件</h3>
           <ul>${renderAgentConfigManualApplyConditions(selectedApplication, selectedApproval)}</ul>
         </div>
+        ${renderAgentConfigRealApplyGate(selectedApplication, selectedApproval)}
         <div class="application-checklist">
           <h3>应用审计记录</h3>
           <ul>${renderAgentConfigApplicationAudit(selectedApplication, selectedApproval)}</ul>
@@ -1400,6 +1441,7 @@ async function renderLocalTrialStatus() {
     const mode = result.mode || info.mode || "unknown";
     const persistence = info.persistence === "sqlite" ? "SQLite 数据库" : "Mock runtime-state 文件";
     const storagePath = mode === "sqlite" ? info.sqliteDbFile : info.runtimeStateFile;
+    const realApplyEnabled = info.safety?.agentConfigRealApplyEnabled === true;
 
     if (modeBadge) {
       modeBadge.textContent = localTrialModeLabel(mode);
@@ -1416,6 +1458,7 @@ async function renderLocalTrialStatus() {
         <div><span>状态保存</span><strong>${escapeHtml(persistence)}</strong></div>
         <div><span>API 地址</span><strong>${escapeHtml(info.apiUrl || apiBase)}</strong></div>
         <div><span>Web 地址</span><strong>${escapeHtml(info.webUrl || window.location.href)}</strong></div>
+        <div><span>Agent config real apply</span><strong>${realApplyEnabled ? "feature flag enabled" : "off by default"}</strong></div>
         <div class="wide-row"><span>状态文件</span><strong>${escapeHtml(storagePath || "未返回")}</strong></div>
       </div>
       <div class="local-command-list">

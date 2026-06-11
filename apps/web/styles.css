@@ -745,6 +745,47 @@ li strong { color: var(--green); font-size: 13px; }
 .application-checklist b {
   color: var(--text);
 }
+.real-apply-gate {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.real-apply-gate.enabled {
+  border-color: #bfe8cc;
+}
+.real-apply-gate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.real-apply-gate p {
+  margin: 0;
+  padding: 12px 14px;
+}
+.real-apply-gate ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.real-apply-gate li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  color: #4e5670;
+}
+.real-apply-gate b {
+  color: var(--text);
+}
+.real-apply-gate button {
+  margin: 12px 14px 14px;
+}
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .data-table th { color: var(--muted); font-size: 12px; }

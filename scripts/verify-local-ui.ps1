@@ -167,6 +167,10 @@ Assert-Equal $runtime.localTrial.safety.realModelCalls $false "Local trial shoul
 Assert-Equal $runtime.localTrial.safety.runnerExecutesCommands $false "Runner command execution should be disabled."
 Assert-Equal $runtime.localTrial.safety.runnerWritesFiles $false "Runner file writes should be disabled."
 Assert-Equal $runtime.localTrial.safety.cloudSync $false "Cloud sync should be disabled."
+Assert-Equal $runtime.localTrial.safety.agentConfigRealApplyDefaultOff $true "Agent config real apply should be documented as default-off."
+Assert-Equal $runtime.localTrial.safety.agentConfigRealApplyRequiresDryRunProof $true "Agent config real apply should require dry-run proof."
+Assert-Equal $runtime.localTrial.safety.agentConfigRealApplyRequiresGitCheckpoint $true "Agent config real apply should require Git checkpoint acknowledgement."
+Assert-Equal $runtime.localTrial.safety.agentConfigRealApplyRequiresRollbackAcceptance $true "Agent config real apply should require rollback acceptance."
 
 Write-Step "Verify browser prerequisites."
 if (-not (Test-Command "npx")) {
@@ -198,11 +202,18 @@ try {
   Invoke-PageClickByDataPage -Page "approval"
   Assert-TextContains (Invoke-PageText -Selector "#approval") "Runner job" "Approval page should describe Runner jobs."
 
+  Invoke-PageClickByDataPage -Page "agents"
+  Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "SQLite real apply gate" "Agent page should render real-apply gate status."
+  Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "Dry-run proof" "Agent page should show real-apply dry-run requirement."
+  Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "Rollback plan" "Agent page should show rollback acceptance requirement."
+  Assert-True ((Invoke-PageEval -Expression "() => Array.from(document.querySelectorAll('.real-apply-gate button')).every((button) => button.disabled)") -eq $true) "Real apply gate buttons should remain disabled in UI."
+
   Invoke-PageClickByDataPage -Page "runtime"
   Assert-TextContains (Invoke-PageText -Selector "#runtime") "Runner Job" "Runtime page should render Runner job details."
 
   Invoke-PageClickByDataPage -Page "settings"
   Assert-True ((Invoke-PageText -Selector "#localTrialStatus").Length -gt 0) "Settings page should render local trial status."
+  Assert-TextContains (Invoke-PageText -Selector "#localTrialStatus") "Agent config real apply" "Settings page should show Agent config real apply flag state."
   Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "API keys stay server-side" "Settings page should render Model Gateway safety copy."
   Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "Connectivity Dry-Run" "Settings page should render Model Gateway dry-run preview."
   Assert-TextContains (Invoke-PageText -Selector "#modelGatewaySettingsStatus") "Would call provider" "Settings page should render dry-run provider call boundary."
