@@ -1265,3 +1265,10 @@ docs/runner-safety-acceptance.md
 - Why: the project skeleton is stable enough for small verified iteration, but future deletion/refactor work needs a clear map of P0 anchors, contracts, refactorable areas, runtime state, and protected paths.
 - Impacted modules: `docs/module-stability-map.md`, `README.md`, `docs/demo-checklist.md`, `dev-docs/下一步开发路线.md`, `dev-docs/AI开发维护手册.md`, `dev-docs/新窗口交接说明.md`.
 - Human docs sync: not required; this is a maintenance map and does not change runtime behavior, enable Runner execution, enable real provider calls, or change permissions.
+
+## 2026-06-11 变更记录：MVP-0.2 Agent 配置安全闭环收口
+
+- 改了什么：新增 `scripts/verify-agent-config-safety-loop.ps1` 聚合验收入口，并同步 API、dry-run 规格、Demo 验收清单、脚本 README、路线和交接说明。
+- 为什么：MVP-0.2 后半段的 Agent config apply / version history / rollback dry-run / rollback review 已经具备 API、UI、helper、docs 和专项脚本覆盖，需要一个明确的一键验收入口和阶段状态，避免后续继续把同一安全闭环当作未完成核心缺口。
+- 影响模块：`scripts/verify-agent-config-safety-loop.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`、`dev-docs/新窗口交接说明.md`。
+- 人类文档同步：不需要；这是验收入口和维护状态收口，不启用默认真实回滚写入、真实 Runner 执行、真实模型调用、云同步或完整运行时权限系统。

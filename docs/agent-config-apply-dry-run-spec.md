@@ -272,6 +272,14 @@ scripts/verify-agent-config-version-history.ps1
 
 ## 验收清单
 
+MVP-0.2 Agent 配置安全闭环聚合入口：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-safety-loop.ps1
+```
+
+该脚本会串联 Agent permission、字段白名单、dry-run、真实 apply gate、事务计划、版本历史、回滚请求、Mock flow、SQLite flow 和 feature-gated SQLite real apply 验证。它用于证明 apply / version history / rollback dry-run / rollback review 已经达到 MVP-0.2 可验收状态；它不启用默认真实回滚、不执行 Runner、不调用真实模型、不做云同步，也不落地完整权限系统。
+
 启用任何真实 apply endpoint 前，必须满足：
 
 - Dry-run endpoint 已存在，并由 Mock 和 SQLite 验证覆盖。
@@ -306,4 +314,4 @@ scripts/verify-agent-config-version-history.ps1
 - 第一次真实 apply 具备 `agents` 和 `agent_config_versions` 的事务覆盖。
 - 回滚创建新审批，而不是修改历史。
 
-在每一项通过之前，项目都保持 Mock / dry-run only 模式。
+以上 Agent config 安全闭环在 MVP-0.2 已收口到可验收状态。除 `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true` 的 SQLite 专项验收路径外，项目默认仍保持 Mock / dry-run only 模式；真实回滚写入、真实 Runner 执行、真实模型调用、云同步和完整权限系统属于后续 MVP-0.3+ 边界。

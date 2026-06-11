@@ -30,6 +30,7 @@ verify-agent-config-transaction-plan.ps1
 verify-agent-config-rollback-request.ps1
 verify-agent-config-version-history.ps1
 verify-agent-config-real-apply-sqlite.ps1
+verify-agent-config-safety-loop.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -50,7 +51,7 @@ sqlite/
 
 - `8787` 保留给人类本地试用和手动开发入口，例如 `start-local.ps1`、`start-dev.ps1`、前端默认 API、`verify-local-ui.ps1` 和 `verify-model-gateway.ps1` 对当前运行服务的检查。
 - AI 自启动的自动验收脚本不得复用 `8787`，也不得连接一个已经存在的未知进程。
-- `verify-sqlite-flows.ps1` 使用隔离端口 `8788`；`verify-mock-flows.ps1` 使用隔离端口 `8789`。如果对应端口启动前已经有 API 响应，脚本会直接失败，而不是误连旧服务。
+- `verify-sqlite-flows.ps1` 使用隔离端口 `8788`；`verify-mock-flows.ps1` 使用隔离端口 `8789`；`verify-agent-config-real-apply-sqlite.ps1` 使用隔离端口 `8790`。如果对应端口启动前已经有 API 响应，脚本会直接失败，而不是误连旧服务。
 
 `verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。它还会检查：非法 Agent permission change request 在创建审批前被拒绝；已批准的 Agent config 变更只创建 `pending_apply` application 记录，不创建 Runner job，也不进行真实 Agent 配置写入；Agent config dry-run 保持 feature-disabled，且所有 sideEffects 为 false。
 
@@ -73,6 +74,8 @@ sqlite/
 `verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。Mock/SQLite flow 脚本还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
 `verify-agent-config-real-apply-sqlite.ps1` 验证受 feature flag 控制的 SQLite Agent 配置真实 apply。默认关闭时，`POST /api/agent-config-applications/:applicationId/apply` 仍只做状态流转，不修改 `agents`，不写 `agent_config_versions`。当 API 进程显式设置 `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`，并且请求体携带 dry-run proof、二次确认、`requestedBy`、Git checkpoint acknowledgement 和 rollback acceptance 时，脚本验证 SQLite 事务会更新 `agents`、插入 `agent_config_versions`、标记 application applied、写 runtime event；两个真实版本存在后，它还验证 rollback-request preview 会读取版本历史并返回 read-only restore diff。脚本继续禁止创建 Runner job、执行 Runner、调用模型或读取 raw secret，并使用隔离端口 `8790`，不得占用人类本地试用端口 `8787`。
+
+`verify-agent-config-safety-loop.ps1` 是 MVP-0.2 Agent 配置安全闭环的聚合验收入口。它串联 Agent permission、字段白名单、dry-run、真实 apply gate、事务计划、版本历史、回滚请求、Mock flow、SQLite flow 和 feature-gated SQLite real apply 检查。脚本本身不新增写入能力，不使用 `8787`，并保持真实 Runner、真实模型、云同步和默认真实回滚关闭。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -195,3 +198,11 @@ This script is acceptance verification, not a real connectivity test. It must no
 - 成功写入必须在一个 SQLite transaction 内完成：更新 `agents` 当前态、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`。
 - 该脚本继续断言不创建审批、不创建 Runner job、不执行 Runner、不调用真实模型、不读取 raw secret。
 - 两个真实版本存在后，脚本会调用禁用态 rollback-request 路由，确认它返回 current/restore 版本和 restore diff，但仍不创建审批、application 或 Runner job。
+
+## verify-agent-config-safety-loop.ps1
+
+`verify-agent-config-safety-loop.ps1` 是 MVP-0.2 Agent 配置安全闭环的最终本地验收入口。
+
+- 它顺序运行 Agent permission、Agent config 字段白名单、dry-run、apply gate、transaction plan、version history、rollback request、Mock flow、SQLite flow 和 feature-gated SQLite real apply 验证。
+- 它用于证明 apply / version history / rollback dry-run / rollback review 已经形成闭环；真实 Runner、真实模型、云同步、默认真实回滚和完整权限系统仍不开放。
+- 它只复用已有专项脚本和隔离端口，不连接人类本地试用端口 `8787`。

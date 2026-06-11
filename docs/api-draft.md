@@ -1554,3 +1554,13 @@ The `dryRun` object must be the disabled dry-run proof with no validation errors
 When all checks pass, the SQLite write command performs one transaction that updates `agents`, inserts `agent_config_versions`, marks the application `applied`, and inserts one `runtime_events` row. It still must not create approvals, create Runner jobs, execute Runner, call real models, modify files/Git, or read raw secrets.
 
 Acceptance is covered by `scripts/verify-agent-config-real-apply-sqlite.ps1`. The script proves both default-off status-only behavior and explicit-flag transactional writes on isolated port `8790`.
+
+## MVP-0.2 Agent Config Safety Loop Acceptance
+
+The MVP-0.2 Agent config apply / version history / rollback dry-run / rollback review loop is closed by the aggregate acceptance script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-safety-loop.ps1
+```
+
+That script runs the Agent permission profile checks, Agent config field whitelist checks, dry-run helper checks, real apply gate checks, transaction-plan checks, version-history checks, rollback-request checks, Mock flow, SQLite flow, and feature-gated SQLite real-apply checks. It is an acceptance entry only; it must not open real Runner execution, real model calls, cloud sync, default real rollback, or a full runtime permission system.
