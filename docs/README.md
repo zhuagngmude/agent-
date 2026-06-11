@@ -33,4 +33,4 @@ Formal technical docs for `agent-swarm`.
 
 Verification scripts are documented in [../scripts/README.md](../scripts/README.md).
 
-Current stage: MVP-0.3 local planning loop with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.
+Current stage: MVP-0.4 execution request review loop with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.

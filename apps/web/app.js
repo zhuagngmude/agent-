@@ -12,6 +12,7 @@ let selectedAgentConfigApplicationId = "";
 let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
+let runnerJobActionRunning = false;
 let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
@@ -318,16 +319,42 @@ function normalizeDashboard(apiData) {
   const agentStatus = apiData.agentStatus || [];
   const workflows = apiData.workflows || [];
   const runnerJobs = apiData.runnerJobs || [];
+  const runtimeEvents = apiData.runtimeEvents || [];
   const agentConfigApplications = apiData.agentConfigApplications || [];
   const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
+  const approvalById = new Map(pendingApprovals.map((approval) => [approval.id, approval]));
+  const taskById = new Map(taskQueue.map((task) => [task.id, task]));
   const primaryWorkflow = workflows[0];
+  const runnerJobStatusAvailableActions = (status) => {
+    switch (status) {
+      case "queued":
+        return ["review", "block", "cancel"];
+      case "reviewed":
+        return ["start", "block", "cancel"];
+      case "running":
+        return ["pause", "complete", "fail", "cancel"];
+      case "paused":
+        return ["start", "fail", "cancel"];
+      case "blocked":
+        return ["review", "cancel"];
+      default:
+        return [];
+    }
+  };
+  const runnerJobReviewState = (status) => {
+    if (status === "blocked") return "blocked";
+    if (["reviewed", "running", "paused", "completed"].includes(status)) return "approved";
+    if (status === "failed") return "failed";
+    if (status === "cancelled") return "cancelled";
+    return "pending";
+  };
 
   return {
     ...fallback,
     project: {
       name: apiData.project?.name || fallback.project?.name || "agent蜂群 MVP",
       status: apiData.project?.status || fallback.project?.status || "running",
-      phase: apiData.project?.phase || fallback.project?.phase || "MVP-0.2",
+      phase: apiData.project?.phase || fallback.project?.phase || "MVP-0.4",
       description: apiData.project?.description || fallback.project?.description || "",
     },
     featureFlags: {
@@ -361,6 +388,18 @@ function normalizeDashboard(apiData) {
       permissions: apiData.runnerStatus?.permissions || {},
       lastHeartbeatAt: apiData.runnerStatus?.lastHeartbeatAt || "",
     },
+    runtimeEvents: runtimeEvents.map((event) => ({
+      id: event.id,
+      projectId: event.projectId || "",
+      entityType: event.entityType || "",
+      entityId: event.entityId || "",
+      eventType: event.eventType || "",
+      actor: event.actor || "",
+      reason: event.reason || "",
+      createdAt: event.createdAt || "",
+      beforeState: event.beforeState ?? null,
+      afterState: event.afterState ?? null,
+    })),
     approvalRequests: pendingApprovals.map((item) => ({
       file: item.affectedFiles?.[0] || item.id,
       type: (item.operationTypes || []).join(" / ") || "unknown",
@@ -412,6 +451,74 @@ function normalizeDashboard(apiData) {
       createdAt: job.createdAt || "",
       updatedAt: job.updatedAt || "",
     })),
+    executionRequests: runnerJobs.map((job) => {
+      const approval = approvalById.get(job.approvalId) || null;
+      const task = taskById.get(job.taskId) || null;
+      const checkpointCommit = approval?.checkpoint?.commit || job.checkpoint || "";
+      const checkpointRequired = Boolean(approval?.checkpoint?.required || checkpointCommit);
+      const secondConfirmRequired = approval?.requiresSecondConfirm === true;
+      const operationTypes = job.operationTypes || [];
+      const needsScopedSafety = operationTypes.some((item) => ["file_write", "git_checkpoint", "network_request", "command"].includes(item));
+      const recentEvents = runtimeEvents
+        .filter((event) => event.entityType === "runner_job" && event.entityId === job.id)
+        .slice(-6)
+        .reverse()
+        .map((event) => ({
+          id: event.id,
+          eventType: event.eventType || "",
+          actor: event.actor || "",
+          reason: event.reason || "",
+          createdAt: event.createdAt || "",
+        }));
+
+      return {
+        id: job.id,
+        approvalId: job.approvalId || "",
+        taskId: job.taskId || "",
+        status: job.status || "queued",
+        requestShape: "execution_request_v1",
+        lifecycle: {
+          availableActions: runnerJobStatusAvailableActions(job.status || "queued"),
+          reviewState: runnerJobReviewState(job.status || "queued"),
+          terminal: ["blocked", "failed", "completed", "cancelled"].includes(job.status || ""),
+        },
+        launchGate: {
+          approved: approval?.status === "approved",
+          scopeLocked: true,
+          checkpointRequired,
+          checkpointCommit,
+          secondConfirmRequired,
+          safetyLockRequired: needsScopedSafety,
+        },
+        scope: {
+          operationTypes,
+          affectedFiles: job.affectedFiles || [],
+          taskTitle: task?.title || "",
+          taskDescription: task?.description || "",
+        },
+        review: {
+          required: true,
+          state: runnerJobReviewState(job.status || "queued"),
+          note: job.safetyNote || "",
+        },
+        resultSummary: job.status === "completed"
+          ? "Execution request completed in mock state only."
+          : job.status === "failed"
+            ? "Execution request failed before any real Runner activity."
+            : job.status === "paused"
+              ? "Execution request is paused in mock state."
+              : job.status === "blocked"
+                ? "Execution request is blocked by safety checks."
+                : "Execution request is read-only and has not started real Runner work.",
+        safetySummary: [
+          approval?.status === "approved" ? "approved" : "approval_required",
+          checkpointRequired ? `checkpoint:${checkpointCommit || "required"}` : "checkpoint_not_required",
+          secondConfirmRequired ? "second_confirm_required" : "second_confirm_optional",
+          "no_real_runner_execution",
+        ],
+        recentEvents,
+      };
+    }),
     agentConfigApplications: agentConfigApplications.map((item) => ({
       id: item.id,
       approvalId: item.approvalId || "",
@@ -501,6 +608,20 @@ async function postTaskAction(taskId, action, body = {}) {
 
 async function postProjectPlanRequest(body = {}) {
   const response = await fetch(`${apiBase}/api/projects/${projectId}/project-plan-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postRunnerJobAction(jobId, action, body = {}) {
+  const response = await fetch(`${apiBase}/api/runner/jobs/${jobId}/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -1537,18 +1658,52 @@ function renderWorkflowPage() {
 function runnerJobStatusLabel(status) {
   const labels = {
     queued: "只读排队",
-    running: "Mock 流转中",
-    succeeded: "已成功",
+    reviewed: "已审查",
+    running: "执行中",
+    paused: "已暂停",
+    blocked: "已阻断",
     failed: "已失败",
+    completed: "已完成",
     cancelled: "已取消",
   };
   return labels[status] || status;
 }
 
+function runnerJobActionLabel(action) {
+  const labels = {
+    review: "审查",
+    start: "启动",
+    pause: "暂停",
+    complete: "完成",
+    fail: "失败",
+    cancel: "取消",
+    block: "阻断",
+  };
+  return labels[action] || action;
+}
+
+function runnerJobAvailableActions(status) {
+  switch (status) {
+    case "queued":
+      return ["review", "block", "cancel"];
+    case "reviewed":
+      return ["start", "block", "cancel"];
+    case "running":
+      return ["pause", "complete", "fail", "cancel"];
+    case "paused":
+      return ["start", "fail", "cancel"];
+    case "blocked":
+      return ["review", "cancel"];
+    default:
+      return [];
+  }
+}
+
 function runnerJobBadgeClass(status) {
-  if (status === "failed") return "red";
-  if (status === "running") return "orange";
-  if (status === "cancelled") return "gray";
+  if (status === "failed" || status === "blocked") return "red";
+  if (status === "running" || status === "reviewed") return "orange";
+  if (status === "paused" || status === "cancelled") return "gray";
+  if (status === "completed") return "green";
   return "green";
 }
 
@@ -1591,12 +1746,15 @@ function renderRunnerStatus() {
 
 function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   const jobs = appData.runnerJobs || [];
+  const executionRequests = appData.executionRequests || [];
+  const runtimeEvents = appData.runtimeEvents || [];
   const count = document.querySelector("#runnerJobCount");
   const queuedCount = document.querySelector("#runnerQueuedCount");
   const failedCount = document.querySelector("#runnerFailedCount");
   const tableBody = document.querySelector("#runnerJobTable tbody");
   const detail = document.querySelector("#runnerJobDetail");
   const detailStatus = document.querySelector("#runnerJobDetailStatus");
+  const requestById = new Map(executionRequests.map((item) => [item.id, item]));
 
   if (count) count.textContent = jobs.length;
   if (queuedCount) queuedCount.textContent = jobs.filter((job) => job.status === "queued").length;
@@ -1632,33 +1790,137 @@ function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
   `).join("");
 
   const job = jobs[selectedRunnerJobIndex] || jobs[0];
+  const request = requestById.get(job.id) || {
+    id: job.id,
+    approvalId: job.approvalId || "",
+    taskId: job.taskId || "",
+    status: job.status || "queued",
+    requestShape: "execution_request_v1",
+    lifecycle: {
+      availableActions: runnerJobAvailableActions(job.status || "queued"),
+      reviewState: ["reviewed", "running", "paused", "completed"].includes(job.status || "")
+        ? "approved"
+        : job.status === "blocked"
+          ? "blocked"
+          : job.status === "failed"
+            ? "failed"
+            : job.status === "cancelled"
+              ? "cancelled"
+              : "pending",
+      terminal: ["blocked", "failed", "completed", "cancelled"].includes(job.status || ""),
+    },
+    launchGate: {
+      approved: false,
+      scopeLocked: true,
+      checkpointRequired: Boolean(job.checkpoint),
+      checkpointCommit: job.checkpoint || "",
+      secondConfirmRequired: false,
+      safetyLockRequired: false,
+    },
+    scope: {
+      operationTypes: job.operationTypes || [],
+      affectedFiles: job.affectedFiles || [],
+      taskTitle: "",
+      taskDescription: "",
+    },
+    review: {
+      required: true,
+      state: job.status === "reviewed" ? "approved" : "pending",
+      note: job.safetyNote || "",
+    },
+    resultSummary: "Execution request is read-only and has not started real Runner work.",
+    safetySummary: [],
+    recentEvents: runtimeEvents
+      .filter((event) => event.entityType === "runner_job" && event.entityId === job.id)
+      .slice(-6)
+      .reverse()
+      .map((event) => ({
+        id: event.id,
+        eventType: event.eventType || "",
+        actor: event.actor || "",
+        reason: event.reason || "",
+        createdAt: event.createdAt || "",
+      })),
+  };
   if (detailStatus) {
     detailStatus.textContent = runnerJobStatusLabel(job.status);
     detailStatus.className = `badge ${runnerJobBadgeClass(job.status)}`;
   }
+
+  const actionDisabled = runnerJobActionRunning ? "disabled" : "";
+  const actionButtons = (request.lifecycle?.availableActions || []).map((action) => `
+    <button class="neutral-action" type="button" data-runner-job-action="${escapeHtml(action)}" ${actionDisabled}>${escapeHtml(runnerJobActionLabel(action))}</button>
+  `).join("");
+  const recentEvents = Array.isArray(request.recentEvents) ? request.recentEvents : [];
 
   detail.innerHTML = `
     <div class="approval-meta">
       <div><span>Job ID</span><strong>${escapeHtml(job.id)}</strong></div>
       <div><span>来源审批</span><strong>${escapeHtml(job.approvalId || "无")}</strong></div>
       <div><span>关联任务</span><strong>${escapeHtml(job.taskId || "未关联")}</strong></div>
-      <div><span>Git checkpoint</span><strong>${escapeHtml(job.checkpoint || "未记录")}</strong></div>
+      <div><span>Git checkpoint</span><strong>${escapeHtml(request.launchGate?.checkpointCommit || "未记录")}</strong></div>
     </div>
     <div class="approval-meta">
       <div><span>操作类型</span><strong>${escapeHtml((job.operationTypes || []).join(" / ") || "未记录")}</strong></div>
       <div><span>创建时间</span><strong>${escapeHtml(job.createdAt || "未记录")}</strong></div>
       <div><span>更新时间</span><strong>${escapeHtml(job.updatedAt || "未记录")}</strong></div>
-      <div><span>安全说明</span><strong>当前只读，只表示已批准记录；不会执行本地命令、写文件或修改 Git。</strong></div>
+      <div><span>执行形态</span><strong>${escapeHtml(request.requestShape || "execution_request_v1")}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>审核状态</span><strong>${escapeHtml(request.review?.state || "pending")}</strong></div>
+      <div><span>启动门禁</span><strong>${request.launchGate?.approved ? "approved" : "approval_required"}</strong></div>
+      <div><span>范围锁定</span><strong>${request.launchGate?.scopeLocked ? "locked" : "unlocked"}</strong></div>
+      <div><span>二次确认</span><strong>${request.launchGate?.secondConfirmRequired ? "required" : "optional"}</strong></div>
     </div>
     <div class="task-files">
-      <h3>影响文件</h3>
-      <ul>${(job.affectedFiles || []).map((file) => `<li>${escapeHtml(file)}</li>`).join("") || "<li>暂无影响文件</li>"}</ul>
+      <h3>执行范围</h3>
+      <ul>${(request.scope?.affectedFiles || job.affectedFiles || []).map((file) => `<li>${escapeHtml(file)}</li>`).join("") || "<li>暂无影响文件</li>"}</ul>
+    </div>
+    <div class="task-files">
+      <h3>结果摘要</h3>
+      <ul>
+        <li><b>说明</b><span>${escapeHtml(request.resultSummary || "暂无")}</span></li>
+        <li><b>任务</b><span>${escapeHtml(request.scope?.taskTitle || "未关联")}</span></li>
+        <li><b>摘要</b><span>${escapeHtml(request.scope?.taskDescription || "未记录")}</span></li>
+      </ul>
+    </div>
+    <div class="task-files">
+      <h3>最近事件</h3>
+      <ul>${recentEvents.length === 0
+        ? "<li>暂无事件</li>"
+        : recentEvents.map((event) => `<li><b>${escapeHtml(event.eventType)}</b><span>${escapeHtml(event.actor || "api")}</span><em>${escapeHtml(event.createdAt || "")}</em></li>`).join("")}
+      </ul>
+    </div>
+    <div class="task-actions" data-runner-job-actions>
+      ${actionButtons || '<button class="neutral-action" type="button" disabled>暂无可用操作</button>'}
     </div>
   `;
 
   tableBody.querySelectorAll("[data-runner-job-index]").forEach((row) => {
     row.addEventListener("click", () => renderRuntimePage(Number(row.dataset.runnerJobIndex)));
   });
+
+  detail.querySelectorAll("[data-runner-job-action]").forEach((button) => {
+    button.addEventListener("click", () => runRunnerJobAction(job.id, button.dataset.runnerJobAction));
+  });
+
+  const runtimeEventList = document.querySelector("#runtimeEventList");
+  if (runtimeEventList) {
+    const events = runtimeEvents
+      .filter((event) => event.entityType === "runner_job")
+      .slice(-10)
+      .reverse();
+    runtimeEventList.innerHTML = events.length === 0
+      ? "<li>暂无审计事件</li>"
+      : events.map((event) => `
+        <li>
+          <b>${escapeHtml(event.eventType || "event")}</b>
+          <span>${escapeHtml(event.entityId || "")}</span>
+          <em>${escapeHtml(event.actor || "api")}</em>
+          <strong>${escapeHtml(event.createdAt || "")}</strong>
+        </li>
+      `).join("");
+  }
 }
 
 function renderTaskPage(selectedIndex = null) {
@@ -2035,6 +2297,59 @@ async function runTaskAction(action) {
   } finally {
     taskActionRunning = false;
     renderTaskPage(selectedTaskIndex);
+  }
+}
+
+async function runRunnerJobAction(jobId, action) {
+  const executionRequest = (appData.executionRequests || []).find((item) => item.id === jobId);
+  const job = (appData.runnerJobs || []).find((item) => item.id === jobId);
+  if (!job || !executionRequest) return;
+
+  const actionLabels = {
+    review: "审查",
+    start: "启动",
+    pause: "暂停",
+    complete: "完成",
+    fail: "失败",
+    cancel: "取消",
+    block: "阻断",
+  };
+
+  if (!executionRequest.lifecycle?.availableActions?.includes(action)) return;
+
+  runnerJobActionRunning = true;
+  setRuntimeStateFeedback(`执行请求：${actionLabels[action]}...`);
+  renderRuntimePage(selectedRunnerJobIndex);
+
+  try {
+    const approval = (appData.approvalRequests || []).find((item) => item.id === job.approvalId);
+    const body = {
+      requestedBy: "local_user",
+      reviewedBy: "local_user",
+      reason: action === "fail" ? "用户在界面标记为失败" : action === "block" ? "用户在界面标记为阻断" : "",
+      scopeLockAccepted: action === "start",
+      secondConfirm: Boolean(approval?.requiresSecondConfirm) || action === "start" ? true : false,
+      gitCheckpointCommit: executionRequest.launchGate?.checkpointCommit || "",
+      blocked: action === "block",
+    };
+    if (action === "review") {
+      body.blocked = false;
+    }
+    await postRunnerJobAction(jobId, action, body);
+    appData = await loadDashboardFromApi();
+    refreshSelectedAgentConfigVersionHistory({ force: true });
+    renderDashboard();
+    renderAgentsPage();
+    renderWorkflowPage();
+    renderRuntimePage(selectedRunnerJobIndex);
+    renderApprovalPage(selectedApprovalIndex);
+    renderTaskPage(selectedTaskIndex);
+    setRuntimeStateFeedback(`执行请求：${actionLabels[action]} 已提交。`, "success");
+  } catch (error) {
+    setRuntimeStateFeedback(`执行请求提交失败：${error.message}`, "error");
+  } finally {
+    runnerJobActionRunning = false;
+    renderRuntimePage(selectedRunnerJobIndex);
   }
 }
 

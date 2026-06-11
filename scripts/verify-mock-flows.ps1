@@ -241,8 +241,8 @@ try {
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should appear in queue."
 
-  Write-Step "Verify MVP-0.3 project plan approval assigns Agents and queues read-only Runner requests."
-  $planId = "verify_mvp03_mock"
+  Write-Step "Verify MVP-0.4 project plan approval assigns Agents and queues read-only Runner requests."
+  $planId = "verify_mvp04_mock"
   $planTaskPrefix = "task_${planId}_"
   $planRequest = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/project-plan-requests" -Body @{
     planId = $planId
@@ -268,7 +268,7 @@ try {
 
   $planApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($planRequest.approval.id)/approve" -Body @{
     secondConfirm = $true
-    confirmText = "Approve MVP-0.3 project plan verification."
+    confirmText = "Approve MVP-0.4 project plan verification."
   }
   Assert-Equal $planApproval.status "approved" "Project plan approval should approve."
   Assert-Equal $planApproval.runnerJobId "" "Project plan approval should not create a single generic Runner job."
@@ -294,6 +294,46 @@ try {
     Assert-TextContains (@($job.operationTypes) -join "`n") "runner_request_readonly" "Project plan Runner request should be read-only."
     Assert-TextContains $job.safetyNote "No command" "Project plan Runner request should document no command execution."
   }
+
+  Write-Step "Verify execution request lifecycle and runtime events."
+  $executionRequests = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/execution-requests"
+  $runnerRequest = @($executionRequests.requests | Where-Object { $_.id -eq $approval.runnerJobId })[0]
+  Assert-True ($null -ne $runnerRequest) "Execution request should be present."
+  Assert-Equal $runnerRequest.requestShape "execution_request_v1" "Execution request shape mismatch."
+  Assert-Equal $runnerRequest.lifecycle.reviewState "pending" "New execution request should start pending review."
+  Assert-Equal $runnerRequest.launchGate.approved $true "Execution request should inherit approved gate."
+  Assert-Equal $runnerRequest.lifecycle.availableActions[0] "review" "Queued execution request should allow review first."
+  $reviewed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/review" -Body @{
+    requestedBy = "verify_mock_flows"
+  }
+  Assert-Equal $reviewed.job.status "reviewed" "Review should move the request to reviewed."
+  $started = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/start" -Body @{
+    requestedBy = "verify_mock_flows"
+    scopeLockAccepted = $true
+    secondConfirm = $true
+    gitCheckpointCommit = "b84cf43"
+  }
+  Assert-Equal $started.job.status "running" "Start should move the request to running."
+  $paused = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/pause" -Body @{
+    requestedBy = "verify_mock_flows"
+    reason = "pause for verification"
+  }
+  Assert-Equal $paused.job.status "paused" "Pause should move the request to paused."
+  $resumed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/start" -Body @{
+    requestedBy = "verify_mock_flows"
+    scopeLockAccepted = $true
+    secondConfirm = $true
+    gitCheckpointCommit = "b84cf43"
+  }
+  Assert-Equal $resumed.job.status "running" "Resume should move the request back to running."
+  $completed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/complete" -Body @{
+    requestedBy = "verify_mock_flows"
+  }
+  Assert-Equal $completed.job.status "completed" "Complete should finish the request."
+  $executionHistory = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runtime-events?entityType=runner_job&entityId=$($approval.runnerJobId)&limit=10"
+  Assert-True (@($executionHistory.events).Count -ge 5) "Runner job should emit runtime events for lifecycle changes."
+  $finalEvent = @($executionHistory.events | Select-Object -First 1)[0]
+  Assert-Equal $finalEvent.eventType "completed" "Final runtime event should be completed."
 
   Write-Step "Verify invalid Agent permission request is rejected."
   $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{

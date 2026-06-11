@@ -11,7 +11,7 @@ project_id = args.get("projectId", "project_agent_swarm")
 
 
 def now():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def as_json(value):
@@ -524,6 +524,18 @@ def upsert_runner_job(connection, approval):
         )
         runtime_event(connection, "runner_job", job_id, "created", None, {"id": job_id, "status": "queued"}, reason=approval["id"])
     else:
+        before = {
+            "id": existing["id"],
+            "approvalId": existing["approval_id"],
+            "taskId": pick(existing, "task_id"),
+            "status": existing["status"],
+            "operationTypes": from_json(existing["operation_types"], []),
+            "affectedFiles": from_json(existing["affected_files"], []),
+            "checkpoint": pick(existing, "checkpoint_commit"),
+            "safetyNote": pick(existing, "safety_note"),
+            "createdAt": pick(existing, "created_at"),
+            "updatedAt": pick(existing, "updated_at"),
+        }
         connection.execute(
             """
             UPDATE runner_jobs
@@ -532,7 +544,146 @@ def upsert_runner_job(connection, approval):
             """,
             (as_json(approval["operationTypes"]), as_json(approval["affectedFiles"]), approval["checkpoint"]["commit"], timestamp, job_id, project_id),
         )
+        updated = fetch_one(connection, "SELECT * FROM runner_jobs WHERE id = ? AND project_id = ?", (job_id, project_id))
+        runtime_event(
+            connection,
+            "runner_job",
+            job_id,
+            "updated",
+            before,
+            {
+                "id": updated["id"],
+                "approvalId": updated["approval_id"],
+                "taskId": pick(updated, "task_id"),
+                "status": updated["status"],
+                "operationTypes": from_json(updated["operation_types"], []),
+                "affectedFiles": from_json(updated["affected_files"], []),
+                "checkpoint": pick(updated, "checkpoint_commit"),
+                "safetyNote": pick(updated, "safety_note"),
+                "createdAt": pick(updated, "created_at"),
+                "updatedAt": pick(updated, "updated_at"),
+            },
+            reason=approval["id"],
+        )
     return job_id
+
+
+def runner_job_terminal_status(status):
+    return status in {"blocked", "failed", "completed", "cancelled"}
+
+
+def runner_job_action_body_required(action):
+    return action in {"start", "review", "pause", "complete", "fail", "cancel", "block"}
+
+
+def runner_job_row_to_api(row):
+    return {
+        "id": row["id"],
+        "approvalId": row["approval_id"],
+        "taskId": pick(row, "task_id"),
+        "status": row["status"],
+        "operationTypes": from_json(row["operation_types"], []),
+        "affectedFiles": from_json(row["affected_files"], []),
+        "checkpoint": pick(row, "checkpoint_commit"),
+        "safetyNote": pick(row, "safety_note"),
+        "createdAt": pick(row, "created_at"),
+        "updatedAt": pick(row, "updated_at"),
+    }
+
+
+def runner_job_action(connection):
+    job_id = args["jobId"]
+    action = args["action"]
+    body = args.get("body", {})
+    row = fetch_one(connection, "SELECT * FROM runner_jobs WHERE id = ? AND project_id = ?", (job_id, project_id))
+    if row is None:
+        return {"statusCode": 404, "body": {"error": "runner_job_not_found"}}
+
+    before = runner_job_row_to_api(row)
+    approval = fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (row["approval_id"], project_id))
+    timestamp = now()
+    status = row["status"]
+    next_status = None
+    event_type = None
+    reason = body.get("reason") or ""
+    requested_by = body.get("requestedBy") or body.get("reviewedBy") or "local_user"
+
+    if action == "review":
+        if status not in {"queued", "blocked", "paused"}:
+            return {"statusCode": 409, "body": {"error": "runner_job_terminal", "message": f"Runner job is already {status}."}}
+        next_status = "blocked" if body.get("blocked") is True else "reviewed"
+        event_type = "blocked" if body.get("blocked") is True else "reviewed"
+    elif action == "start":
+        if not body.get("requestedBy"):
+            return {"statusCode": 409, "body": {"error": "runner_job_requested_by_required", "message": "requestedBy is required."}}
+        if approval is None or approval["status"] != "approved":
+            return {"statusCode": 409, "body": {"error": "runner_job_approval_required", "message": "Runner job requires an approved source approval."}}
+        if body.get("scopeLockAccepted") is not True:
+            return {"statusCode": 409, "body": {"error": "runner_job_scope_lock_required", "message": "scopeLockAccepted=true is required."}}
+        checkpoint_commit = pick(approval, "checkpoint_commit") or pick(row, "checkpoint_commit")
+        checkpoint_required = bool_from_int(approval["checkpoint_required"]) or bool(checkpoint_commit)
+        if checkpoint_required and body.get("gitCheckpointCommit") != checkpoint_commit:
+            return {"statusCode": 409, "body": {"error": "runner_job_checkpoint_required", "message": "gitCheckpointCommit must match the locked checkpoint."}}
+        second_confirm_required = bool_from_int(approval["requires_second_confirm"]) or any(item in {"file_write", "git_checkpoint", "network_request", "command"} for item in from_json(row["operation_types"], []))
+        if second_confirm_required and body.get("secondConfirm") is not True:
+            return {"statusCode": 409, "body": {"error": "runner_job_second_confirm_required", "message": "secondConfirm=true is required for this job."}}
+        if status not in {"queued", "reviewed", "paused"}:
+            return {"statusCode": 409, "body": {"error": "runner_job_cannot_start", "message": f"Runner job cannot start from status {status}."}}
+        next_status = "running"
+        event_type = "started"
+        reason = reason or "launch_gate_passed"
+    elif action == "pause":
+        if status != "running":
+            return {"statusCode": 409, "body": {"error": "runner_job_cannot_pause", "message": "Only running runner jobs can pause."}}
+        next_status = "paused"
+        event_type = "paused"
+    elif action == "complete":
+        if status != "running":
+            return {"statusCode": 409, "body": {"error": "runner_job_cannot_complete", "message": "Only running runner jobs can complete."}}
+        next_status = "completed"
+        event_type = "completed"
+    elif action == "fail":
+        if runner_job_terminal_status(status):
+            return {"statusCode": 409, "body": {"error": "runner_job_terminal", "message": f"Runner job is already {status}."}}
+        next_status = "failed"
+        event_type = "failed"
+        reason = reason or "execution_failed"
+    elif action == "cancel":
+        if runner_job_terminal_status(status):
+            return {"statusCode": 409, "body": {"error": "runner_job_terminal", "message": f"Runner job is already {status}."}}
+        next_status = "cancelled"
+        event_type = "cancelled"
+    elif action == "block":
+        if runner_job_terminal_status(status):
+            return {"statusCode": 409, "body": {"error": "runner_job_terminal", "message": f"Runner job is already {status}."}}
+        next_status = "blocked"
+        event_type = "blocked"
+        reason = reason or "safety_check_failed"
+    else:
+        return {"statusCode": 404, "body": {"error": "unknown_runner_job_action", "message": "Unknown Runner job action."}}
+
+    connection.execute(
+        """
+        UPDATE runner_jobs
+        SET status = ?, updated_at = ?
+        WHERE id = ? AND project_id = ?
+        """,
+        (next_status, timestamp, job_id, project_id),
+    )
+    updated = runner_job_row_to_api(fetch_one(connection, "SELECT * FROM runner_jobs WHERE id = ? AND project_id = ?", (job_id, project_id)))
+    runtime_event(connection, "runner_job", job_id, event_type, before, updated, actor=requested_by, reason=reason)
+    return {
+        "statusCode": 200,
+        "body": {
+            "job": updated,
+            "executionRequest": {
+                "id": updated["id"],
+                "approvalId": updated["approvalId"],
+                "taskId": updated["taskId"],
+                "status": updated["status"],
+            },
+        },
+    }
 
 
 def is_project_plan_approval(approval):
@@ -1300,6 +1451,8 @@ with sqlite3.connect(db_file) as connection:
             result = agent_config_application_action(connection)
         elif command == "agentConfigApplicationRealApply":
             result = agent_config_application_real_apply(connection)
+        elif command == "runnerJobAction":
+            result = runner_job_action(connection)
         else:
             result = {"statusCode": 404, "body": {"error": "unknown_sqlite_write_command"}}
 

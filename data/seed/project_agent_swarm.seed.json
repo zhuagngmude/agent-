@@ -5,7 +5,7 @@
     "id": "project_agent_swarm",
     "name": "agent蜂群 MVP",
     "status": "running",
-    "phase": "MVP-0.3",
+    "phase": "MVP-0.4",
     "description": "多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。",
     "workspacePath": "F:/projects/agent-swarm"
   },

@@ -202,6 +202,21 @@ def knowledge_update_row_to_api(row):
     }
 
 
+def runtime_event_row_to_api(row):
+    return {
+        "id": row["id"],
+        "projectId": row["project_id"],
+        "entityType": row["entity_type"],
+        "entityId": row["entity_id"],
+        "eventType": row["event_type"],
+        "beforeState": from_json(row["before_state"], None) if row["before_state"] else None,
+        "afterState": from_json(row["after_state"], None) if row["after_state"] else None,
+        "actor": pick(row, "actor"),
+        "reason": pick(row, "reason"),
+        "createdAt": pick(row, "created_at"),
+    }
+
+
 def fetch_project(connection):
     row = connection.execute(
         """
@@ -241,7 +256,7 @@ def attach_agent_relationships(connection, agents):
             parent["childAgentIds"].append(row["child_agent_id"])
 
 
-def build_dashboard(project, agents, tasks, approvals, workflows, runner_status, runner_jobs, applications, git_checkpoints, knowledge_updates):
+def build_dashboard(project, agents, tasks, approvals, workflows, runner_status, runner_jobs, applications, git_checkpoints, knowledge_updates, runtime_events):
     active_agents = sum(1 for agent in agents if agent["status"] == "running")
     pending_approvals = sum(1 for approval in approvals if approval["status"] == "pending")
     active_tasks = sum(1 for task in tasks if task["status"] in ("running", "queued"))
@@ -268,6 +283,7 @@ def build_dashboard(project, agents, tasks, approvals, workflows, runner_status,
         "runnerStatus": runner_status,
         "runnerJobs": runner_jobs,
         "agentConfigApplications": applications,
+        "runtimeEvents": runtime_events,
         "pendingApprovals": approvals,
         "taskQueue": tasks,
         "agentStatus": agents,
@@ -397,6 +413,16 @@ with sqlite3.connect(db_file) as connection:
         """,
         knowledge_update_row_to_api,
     )
+    runtime_events = fetch_mapped_list(
+        connection,
+        """
+        SELECT *
+        FROM runtime_events
+        WHERE project_id = ?
+        ORDER BY created_at, id
+        """,
+        runtime_event_row_to_api,
+    )
 
     dashboard = build_dashboard(
         project,
@@ -409,6 +435,7 @@ with sqlite3.connect(db_file) as connection:
         applications,
         git_checkpoints,
         knowledge_updates,
+        runtime_events,
     )
 
     snapshot = {
@@ -423,6 +450,7 @@ with sqlite3.connect(db_file) as connection:
         "agentConfigVersions": agent_config_versions,
         "gitCheckpoints": git_checkpoints,
         "knowledgeUpdates": knowledge_updates,
+        "runtimeEvents": runtime_events,
     }
 
     print(json.dumps(snapshot, ensure_ascii=False))

@@ -83,6 +83,8 @@
 - `GET /api/projects/:projectId/workflows`
 - `GET /api/projects/:projectId/runner/status`
 - `GET /api/projects/:projectId/runner/jobs`
+- `GET /api/projects/:projectId/execution-requests`
+- `GET /api/projects/:projectId/runtime-events`
 - `GET /api/projects/:projectId/git/checkpoints`
 - `GET /api/projects/:projectId/knowledge/updates`
 - `GET /api/projects/:projectId/usage`
@@ -98,11 +100,20 @@
 - `POST /api/tasks/:taskId/complete`
 - `POST /api/tasks/:taskId/fail`
 - `POST /api/tasks/:taskId/cancel`
+- `POST /api/runner/jobs/:jobId/review`
+- `POST /api/runner/jobs/:jobId/start`
+- `POST /api/runner/jobs/:jobId/pause`
+- `POST /api/runner/jobs/:jobId/complete`
+- `POST /api/runner/jobs/:jobId/fail`
+- `POST /api/runner/jobs/:jobId/cancel`
+- `POST /api/runner/jobs/:jobId/block`
 - `POST /api/approvals/:approvalId/reject`
 - `POST /api/approvals/:approvalId/patch-only`
 - `PATCH /api/projects/:projectId/settings`
 - `POST /api/runtime-state/reset`
 - `DELETE /api/runtime-state`
+
+Runner request records are still read-only with respect to real execution, but the mock / SQLite API now allows lifecycle state changes through the `review`, `start`, `pause`, `complete`, `fail`, `cancel`, and `block` actions above. Every transition must be audited through `runtime_events`; none of these routes may execute local commands, write project files, or modify Git.
 
 ## Helper-only 模块
 

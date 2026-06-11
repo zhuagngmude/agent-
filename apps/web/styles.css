@@ -846,6 +846,23 @@ li strong { color: var(--green); font-size: 13px; }
 .task-files { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fbfbfe; overflow: hidden; }
 .task-files h3 { margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
 .task-files ul { margin: 0; padding: 10px 14px 12px 30px; color: #4e5670; }
+.runner-event-panel #runtimeEventList { list-style: none; padding: 0; }
+.runner-event-panel #runtimeEventList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+  color: #4e5670;
+}
+.runner-event-panel #runtimeEventList li:first-child { border-top: 0; }
+.runner-event-panel #runtimeEventList b { color: var(--text); }
+.runner-event-panel #runtimeEventList em,
+.runner-event-panel #runtimeEventList strong {
+  font-style: normal;
+  color: var(--muted);
+}
 .badge { padding: 5px 9px; border-radius: 999px; font-weight: 800; font-size: 12px; }
 .badge.green { color: var(--green); background: #e5f8ed; }
 .badge.orange { color: var(--orange); background: #fff1df; }

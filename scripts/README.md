@@ -26,6 +26,8 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-agent-config-real-apply-sqlite.ps1`
 - `verify-agent-config-safety-loop.ps1`
 
+The mock / SQLite flow scripts now also cover execution request lifecycle transitions, read-only execution request views, and runtime event auditing.
+
 ## Ports
 
 - `8787`: manual local trial default

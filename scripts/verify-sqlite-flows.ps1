@@ -243,8 +243,8 @@ try {
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should be read back from SQLite."
 
-  Write-Step "Verify MVP-0.3 project plan approval assigns Agents and queues read-only SQLite Runner requests."
-  $planId = "verify_mvp03_sqlite"
+  Write-Step "Verify MVP-0.4 project plan approval assigns Agents and queues read-only SQLite Runner requests."
+  $planId = "verify_mvp04_sqlite"
   $planTaskPrefix = "task_${planId}_"
   $planRequest = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/project-plan-requests" -Body @{
     planId = $planId
@@ -270,7 +270,7 @@ try {
 
   $planApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($planRequest.approval.id)/approve" -Body @{
     secondConfirm = $true
-    confirmText = "Approve SQLite MVP-0.3 project plan verification."
+    confirmText = "Approve SQLite MVP-0.4 project plan verification."
   }
   Assert-Equal $planApproval.status "approved" "SQLite project plan approval should approve."
   Assert-Equal $planApproval.runnerJobId "" "SQLite project plan approval should not create a single generic Runner job."
@@ -296,6 +296,46 @@ try {
     Assert-TextContains (@($job.operationTypes) -join "`n") "runner_request_readonly" "SQLite project plan Runner request should be read-only."
     Assert-TextContains $job.safetyNote "No command" "SQLite project plan Runner request should document no command execution."
   }
+
+  Write-Step "Verify SQLite execution request lifecycle and runtime events."
+  $executionRequests = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/execution-requests"
+  $runnerRequest = @($executionRequests.requests | Where-Object { $_.id -eq $approval.runnerJobId })[0]
+  Assert-True ($null -ne $runnerRequest) "SQLite execution request should be present."
+  Assert-Equal $runnerRequest.requestShape "execution_request_v1" "SQLite execution request shape mismatch."
+  Assert-Equal $runnerRequest.lifecycle.reviewState "pending" "SQLite execution request should start pending review."
+  Assert-Equal $runnerRequest.launchGate.approved $true "SQLite execution request should inherit approved gate."
+  Assert-Equal $runnerRequest.lifecycle.availableActions[0] "review" "SQLite queued execution request should allow review first."
+  $reviewed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/review" -Body @{
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $reviewed.job.status "reviewed" "SQLite review should move the request to reviewed."
+  $started = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/start" -Body @{
+    requestedBy = "verify_sqlite_flows"
+    scopeLockAccepted = $true
+    secondConfirm = $true
+    gitCheckpointCommit = "b84cf43"
+  }
+  Assert-Equal $started.job.status "running" "SQLite start should move the request to running."
+  $paused = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/pause" -Body @{
+    requestedBy = "verify_sqlite_flows"
+    reason = "pause for verification"
+  }
+  Assert-Equal $paused.job.status "paused" "SQLite pause should move the request to paused."
+  $resumed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/start" -Body @{
+    requestedBy = "verify_sqlite_flows"
+    scopeLockAccepted = $true
+    secondConfirm = $true
+    gitCheckpointCommit = "b84cf43"
+  }
+  Assert-Equal $resumed.job.status "running" "SQLite resume should move the request back to running."
+  $completed = Invoke-Json -Method "POST" -Path "/api/runner/jobs/$($approval.runnerJobId)/complete" -Body @{
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $completed.job.status "completed" "SQLite complete should finish the request."
+  $executionHistory = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runtime-events?entityType=runner_job&entityId=$($approval.runnerJobId)&limit=10"
+  Assert-True (@($executionHistory.events).Count -ge 5) "SQLite runner job should emit runtime events for lifecycle changes."
+  $finalEvent = @($executionHistory.events | Select-Object -First 1)[0]
+  Assert-Equal $finalEvent.eventType "completed" "SQLite final runtime event should be completed."
 
   Write-Step "Verify invalid Agent permission request is rejected before SQLite write."
   $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{

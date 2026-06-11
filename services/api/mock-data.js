@@ -33,7 +33,7 @@ const project = {
   id: projectId,
   name: "agent蜂群 MVP",
   status: "running",
-  phase: "MVP-0.3",
+  phase: "MVP-0.4",
   description: "多 AI 智能体协作调度系统，优先打磨任务流、审批确认和知识库联动。",
 };
 
@@ -301,6 +301,8 @@ const workflows = [
 
 const runnerJobs = [];
 const initialRunnerJobState = runnerJobs.map((job) => ({ ...job }));
+const runtimeEvents = [];
+const initialRuntimeEventState = runtimeEvents.map((event) => ({ ...event }));
 const agentConfigApplications = [];
 const initialAgentConfigApplicationState = agentConfigApplications.map((item) => ({ ...item }));
 const runnerStatus = {
@@ -418,6 +420,7 @@ function dashboard() {
       lastHeartbeatAt: new Date().toISOString(),
     },
     runnerJobs,
+    runtimeEvents,
     agentConfigApplications,
     pendingApprovals: approvals,
     taskQueue: tasks,
@@ -433,6 +436,7 @@ function resetRuntimeData() {
   approvals.splice(0, approvals.length, ...initialApprovalState.map((approval) => cloneValue(approval)));
   tasks.splice(0, tasks.length, ...initialTaskState.map((task) => cloneValue(task)));
   runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => cloneValue(job)));
+  runtimeEvents.splice(0, runtimeEvents.length, ...initialRuntimeEventState.map((event) => cloneValue(event)));
   agentConfigApplications.splice(
     0,
     agentConfigApplications.length,
@@ -449,6 +453,7 @@ module.exports = {
   workflows,
   runnerStatus,
   runnerJobs,
+  runtimeEvents,
   agentConfigApplications,
   approvals,
   gitCheckpoints,

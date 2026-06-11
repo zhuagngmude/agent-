@@ -229,6 +229,7 @@ function serializeRuntimeState() {
       updatedAt: task.updatedAt || "",
     })),
     runnerJobs: data.runnerJobs.map((job) => ({ ...job })),
+    runtimeEvents: data.runtimeEvents.map((event) => ({ ...event })),
     agentConfigApplications: data.agentConfigApplications.map((item) => ({ ...item })),
   };
 }
@@ -324,6 +325,14 @@ function applyRuntimeState(state) {
     data.runnerJobs.splice(0, data.runnerJobs.length, ...state.runnerJobs.map((job) => ({ ...job })));
   }
 
+  if (Array.isArray(state.runtimeEvents)) {
+    data.runtimeEvents.splice(
+      0,
+      data.runtimeEvents.length,
+      ...state.runtimeEvents.map((event) => ({ ...event }))
+    );
+  }
+
   if (Array.isArray(state.agentConfigApplications)) {
     data.agentConfigApplications.splice(
       0,
@@ -338,6 +347,23 @@ function saveRuntimeState() {
   const tmpFile = `${runtimeStateFile}.tmp`;
   fs.writeFileSync(tmpFile, `${JSON.stringify(serializeRuntimeState(), null, 2)}\n`, "utf8");
   fs.renameSync(tmpFile, runtimeStateFile);
+}
+
+function recordRuntimeEvent(entityType, entityId, eventType, beforeState, afterState, actor = "api", reason = "") {
+  const event = {
+    id: `runtime_event_${entityType}_${entityId}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+    projectId: data.projectId,
+    entityType,
+    entityId,
+    eventType,
+    beforeState: beforeState === undefined ? null : beforeState,
+    afterState: afterState === undefined ? null : afterState,
+    actor,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
+  data.runtimeEvents.push(event);
+  return event;
 }
 
 function loadRuntimeState() {
@@ -365,6 +391,7 @@ function clearRuntimeState() {
 function upsertRunnerJobFromApproval(approval) {
   const runnerJobId = `runner_job_${approval.id}`;
   const existing = findRunnerJob(runnerJobId);
+  const before = existing ? { ...existing } : null;
   const job = existing || {
     id: runnerJobId,
     approvalId: approval.id,
@@ -385,9 +412,217 @@ function upsertRunnerJobFromApproval(approval) {
 
   if (!existing) {
     data.runnerJobs.push(job);
+    recordRuntimeEvent("runner_job", runnerJobId, "created", null, { ...job }, "api", approval.id);
+  } else {
+    recordRuntimeEvent("runner_job", runnerJobId, "updated", before, { ...job }, "api", approval.id);
   }
 
   return job;
+}
+
+function runnerJobTerminalStatuses() {
+  return new Set(["blocked", "failed", "completed", "cancelled"]);
+}
+
+function runnerJobAvailableActions(job = {}) {
+  switch (job.status) {
+    case "queued":
+      return ["review", "block", "cancel"];
+    case "reviewed":
+      return ["start", "block", "cancel"];
+    case "running":
+      return ["pause", "complete", "fail", "cancel"];
+    case "paused":
+      return ["start", "fail", "cancel"];
+    case "blocked":
+      return ["review", "cancel"];
+    default:
+      return [];
+  }
+}
+
+function runnerJobReviewState(job = {}) {
+  if (job.status === "blocked") return "blocked";
+  if (["reviewed", "running", "paused", "completed"].includes(job.status)) return "approved";
+  if (job.status === "failed") return "failed";
+  if (job.status === "cancelled") return "cancelled";
+  return "pending";
+}
+
+function buildRunnerJobLifecycleSummary(job = {}, approval = null, task = null) {
+  const approvalApproved = approval?.status === "approved";
+  const checkpointCommit = approval?.checkpoint?.commit || job.checkpoint || "";
+  const checkpointRequired = Boolean(approval?.checkpoint?.required || checkpointCommit);
+  const secondConfirmRequired = approval?.requiresSecondConfirm === true;
+  const operationTypes = Array.isArray(job.operationTypes) ? job.operationTypes : [];
+  const requiresScopedSafety = operationTypes.some((item) =>
+    ["file_write", "git_checkpoint", "network_request", "command"].includes(item)
+  );
+
+  return {
+    requestShape: "execution_request_v1",
+    approvalId: job.approvalId || approval?.id || "",
+    taskId: job.taskId || task?.id || "",
+    status: job.status || "queued",
+    lifecycle: {
+      availableActions: runnerJobAvailableActions(job),
+      reviewState: runnerJobReviewState(job),
+      terminal: runnerJobTerminalStatuses().has(job.status),
+    },
+    launchGate: {
+      approved: approvalApproved,
+      scopeLocked: true,
+      checkpointRequired,
+      checkpointCommit,
+      secondConfirmRequired,
+      safetyLockRequired: requiresScopedSafety,
+    },
+    scope: {
+      operationTypes,
+      affectedFiles: Array.isArray(job.affectedFiles) ? job.affectedFiles : [],
+      taskTitle: task?.title || "",
+      taskDescription: task?.description || "",
+    },
+    review: {
+      required: true,
+      state: runnerJobReviewState(job),
+      note: job.safetyNote || "",
+    },
+    resultSummary: job.status === "completed"
+      ? "Execution request completed in mock state only."
+      : job.status === "failed"
+        ? "Execution request failed before any real Runner activity."
+        : job.status === "paused"
+          ? "Execution request is paused in mock state."
+          : job.status === "blocked"
+            ? "Execution request is blocked by safety checks."
+            : "Execution request is read-only and has not started real Runner work.",
+    safetySummary: [
+      approvalApproved ? "approved" : "approval_required",
+      checkpointRequired ? `checkpoint:${checkpointCommit || "required"}` : "checkpoint_not_required",
+      secondConfirmRequired ? "second_confirm_required" : "second_confirm_optional",
+      "no_real_runner_execution",
+    ],
+  };
+}
+
+function updateRunnerJobLifecycle(job, action, body = {}) {
+  const before = { ...job };
+  const approval = findApproval(job.approvalId);
+  const task = findTask(job.taskId);
+  const now = new Date().toISOString();
+  const requestedBy = body.requestedBy || body.reviewedBy || body.appliedBy || "local_user";
+  let nextStatus = "";
+  let eventType = "";
+  let reason = body.reason || "";
+
+  if (action === "review") {
+    if (!["queued", "blocked", "paused"].includes(job.status)) {
+      return { error: "runner_job_terminal", message: `Runner job is already ${job.status}.` };
+    }
+    nextStatus = body.blocked === true ? "blocked" : "reviewed";
+    eventType = body.blocked === true ? "blocked" : "reviewed";
+  } else if (action === "start") {
+    if (!body.requestedBy) {
+      return { error: "runner_job_requested_by_required", message: "requestedBy is required." };
+    }
+    const approvalApproved = approval?.status === "approved";
+    const checkpointCommit = approval?.checkpoint?.commit || job.checkpoint || "";
+    const checkpointRequired = Boolean(approval?.checkpoint?.required || checkpointCommit);
+    const secondConfirmRequired = approval?.requiresSecondConfirm === true
+      || (Array.isArray(job.operationTypes) && job.operationTypes.some((item) => ["file_write", "git_checkpoint", "network_request", "command"].includes(item)));
+
+    if (!approvalApproved) {
+      return { error: "runner_job_approval_required", message: "Runner job requires an approved source approval." };
+    }
+    if (body.scopeLockAccepted !== true) {
+      return { error: "runner_job_scope_lock_required", message: "scopeLockAccepted=true is required." };
+    }
+    if (checkpointRequired && body.gitCheckpointCommit !== checkpointCommit) {
+      return { error: "runner_job_checkpoint_required", message: "gitCheckpointCommit must match the locked checkpoint." };
+    }
+    if (secondConfirmRequired && body.secondConfirm !== true) {
+      return { error: "runner_job_second_confirm_required", message: "secondConfirm=true is required for this job." };
+    }
+    if (!["reviewed", "paused", "queued"].includes(job.status)) {
+      return { error: "runner_job_cannot_start", message: `Runner job cannot start from status ${job.status}.` };
+    }
+    nextStatus = "running";
+    eventType = "started";
+    reason = reason || "launch_gate_passed";
+  } else if (action === "pause") {
+    if (job.status !== "running") {
+      return { error: "runner_job_cannot_pause", message: "Only running runner jobs can pause." };
+    }
+    nextStatus = "paused";
+    eventType = "paused";
+  } else if (action === "complete") {
+    if (job.status !== "running") {
+      return { error: "runner_job_cannot_complete", message: "Only running runner jobs can complete." };
+    }
+    nextStatus = "completed";
+    eventType = "completed";
+  } else if (action === "fail") {
+    if (runnerJobTerminalStatuses().has(job.status)) {
+      return { error: "runner_job_terminal", message: `Runner job is already ${job.status}.` };
+    }
+    nextStatus = "failed";
+    eventType = "failed";
+    reason = reason || "execution_failed";
+  } else if (action === "cancel") {
+    if (runnerJobTerminalStatuses().has(job.status)) {
+      return { error: "runner_job_terminal", message: `Runner job is already ${job.status}.` };
+    }
+    nextStatus = "cancelled";
+    eventType = "cancelled";
+  } else if (action === "block") {
+    if (runnerJobTerminalStatuses().has(job.status)) {
+      return { error: "runner_job_terminal", message: `Runner job is already ${job.status}.` };
+    }
+    nextStatus = "blocked";
+    eventType = "blocked";
+    reason = reason || "safety_check_failed";
+  } else {
+    return { error: "unknown_runner_job_action", message: "Unknown Runner job action." };
+  }
+
+  job.status = nextStatus;
+  job.updatedAt = now;
+
+  const after = { ...job };
+  const event = recordRuntimeEvent("runner_job", job.id, eventType, before, after, requestedBy, reason);
+  return { job, event };
+}
+
+function buildExecutionRequestResponse(job) {
+  const approval = findApproval(job.approvalId);
+  const task = findTask(job.taskId);
+  const summary = buildRunnerJobLifecycleSummary(job, approval, task);
+  const events = data.runtimeEvents
+    .filter((event) => event.entityType === "runner_job" && event.entityId === job.id)
+    .slice(-8)
+    .map((event) => ({ ...event }));
+
+  return {
+    id: job.id,
+    approvalId: job.approvalId || "",
+    taskId: job.taskId || "",
+    status: job.status || "queued",
+    requestShape: "execution_request_v1",
+    launchGate: summary.launchGate,
+    lifecycle: summary.lifecycle,
+    scope: summary.scope,
+    review: summary.review,
+    resultSummary: summary.resultSummary,
+    safetySummary: summary.safetySummary,
+    operationTypes: Array.isArray(job.operationTypes) ? job.operationTypes : [],
+    affectedFiles: Array.isArray(job.affectedFiles) ? job.affectedFiles : [],
+    checkpoint: job.checkpoint || "",
+    safetyNote: job.safetyNote || "",
+    createdAt: job.createdAt || "",
+    updatedAt: job.updatedAt || "",
+    recentEvents: events,
+  };
 }
 
 function upsertAgentConfigApplicationFromApproval(approval) {
@@ -1428,6 +1663,38 @@ async function handleTaskAction(req, res, taskId, action) {
   sendJson(res, 200, { task });
 }
 
+async function handleRunnerJobAction(req, res, jobId, action) {
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("runnerJobAction", {
+      projectId: data.projectId,
+      jobId,
+      action,
+      body,
+    }));
+    return;
+  }
+
+  const job = findRunnerJob(jobId);
+  if (!job) {
+    sendJson(res, 404, { error: "runner_job_not_found" });
+    return;
+  }
+
+  const result = updateRunnerJobLifecycle(job, action, body);
+  if (result.error) {
+    sendJson(res, 409, result);
+    return;
+  }
+
+  saveRuntimeState();
+  sendJson(res, 200, {
+    job: result.job,
+    executionRequest: buildExecutionRequestResponse(result.job),
+    runtimeEvent: result.event,
+  });
+}
+
 async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const { pathname } = url;
@@ -1456,6 +1723,7 @@ async function handleRequest(req, res) {
           approvals: snapshot?.approvals || [],
           tasks: snapshot?.tasks || [],
           runnerJobs: snapshot?.runnerJobs || [],
+          runtimeEvents: snapshot?.runtimeEvents || [],
           agentConfigApplications: snapshot?.agentConfigApplications || [],
         },
       });
@@ -1503,6 +1771,7 @@ async function handleRequest(req, res) {
           approvals: snapshot?.approvals || [],
           tasks: snapshot?.tasks || [],
           runnerJobs: snapshot?.runnerJobs || [],
+          runtimeEvents: snapshot?.runtimeEvents || [],
           agentConfigApplications: snapshot?.agentConfigApplications || [],
         },
       });
@@ -1623,6 +1892,12 @@ async function handleRequest(req, res) {
     return;
   }
 
+  const runnerJobAction = pathname.match(/^\/api\/runner\/jobs\/([^/]+)\/(review|start|pause|complete|fail|cancel|block)$/);
+  if (req.method === "POST" && runnerJobAction) {
+    await handleRunnerJobAction(req, res, runnerJobAction[1], runnerJobAction[2]);
+    return;
+  }
+
   if (req.method === "GET" && withProject(pathname, "/approvals")) {
     const status = url.searchParams.get("status");
     const riskLevel = url.searchParams.get("riskLevel");
@@ -1662,6 +1937,51 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && withProject(pathname, "/runner/jobs")) {
     const snapshot = projectSnapshotResponse(() => null);
     sendJson(res, 200, { jobs: snapshot?.runnerJobs || data.runnerJobs });
+    return;
+  }
+
+  if (req.method === "GET" && withProject(pathname, "/execution-requests")) {
+    const snapshot = projectSnapshotResponse(() => null);
+    const jobs = snapshot?.runnerJobs || data.runnerJobs;
+    const approvals = snapshot?.approvals || data.approvals;
+    const tasks = snapshot?.tasks || data.tasks;
+    const runtimeEvents = snapshot?.runtimeEvents || data.runtimeEvents;
+    sendJson(res, 200, {
+      requests: jobs.map((job) => {
+        const approval = approvals.find((item) => item.id === job.approvalId) || null;
+        const task = tasks.find((item) => item.id === job.taskId) || null;
+        const summary = buildRunnerJobLifecycleSummary(job, approval, task);
+        return {
+          ...buildExecutionRequestResponse(job),
+          ...summary,
+          recentEvents: runtimeEvents
+            .filter((event) => event.entityType === "runner_job" && event.entityId === job.id)
+            .slice(-8)
+            .reverse()
+            .map((event) => ({ ...event })),
+        };
+      }),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && withProject(pathname, "/runtime-events")) {
+    const snapshot = projectSnapshotResponse(() => null);
+    const runtimeEvents = snapshot?.runtimeEvents || data.runtimeEvents;
+    const entityType = url.searchParams.get("entityType");
+    const entityId = url.searchParams.get("entityId");
+    const requestedLimit = Number(url.searchParams.get("limit") || 100);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 100;
+    const events = runtimeEvents
+      .filter((event) => {
+        if (entityType && event.entityType !== entityType) return false;
+        if (entityId && event.entityId !== entityId) return false;
+        return true;
+      })
+      .slice(-limit)
+      .reverse()
+      .map((event) => ({ ...event }));
+    sendJson(res, 200, { events });
     return;
   }
 

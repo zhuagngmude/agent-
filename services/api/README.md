@@ -55,7 +55,7 @@ Feature-gated SQLite real apply is wired only through `POST /api/agent-config-ap
 
 Provider adapter work currently stops at the disabled adapter registry and stub. Future real adapters must stay behind the Model Gateway service boundary, enforce timeout and response-size limits, return only coarse redacted status fields, and be implemented one provider at a time. Do not add provider SDK imports or real provider network calls in this stage.
 
-`project-plan.js` owns the MVP-0.3 local project planning loop. `POST /api/projects/:projectId/project-plan-requests` builds a deterministic local `project_plan` approval from a user idea and constraints. The draft may persist an approval in Mock runtime state or SQLite, but it must not create tasks or Runner request records before approval. Approving that `project_plan` approval creates five queued tasks for `agent_frontend`, `agent_backend`, `agent_qa`, `agent_docs`, and `agent_reviewer`, plus five read-only Runner request queue records with `runner_request_readonly`. These queue records are not executable Runner jobs: they must not execute commands, write files, make network requests, modify Git, call models, trigger Agents, or read raw secrets. Mock and SQLite approval paths both validate that plan tasks and Runner requests have IDs, no duplicate IDs, and that each Runner request references a planned task and stays read-only.
+`project-plan.js` owns the MVP-0.4 local project planning loop. `POST /api/projects/:projectId/project-plan-requests` builds a deterministic local `project_plan` approval from a user idea and constraints. The draft may persist an approval in Mock runtime state or SQLite, but it must not create tasks or Runner request records before approval. Approving that `project_plan` approval creates five queued tasks for `agent_frontend`, `agent_backend`, `agent_qa`, `agent_docs`, and `agent_reviewer`, plus five read-only Runner request queue records with `runner_request_readonly`. These queue records are not executable Runner jobs: they must not execute commands, write files, make network requests, modify Git, call models, trigger Agents, or read raw secrets. Mock and SQLite approval paths both validate that plan tasks and Runner requests have IDs, no duplicate IDs, and that each Runner request references a planned task and stays read-only.
 
 启动：
 
@@ -115,3 +115,5 @@ SQLite 模式回归验证：
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/verify-sqlite-flows.ps1
 ```
+
+`GET /api/projects/:projectId/execution-requests` 和 `GET /api/projects/:projectId/runtime-events` 是 0.4 的只读审计视图；`POST /api/runner/jobs/:jobId/review|start|pause|complete|fail|cancel|block` 只做状态流转和 runtime event 记录，不会触发真实 Runner、写项目文件、改 Git、调用模型或扩大权限。
