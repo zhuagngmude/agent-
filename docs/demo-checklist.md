@@ -144,6 +144,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8787/api/runtime-state/reset
 可以运行：
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-project-plan-flow.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
@@ -163,6 +164,8 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - Dashboard 聚合接口包含 Runner 状态。
 - 任务可以 `start -> complete`。
 - Runner 审批通过后只生成只读 Runner job。
+- MVP-0.3 project plan helper 会生成本地确定性计划草案、`project_plan` 审批、五个 Agent 分工任务和五条只读 Runner request queue 预览，并拒绝空 idea、无效计划、重复 ID、非只读 Runner request。
+- Mock/SQLite flow 会覆盖 `POST /api/projects/:projectId/project-plan-requests`：草案阶段只能创建/更新审批，不能创建任务或 Runner request queue record；用户批准后才创建 frontend/backend/qa/docs/reviewer 五个 queued 任务和五条 `runner_request_readonly` 队列记录。
 - Agent 配置审批后可以走 Mock 应用状态流转。
 - Agent 配置审批后可以走 Mock 取消状态流转。
 - Agent 配置审批通过后必须只生成 `pending_apply` 待应用记录，`runnerJobId` 为空，Runner job 队列不得出现对应记录，Mock 应用后也不得真实修改 Agent 配置。
@@ -206,6 +209,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 
 - 读取 Mock API 数据。
 - 把审批、任务、Agent 配置应用记录的状态写入本地 runtime state 或 SQLite。
+- 用户提交项目想法后，在本地生成确定性 `project_plan` 审批草案；审批通过后创建 Agent 分工任务和只读 Runner request queue 记录。
 - 展示 Runner job、Runner 状态和 Agent 配置审查信息。
 
 当前 Demo 不允许：
@@ -213,6 +217,7 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - 不会真实修改 Agent 配置。
 - 不会让 Runner 写文件、删文件、执行命令、发起网络请求或修改 Git。
 - 不会调用真实模型 API。
+- 不会让项目计划草案触发真实 Agent、真实 Runner 或本地项目文件写入。
 - 不会连接真实数据库或云同步。
 - 不会因为 Agent 标记为 `architect_admin` 或“全权限”而绕过 Approval Service、Runner 安全检查、Model Gateway 禁用态或密钥边界。
 
@@ -277,3 +282,24 @@ git diff --check
 `verify-local-ui.ps1` and `verify-model-gateway.ps1` expect `scripts\start-local.ps1` to be running on `8787/5175`; run `scripts\stop-local.ps1` and `scripts\status-local.ps1` after local UI verification. The remaining automated flow checks use isolated ports and do not attach to `8787`.
 
 This closes the MVP-0.2 Agent config apply / version history / rollback dry-run / rollback review loop. Future real rollback writes, real Runner execution, real model calls, cloud sync, and a full permission system are MVP-0.3+ work unless a later feature-flagged and reviewed acceptance commit explicitly changes that boundary.
+
+## MVP-0.3 Project Plan Acceptance Status
+
+MVP-0.3 project idea -> plan approval -> Agent task split -> read-only Runner request queue is acceptable when the standard checks pass:
+
+```powershell
+node --check apps\web\app.js
+node --check services\api\server.js
+node --check services\api\mock-data.js
+node --check services\api\project-plan.js
+powershell -ExecutionPolicy Bypass -File scripts\check-encoding.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-project-plan-flow.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
+git diff --check
+```
+
+`verify-project-plan-flow.ps1` is helper-only and does not start services. Mock and SQLite flow scripts use isolated ports and cover API/state transitions. `verify-local-ui.ps1` expects the local trial to be running on `8787/5175`; after local UI verification, run `scripts\stop-local.ps1` and `scripts\status-local.ps1`.
+
+This closes the MVP-0.3 local planning loop only. Real model planning, real Agent execution, real Runner execution, project file writes, Git mutation, cloud sync, and a full permission system remain disabled.

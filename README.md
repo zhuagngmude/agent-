@@ -182,3 +182,23 @@ powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 ```text
 docs/demo-checklist.md
 ```
+
+## MVP-0.3 Current Loop
+
+The current local MVP-0.3 loop is documented in `docs/mvp-0.3-project-plan-flow-spec.md`.
+
+Implemented:
+
+- User enters a project idea and constraints in the workflow page.
+- The API creates a deterministic local `project_plan` approval draft.
+- User approval splits the plan into frontend, backend, qa, docs, and reviewer tasks.
+- The approval creates read-only Runner request queue records for those tasks.
+
+Still not enabled:
+
+- No real Runner execution.
+- No real model call.
+- No local project file write.
+- No Git mutation.
+- No cloud sync.
+- No full permission system.

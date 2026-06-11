@@ -1,8 +1,12 @@
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$dbDir = Join-Path $root "data\local"
-$dbFile = Join-Path $dbDir "agent-swarm.sqlite"
+$dbFile = if ($env:AGENT_SWARM_SQLITE_DB) {
+  $env:AGENT_SWARM_SQLITE_DB
+} else {
+  Join-Path $root "data\local\agent-swarm.sqlite"
+}
+$dbDir = Split-Path -Parent $dbFile
 $migrationFile = Join-Path $root "data\migrations\001_initial_sqlite.sql"
 $pythonScript = Join-Path $PSScriptRoot "sqlite\init_sqlite.py"
 

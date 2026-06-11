@@ -145,6 +145,21 @@ function Assert-AgentConfigVersionHistoryNoSideEffects {
   Assert-Equal $VersionHistory.sideEffects.readsRawSecrets $false "Agent config version history should not read raw secrets."
 }
 
+function Assert-ProjectPlanNoRealSideEffects {
+  param(
+    [object]$SideEffects,
+    [string]$Prefix
+  )
+
+  Assert-Equal $SideEffects.writesProjectFiles $false "$Prefix should not write project files."
+  Assert-Equal $SideEffects.modifiesGit $false "$Prefix should not modify Git."
+  Assert-Equal $SideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $SideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $SideEffects.readsRawSecrets $false "$Prefix should not read raw secrets."
+  Assert-Equal $SideEffects.makesNetworkRequests $false "$Prefix should not make network requests."
+  Assert-Equal $SideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -158,12 +173,16 @@ if (Test-ApiReady) {
   throw "Port $port already has an API responding before verification started. This script will not attach to an existing service; stop that process or use a different isolated verification port."
 }
 
+$verifyTempDir = Join-Path ([System.IO.Path]::GetTempPath()) "agent-swarm-verify-sqlite"
+New-Item -ItemType Directory -Force -Path $verifyTempDir | Out-Null
+$tempDbFile = Join-Path $verifyTempDir "agent-swarm-verify.sqlite"
+$outLog = Join-Path $verifyTempDir "sqlite-api.out.log"
+$errLog = Join-Path $verifyTempDir "sqlite-api.err.log"
+$previousSqliteDb = $env:AGENT_SWARM_SQLITE_DB
+$env:AGENT_SWARM_SQLITE_DB = $tempDbFile
+
 Write-Step "Rebuild SQLite database from seed."
 powershell -ExecutionPolicy Bypass -File $seedScript | Out-Null
-
-$outLog = Join-Path $root "logs\sqlite-api.out.log"
-$errLog = Join-Path $root "logs\sqlite-api.err.log"
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outLog) | Out-Null
 
 Write-Step "Start API in SQLite mode on port $port."
 $previousPort = $env:AGENT_SWARM_API_PORT
@@ -192,7 +211,7 @@ try {
   }
 
   if (-not $ready) {
-    throw "SQLite API did not start. Check logs/sqlite-api.out.log and logs/sqlite-api.err.log"
+    throw "SQLite API did not start. Check $outLog and $errLog"
   }
 
   Write-Step "Reset SQLite runtime state."
@@ -223,6 +242,60 @@ try {
   $jobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should be read back from SQLite."
+
+  Write-Step "Verify MVP-0.3 project plan approval assigns Agents and queues read-only SQLite Runner requests."
+  $planId = "verify_mvp03_sqlite"
+  $planTaskPrefix = "task_${planId}_"
+  $planRequest = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/project-plan-requests" -Body @{
+    planId = $planId
+    idea = "Build a local customer lead tracker"
+    constraints = "SQLite mode only; no real Runner; no real model calls"
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $planRequest.approval.status "pending" "SQLite project plan approval should start pending."
+  Assert-Equal $planRequest.approval.targetService "project_plan" "SQLite project plan approval target service mismatch."
+  Assert-Equal $planRequest.approval.changeRequest.type "project_plan" "SQLite project plan change request type mismatch."
+  Assert-Equal @($planRequest.plan.tasks).Count 5 "SQLite project plan draft should include five tasks."
+  Assert-Equal @($planRequest.plan.runnerRequests).Count 5 "SQLite project plan draft should include five Runner requests."
+  Assert-ProjectPlanNoRealSideEffects -SideEffects $planRequest.sideEffects -Prefix "SQLite project plan draft request"
+  Assert-Equal $planRequest.sideEffects.createsTasks $false "SQLite project plan draft should not create tasks before approval."
+  Assert-Equal $planRequest.sideEffects.createsRunnerJobs $false "SQLite project plan draft should not create Runner jobs before approval."
+
+  $draftTasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $draftPlanTasks = @($draftTasks.tasks | Where-Object { $_.id -like "$planTaskPrefix*" })
+  Assert-Equal $draftPlanTasks.Count 0 "SQLite project plan draft should not appear in task queue before approval."
+  $draftJobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $draftPlanJobs = @($draftJobs.jobs | Where-Object { $_.approvalId -eq $planRequest.approval.id })
+  Assert-Equal $draftPlanJobs.Count 0 "SQLite project plan draft should not create Runner queue records before approval."
+
+  $planApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($planRequest.approval.id)/approve" -Body @{
+    secondConfirm = $true
+    confirmText = "Approve SQLite MVP-0.3 project plan verification."
+  }
+  Assert-Equal $planApproval.status "approved" "SQLite project plan approval should approve."
+  Assert-Equal $planApproval.runnerJobId "" "SQLite project plan approval should not create a single generic Runner job."
+  Assert-Equal @($planApproval.createdTaskIds).Count 5 "SQLite project plan approval should create five tasks."
+  Assert-Equal @($planApproval.createdRunnerJobIds).Count 5 "SQLite project plan approval should create five Runner request records."
+  Assert-ProjectPlanNoRealSideEffects -SideEffects $planApproval.sideEffects -Prefix "SQLite project plan approval"
+
+  $approvedTasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $projectPlanTasks = @($approvedTasks.tasks | Where-Object { $_.id -like "$planTaskPrefix*" })
+  Assert-Equal $projectPlanTasks.Count 5 "SQLite approved project plan tasks should appear in task queue."
+  foreach ($agentId in @("agent_frontend", "agent_backend", "agent_qa", "agent_docs", "agent_reviewer")) {
+    $assignedTasks = @($projectPlanTasks | Where-Object { $_.assignedAgentId -eq $agentId })
+    Assert-Equal $assignedTasks.Count 1 "SQLite project plan should assign exactly one task to $agentId."
+    Assert-Equal $assignedTasks[0].status "queued" "SQLite project plan task for $agentId should start queued."
+  }
+
+  $approvedJobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $projectPlanJobs = @($approvedJobs.jobs | Where-Object { $_.approvalId -eq $planRequest.approval.id })
+  Assert-Equal $projectPlanJobs.Count 5 "SQLite approved project plan should create five Runner queue records."
+  foreach ($job in $projectPlanJobs) {
+    Assert-Equal $job.status "queued" "SQLite project plan Runner request should start queued."
+    Assert-True ($job.taskId -like "$planTaskPrefix*") "SQLite project plan Runner request should reference a project plan task."
+    Assert-TextContains (@($job.operationTypes) -join "`n") "runner_request_readonly" "SQLite project plan Runner request should be read-only."
+    Assert-TextContains $job.safetyNote "No command" "SQLite project plan Runner request should document no command execution."
+  }
 
   Write-Step "Verify invalid Agent permission request is rejected before SQLite write."
   $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{
@@ -420,9 +493,12 @@ try {
   }
   $env:AGENT_SWARM_API_PORT = $previousPort
   $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
+  $env:AGENT_SWARM_SQLITE_DB = $previousSqliteDb
   try {
-    powershell -ExecutionPolicy Bypass -File $seedScript | Out-Null
+    Remove-Item -LiteralPath $tempDbFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$tempDbFile-shm" -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$tempDbFile-wal" -Force -ErrorAction SilentlyContinue
   } catch {
-    Write-Warning "Failed to reseed SQLite after verification: $($_.Exception.Message)"
+    Write-Warning "Failed to clean temp SQLite verification database: $($_.Exception.Message)"
   }
 }

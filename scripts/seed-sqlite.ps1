@@ -1,7 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$dbFile = Join-Path $root "data\local\agent-swarm.sqlite"
+$dbFile = if ($env:AGENT_SWARM_SQLITE_DB) {
+  $env:AGENT_SWARM_SQLITE_DB
+} else {
+  Join-Path $root "data\local\agent-swarm.sqlite"
+}
 $seedFile = Join-Path $root "data\seed\project_agent_swarm.seed.json"
 $initScript = Join-Path $PSScriptRoot "init-sqlite.ps1"
 $pythonScript = Join-Path $PSScriptRoot "sqlite\seed_sqlite.py"

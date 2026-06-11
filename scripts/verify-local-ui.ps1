@@ -199,6 +199,12 @@ try {
   Assert-True ((Invoke-PageText -Selector "#taskDetail").Length -gt 0) "Tasks page should render task details."
   Assert-True ((Invoke-PageEval -Expression "() => document.querySelectorAll('#startTaskAction, #completeTaskAction, #failTaskAction, #cancelTaskAction').length") -eq 4) "Task action buttons should be present."
 
+  Invoke-PageClickByDataPage -Page "workflow"
+  Assert-TextContains (Invoke-PageText -Selector "#workflowPage") "MVP-0.3" "Workflow page should render MVP-0.3 project plan request panel."
+  Assert-TextContains (Invoke-PageText -Selector "#workflowPage") "Runner request queue" "Workflow page should describe read-only Runner request queue."
+  Assert-True ((Invoke-PageEval -Expression "() => document.querySelector('#projectPlanIdea')?.tagName === 'TEXTAREA'") -eq $true) "Workflow page should render the project idea input."
+  Assert-True ((Invoke-PageEval -Expression "() => document.querySelector('#submitProjectPlanRequest')?.disabled === false") -eq $true) "Project plan request button should be available in local UI."
+
   Invoke-PageClickByDataPage -Page "approval"
   Assert-TextContains (Invoke-PageText -Selector "#approval") "Runner job" "Approval page should describe Runner jobs."
 

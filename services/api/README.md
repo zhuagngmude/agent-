@@ -30,6 +30,7 @@ agent-config-rollback-request.js
 agent-config-version-history.js
 model-gateway.js
 model-gateway-adapters.js
+project-plan.js
 ```
 
 `agent-permissions.js` 负责 mock Agent 权限 profile 边界。`POST /api/agents/:agentId/change-requests` 在创建审批前验证 `changeType=permission`。安全 profile 会创建 Agent 配置审批，并把 `permissionValidation` 记录到 `changeRequest`；禁止 capability、未知 capability、未支持 profile 和 `all=true` 会返回 `422 agent_permission_validation_failed`，不写 runtime state 或 SQLite。
@@ -53,6 +54,8 @@ Feature-gated SQLite real apply is wired only through `POST /api/agent-config-ap
 `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is currently a visible request flag only. Even when that environment variable is `true`, MVP-0.2 must keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
 
 Provider adapter work currently stops at the disabled adapter registry and stub. Future real adapters must stay behind the Model Gateway service boundary, enforce timeout and response-size limits, return only coarse redacted status fields, and be implemented one provider at a time. Do not add provider SDK imports or real provider network calls in this stage.
+
+`project-plan.js` owns the MVP-0.3 local project planning loop. `POST /api/projects/:projectId/project-plan-requests` builds a deterministic local `project_plan` approval from a user idea and constraints. The draft may persist an approval in Mock runtime state or SQLite, but it must not create tasks or Runner request records before approval. Approving that `project_plan` approval creates five queued tasks for `agent_frontend`, `agent_backend`, `agent_qa`, `agent_docs`, and `agent_reviewer`, plus five read-only Runner request queue records with `runner_request_readonly`. These queue records are not executable Runner jobs: they must not execute commands, write files, make network requests, modify Git, call models, trigger Agents, or read raw secrets. Mock and SQLite approval paths both validate that plan tasks and Runner requests have IDs, no duplicate IDs, and that each Runner request references a planned task and stays read-only.
 
 启动：
 

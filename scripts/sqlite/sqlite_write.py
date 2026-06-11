@@ -32,6 +32,10 @@ def bool_from_int(value):
     return bool(value)
 
 
+def as_bool(value):
+    return 1 if value else 0
+
+
 ALLOWED_AGENT_CONFIG_FIELDS = {
     "permissions",
     "model",
@@ -531,6 +535,194 @@ def upsert_runner_job(connection, approval):
     return job_id
 
 
+def is_project_plan_approval(approval):
+    change_request = approval.get("changeRequest") or {}
+    return (
+        approval.get("targetService") == "project_plan"
+        or change_request.get("type") == "project_plan"
+        or change_request.get("changeType") == "project_plan"
+    )
+
+
+def no_project_plan_request_side_effects():
+    return {
+        "writesProjectFiles": False,
+        "modifiesGit": False,
+        "executesRunner": False,
+        "callsRealModel": False,
+        "readsRawSecrets": False,
+        "makesNetworkRequests": False,
+        "triggersAgents": False,
+    }
+
+
+def upsert_project_plan_task(connection, planned_task, timestamp):
+    task_id = planned_task["id"]
+    existing = fetch_one(connection, "SELECT * FROM tasks WHERE id = ? AND project_id = ?", (task_id, project_id))
+    task_status = existing["status"] if existing else planned_task.get("status", "queued")
+    values = (
+        task_id,
+        project_id,
+        planned_task.get("title", task_id),
+        planned_task.get("description", ""),
+        task_status,
+        planned_task.get("priority", "medium"),
+        planned_task.get("assignedAgentId") or None,
+        planned_task.get("riskLevel", "low"),
+        as_json(planned_task.get("relatedFiles", [])),
+        as_bool(planned_task.get("requiresApproval")),
+        as_json(planned_task.get("dependsOn", [])),
+        None,
+        None,
+        None,
+        None,
+        None,
+        existing["created_at"] if existing else timestamp,
+        timestamp,
+    )
+    connection.execute(
+        """
+        INSERT INTO tasks (
+          id, project_id, title, description, status, priority, assigned_agent_id,
+          risk_level, related_files, requires_approval, depends_on,
+          started_at, completed_at, failed_at, cancelled_at, failure_reason,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          title = excluded.title,
+          description = excluded.description,
+          priority = excluded.priority,
+          assigned_agent_id = excluded.assigned_agent_id,
+          risk_level = excluded.risk_level,
+          related_files = excluded.related_files,
+          requires_approval = excluded.requires_approval,
+          depends_on = excluded.depends_on,
+          updated_at = excluded.updated_at
+        """,
+        values,
+    )
+    if existing is None:
+        runtime_event(connection, "task", task_id, "created", None, {"id": task_id, "status": task_status}, reason="project_plan_approval")
+    return existing is None
+
+
+def upsert_project_plan_runner_job(connection, approval, runner_request, timestamp):
+    job_id = runner_request["id"]
+    existing = fetch_one(connection, "SELECT * FROM runner_jobs WHERE id = ? AND project_id = ?", (job_id, project_id))
+    job_status = existing["status"] if existing else runner_request.get("status", "queued")
+    values = (
+        job_id,
+        project_id,
+        approval["id"],
+        runner_request.get("taskId") or None,
+        job_status,
+        as_json(runner_request.get("operationTypes", ["runner_request_readonly"])),
+        as_json(runner_request.get("affectedFiles", [])),
+        "",
+        runner_request.get("safetyNote") or "SQLite MVP-0.3 read-only Runner request. No command, file write, network request, or Git change is executed.",
+        existing["created_at"] if existing else timestamp,
+        timestamp,
+    )
+    connection.execute(
+        """
+        INSERT INTO runner_jobs (
+          id, project_id, approval_id, task_id, status, operation_types,
+          affected_files, checkpoint_commit, safety_note, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          approval_id = excluded.approval_id,
+          task_id = excluded.task_id,
+          operation_types = excluded.operation_types,
+          affected_files = excluded.affected_files,
+          checkpoint_commit = excluded.checkpoint_commit,
+          safety_note = excluded.safety_note,
+          updated_at = excluded.updated_at
+        """,
+        values,
+    )
+    if existing is None:
+        runtime_event(connection, "runner_job", job_id, "created", None, {"id": job_id, "status": job_status}, reason=approval["id"])
+    return existing is None
+
+
+def validate_project_plan_payload(planned_tasks, runner_requests):
+    task_ids = set()
+    for planned_task in planned_tasks:
+        if not isinstance(planned_task, dict) or not str(planned_task.get("id", "")).strip():
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan approval contains a task without an id.",
+            }
+        task_id = planned_task["id"]
+        if task_id in task_ids:
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan approval contains duplicate task ids.",
+            }
+        task_ids.add(task_id)
+
+    runner_job_ids = set()
+    for runner_request in runner_requests:
+        if not isinstance(runner_request, dict) or not str(runner_request.get("id", "")).strip():
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan approval contains a Runner request without an id.",
+            }
+        runner_job_id = runner_request["id"]
+        if runner_job_id in runner_job_ids:
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan approval contains duplicate Runner request ids.",
+            }
+        if runner_request.get("taskId") not in task_ids:
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan Runner request must reference a planned task.",
+            }
+        operation_types = runner_request.get("operationTypes")
+        if not isinstance(operation_types, list) or "runner_request_readonly" not in operation_types:
+            return {
+                "error": "invalid_project_plan_approval",
+                "message": "Project plan Runner request must remain read-only.",
+            }
+        runner_job_ids.add(runner_job_id)
+
+    return None
+
+
+def instantiate_project_plan_approval(connection, approval, timestamp):
+    change_request = approval.get("changeRequest") or {}
+    plan = change_request.get("plan") or {}
+    planned_tasks = plan.get("tasks") if isinstance(plan.get("tasks"), list) else []
+    runner_requests = plan.get("runnerRequests") if isinstance(plan.get("runnerRequests"), list) else []
+    if len(planned_tasks) == 0 or len(runner_requests) == 0:
+        return {
+            "error": "invalid_project_plan_approval",
+            "message": "Project plan approval must contain plan tasks and runnerRequests.",
+        }
+
+    validation_error = validate_project_plan_payload(planned_tasks, runner_requests)
+    if validation_error:
+        return validation_error
+
+    created_task_ids = []
+    created_runner_job_ids = []
+    for planned_task in planned_tasks:
+        if upsert_project_plan_task(connection, planned_task, timestamp):
+            created_task_ids.append(planned_task["id"])
+    for runner_request in runner_requests:
+        if upsert_project_plan_runner_job(connection, approval, runner_request, timestamp):
+            created_runner_job_ids.append(runner_request["id"])
+
+    return {
+        "planId": plan.get("id", ""),
+        "createdTaskIds": created_task_ids,
+        "createdRunnerJobIds": created_runner_job_ids,
+        "taskIds": [task.get("id", "") for task in planned_tasks],
+        "runnerJobIds": [job.get("id", "") for job in runner_requests],
+    }
+
+
 def upsert_agent_config_application(connection, approval):
     change_request = approval.get("changeRequest") or {}
     agent_id = change_request.get("agentId") or approval.get("requestAgentId") or ""
@@ -604,8 +796,13 @@ def approval_action(connection):
             return {"statusCode": 409, "body": {"error": "second_confirm_required", "message": "High risk approval requires secondConfirm=true."}}
         runner_job_id = ""
         application_id = ""
+        project_plan_result = None
         if before["targetService"] == "agent_config":
             application_id = upsert_agent_config_application(connection, before)
+        elif is_project_plan_approval(before):
+            project_plan_result = instantiate_project_plan_approval(connection, before, timestamp)
+            if project_plan_result.get("error"):
+                return {"statusCode": 409, "body": project_plan_result}
         else:
             runner_job_id = upsert_runner_job(connection, before)
         connection.execute(
@@ -618,7 +815,26 @@ def approval_action(connection):
         )
         updated = approval_row_to_api(fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (approval_id, project_id)))
         runtime_event(connection, "approval", approval_id, "status_changed", before, updated, reason=action)
-        return {"statusCode": 200, "body": {"id": approval_id, "status": "approved", "runnerJobId": runner_job_id, "agentConfigApplicationId": application_id}}
+        body = {
+            "id": approval_id,
+            "status": "approved",
+            "runnerJobId": runner_job_id,
+            "agentConfigApplicationId": application_id,
+        }
+        if project_plan_result:
+            body.update({
+                "createdTaskIds": project_plan_result["createdTaskIds"],
+                "createdRunnerJobIds": project_plan_result["createdRunnerJobIds"],
+                "sideEffects": {
+                    **no_project_plan_request_side_effects(),
+                    "writesRuntimeState": False,
+                    "writesSqlite": True,
+                    "createsApproval": False,
+                    "createsTasks": len(project_plan_result["createdTaskIds"]) > 0,
+                    "createsRunnerJobs": len(project_plan_result["createdRunnerJobIds"]) > 0,
+                },
+            })
+        return {"statusCode": 200, "body": body}
 
     if action == "reject":
         connection.execute(
@@ -734,6 +950,124 @@ def create_agent_change_request(connection):
             "approval": updated,
             "permissionValidation": body.get("permissionValidation"),
             "message": "Agent change request created. Agent config was not modified.",
+        },
+    }
+
+
+def create_project_plan_request(connection):
+    approval = args.get("approval") or {}
+    plan = args.get("plan") or {}
+    approval_id = approval.get("id")
+    if not approval_id:
+        return {"statusCode": 422, "body": {"error": "project_plan_approval_required"}}
+
+    project = fetch_one(connection, "SELECT id FROM projects WHERE id = ?", (project_id,))
+    if project is None:
+        return {"statusCode": 404, "body": {"error": "project_not_found"}}
+
+    existing = fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (approval_id, project_id))
+    before = approval_row_to_api(existing) if existing else None
+    if before and before["status"] != "pending":
+        return {
+            "statusCode": 409,
+            "body": {
+                "error": "project_plan_approval_already_closed",
+                "message": "Existing project plan approval is no longer pending.",
+                "approval": before,
+                "sideEffects": {
+                    **no_project_plan_request_side_effects(),
+                    "writesRuntimeState": False,
+                    "writesSqlite": False,
+                    "createsApproval": False,
+                    "createsTasks": False,
+                    "createsRunnerJobs": False,
+                },
+            },
+        }
+
+    timestamp = now()
+    checkpoint = approval.get("checkpoint") or {}
+    values = (
+        approval_id,
+        project_id,
+        "pending",
+        approval.get("riskLevel", "medium"),
+        approval.get("riskTone", "mid"),
+        approval.get("requestAgentId") or None,
+        approval.get("requestAgentName", ""),
+        "project_plan",
+        as_json(approval.get("operationTypes", [])),
+        approval.get("reason", ""),
+        as_bool(checkpoint.get("required")),
+        as_bool(checkpoint.get("created")),
+        checkpoint.get("commit", ""),
+        as_json(approval.get("affectedFiles", [])),
+        approval.get("diffSummary", ""),
+        as_json(approval.get("diffPreview", [])),
+        as_bool(approval.get("requiresSecondConfirm")),
+        as_json(approval.get("changeRequest")),
+        "",
+        "",
+        "",
+        None,
+        None,
+        None,
+        existing["created_at"] if existing else approval.get("createdAt", timestamp),
+        timestamp,
+    )
+    connection.execute(
+        """
+        INSERT INTO approvals (
+          id, project_id, status, risk_level, risk_tone, request_agent_id,
+          request_agent_name, target_service, operation_types, reason,
+          checkpoint_required, checkpoint_created, checkpoint_commit,
+          affected_files, diff_summary, diff_preview, requires_second_confirm,
+          change_request, runner_job_id, patch_artifact_id, reject_reason,
+          approved_at, rejected_at, patch_only_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          status = excluded.status,
+          risk_level = excluded.risk_level,
+          risk_tone = excluded.risk_tone,
+          request_agent_id = excluded.request_agent_id,
+          request_agent_name = excluded.request_agent_name,
+          target_service = excluded.target_service,
+          operation_types = excluded.operation_types,
+          reason = excluded.reason,
+          checkpoint_required = excluded.checkpoint_required,
+          checkpoint_created = excluded.checkpoint_created,
+          checkpoint_commit = excluded.checkpoint_commit,
+          affected_files = excluded.affected_files,
+          diff_summary = excluded.diff_summary,
+          diff_preview = excluded.diff_preview,
+          requires_second_confirm = excluded.requires_second_confirm,
+          change_request = excluded.change_request,
+          runner_job_id = excluded.runner_job_id,
+          patch_artifact_id = excluded.patch_artifact_id,
+          reject_reason = excluded.reject_reason,
+          approved_at = excluded.approved_at,
+          rejected_at = excluded.rejected_at,
+          patch_only_at = excluded.patch_only_at,
+          updated_at = excluded.updated_at
+        """,
+        values,
+    )
+    updated = approval_row_to_api(fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (approval_id, project_id)))
+    runtime_event(connection, "approval", approval_id, "created" if before is None else "updated", before, updated, reason="project_plan_request")
+    return {
+        "statusCode": 201,
+        "body": {
+            "approval": updated,
+            "plan": plan,
+            "sideEffects": {
+                **no_project_plan_request_side_effects(),
+                "writesRuntimeState": False,
+                "writesSqlite": True,
+                "createsApproval": before is None,
+                "createsTasks": False,
+                "createsRunnerJobs": False,
+            },
+            "message": "Project plan approval created in SQLite. No Agent was triggered and no Runner request was executed.",
         },
     }
 
@@ -960,6 +1294,8 @@ with sqlite3.connect(db_file) as connection:
             result = approval_action(connection)
         elif command == "createAgentChangeRequest":
             result = create_agent_change_request(connection)
+        elif command == "createProjectPlanRequest":
+            result = create_project_plan_request(connection)
         elif command == "agentConfigApplicationAction":
             result = agent_config_application_action(connection)
         elif command == "agentConfigApplicationRealApply":

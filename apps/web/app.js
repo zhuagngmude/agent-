@@ -16,6 +16,7 @@ let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
 let agentConfigRollbackRequestRunning = false;
+let projectPlanRequestRunning = false;
 const agentConfigVersionHistoryByAgentId = new Map();
 const agentConfigRollbackPreviewByApplicationId = new Map();
 
@@ -407,6 +408,7 @@ function normalizeDashboard(apiData) {
       operationTypes: job.operationTypes || [],
       affectedFiles: job.affectedFiles || [],
       checkpoint: job.checkpoint || "",
+      safetyNote: job.safetyNote || "",
       createdAt: job.createdAt || "",
       updatedAt: job.updatedAt || "",
     })),
@@ -485,6 +487,20 @@ async function postApprovalAction(approvalId, action, body = {}) {
 
 async function postTaskAction(taskId, action, body = {}) {
   const response = await fetch(`${apiBase}/api/tasks/${taskId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postProjectPlanRequest(body = {}) {
+  const response = await fetch(`${apiBase}/api/projects/${projectId}/project-plan-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -1315,6 +1331,13 @@ function setAgentChangeFeedback(text, mode = "") {
   feedback.textContent = text;
 }
 
+function setProjectPlanFeedback(text, mode = "") {
+  const feedback = document.querySelector("#projectPlanFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
 function setRuntimeStateButtons(disabled) {
   document.querySelectorAll("#exportRuntimeState, #resetRuntimeState, #clearRuntimeState")
     .forEach((button) => { button.disabled = disabled; });
@@ -1356,6 +1379,25 @@ function renderApprovalPage(selectedIndex = 0) {
   `).join("");
 
   const item = approvals[selectedApprovalIndex] || approvals[0];
+  const isAgentConfigApproval = item.targetService === "agent_config";
+  const isProjectPlanApproval = item.targetService === "project_plan";
+  const approvalEffectText = isAgentConfigApproval
+    ? "只创建 Agent 配置审批申请，当前不会修改 Agent 配置，也不会进入 Runner 队列。"
+    : isProjectPlanApproval
+      ? "批准后创建 Agent 任务和只读 Runner request queue 记录；当前不会执行命令、写文件、调用模型或修改 Git。"
+      : `只生成只读 Runner job 记录，展示 ${escapeHtml(item.affectedFiles.length)} 个影响文件；当前不会执行命令、写文件或修改 Git。`;
+  const projectPlanApprovalNote = isProjectPlanApproval
+    ? `
+    <div class="approval-files project-plan-approval-note">
+      <h3>MVP-0.3 project plan approval</h3>
+      <ul>
+        <li>批准后创建 frontend / backend / qa / docs / reviewer 五个 Agent 任务。</li>
+        <li>同时生成五条只读 Runner request queue 记录。</li>
+        <li>不会执行命令、写项目文件、调用真实模型、发起网络请求或修改 Git。</li>
+      </ul>
+    </div>
+  `
+    : "";
   if (detailRisk) {
     detailRisk.textContent = item.risk;
     detailRisk.className = `badge ${item.riskTone === "high" ? "red" : item.riskTone === "mid" ? "orange" : "green"}`;
@@ -1370,12 +1412,13 @@ function renderApprovalPage(selectedIndex = 0) {
     </div>
     <div class="approval-meta">
       <div><span>修改原因</span><strong>${escapeHtml(item.reason)}</strong></div>
-      <div><span>审批后果</span><strong>${item.targetService === "agent_config" ? "只创建 Agent 配置审批申请，当前不会修改 Agent 配置，也不会进入 Runner 队列。" : `只生成只读 Runner job 记录，展示 ${escapeHtml(item.affectedFiles.length)} 个影响文件；当前不会执行命令、写文件或修改 Git。`}</strong></div>
+      <div><span>审批后果</span><strong>${approvalEffectText}</strong></div>
     </div>
     <div class="approval-files">
       <h3>影响文件</h3>
       <ul>${item.affectedFiles.map((file) => `<li>${escapeHtml(file)}</li>`).join("")}</ul>
     </div>
+    ${projectPlanApprovalNote}
     <div class="approval-diff">
       <h3>差异预览</h3>
       ${item.diffPreview.map((line) => `<code class="${line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : ""}">${escapeHtml(line)}</code>`).join("")}
@@ -1392,7 +1435,9 @@ function renderApprovalPage(selectedIndex = 0) {
     allowButton.disabled = !isPending || approvalActionRunning;
     allowButton.textContent = item.targetService === "agent_config"
       ? "批准 Agent 配置申请"
-      : "批准并生成只读 Runner job";
+      : isProjectPlanApproval
+        ? "批准计划并分配任务"
+        : "批准并生成只读 Runner job";
   }
   if (patchOnlyButton) patchOnlyButton.disabled = !isPending || approvalActionRunning;
   if (rejectButton) rejectButton.disabled = !isPending || approvalActionRunning;
@@ -1424,8 +1469,28 @@ function renderWorkflowPage() {
   const stats = workflow.stats || [];
   const nodes = workflow.nodes || [];
   const edges = workflow.edges || [];
+  const disabled = projectPlanRequestRunning ? "disabled" : "";
 
   page.innerHTML = `
+    <div class="project-plan-request">
+      <div>
+        <span>MVP-0.3</span>
+        <strong>项目计划审批</strong>
+        <p>项目想法会先生成本地确定性计划草案，确认后才拆分 Agent 任务和只读 Runner request queue。</p>
+      </div>
+      <label>
+        <span>项目想法</span>
+        <textarea id="projectPlanIdea" rows="4" ${disabled}>做一个本地客户线索跟进工具</textarea>
+      </label>
+      <label>
+        <span>约束</span>
+        <input id="projectPlanConstraints" type="text" value="Mock/SQLite only; no real Runner; no real model calls" ${disabled}>
+      </label>
+      <div class="agent-change-submit">
+        <button class="neutral-action" id="submitProjectPlanRequest" type="button" ${disabled}>生成计划审批草案</button>
+      </div>
+      <p class="approval-feedback" id="projectPlanFeedback" role="status"></p>
+    </div>
     <div class="workflow-summary">
       <div>
         <span>当前流程</span>
@@ -1462,6 +1527,11 @@ function renderWorkflowPage() {
       </section>
     </div>
   `;
+
+  const button = page.querySelector("#submitProjectPlanRequest");
+  if (button) {
+    button.addEventListener("click", () => runProjectPlanRequest());
+  }
 }
 
 function runnerJobStatusLabel(status) {
@@ -1843,12 +1913,59 @@ async function renderModelGatewayStatus() {
   }
 }
 
+async function runProjectPlanRequest() {
+  if (projectPlanRequestRunning) return;
+
+  const idea = document.querySelector("#projectPlanIdea")?.value?.trim() || "";
+  const constraints = document.querySelector("#projectPlanConstraints")?.value?.trim() || "";
+  if (!idea) {
+    setProjectPlanFeedback("请输入项目想法。", "error");
+    return;
+  }
+
+  projectPlanRequestRunning = true;
+  setProjectPlanFeedback("正在生成计划审批草案...");
+  renderWorkflowPage();
+
+  let feedbackText = "";
+  let feedbackMode = "";
+  try {
+    const result = await postProjectPlanRequest({
+      idea,
+      constraints,
+      requestedBy: "local_user",
+    });
+    appData = await loadDashboardFromApi();
+    renderDashboard();
+    renderAgentsPage();
+    renderWorkflowPage();
+    renderRuntimePage();
+    renderTaskPage(selectedTaskIndex);
+    renderApprovalPage(selectedApprovalIndex);
+    feedbackText = `已生成计划审批草案：${result.approval?.id || "未知 ID"}`;
+    feedbackMode = "success";
+  } catch (error) {
+    feedbackText = `生成失败：${error.message}`;
+    feedbackMode = "error";
+  } finally {
+    projectPlanRequestRunning = false;
+    renderWorkflowPage();
+    if (feedbackText) {
+      setProjectPlanFeedback(feedbackText, feedbackMode);
+    }
+  }
+}
+
 async function runApprovalAction(action) {
   const item = pendingApprovalRequests()[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
 
   const actionLabels = {
-    approve: item.targetService === "agent_config" ? "批准 Agent 配置申请" : "生成只读 Runner job",
+    approve: item.targetService === "agent_config"
+      ? "批准 Agent 配置申请"
+      : item.targetService === "project_plan"
+        ? "批准计划并分配任务"
+        : "生成只读 Runner job",
     reject: "拒绝",
     "patch-only": "只生成补丁",
   };

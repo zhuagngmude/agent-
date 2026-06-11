@@ -261,6 +261,55 @@ a { color: inherit; text-decoration: none; }
 .workflow-stats div { display: flex; align-items: center; gap: 10px; }
 .workflow-stats span { color: var(--muted); }
 .workflow-stats strong { font-size: 21px; }
+.project-plan-request {
+  display: grid;
+  grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.2fr);
+  gap: 12px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfe;
+  padding: 14px;
+}
+.project-plan-request > div,
+.project-plan-request label {
+  min-width: 0;
+}
+.project-plan-request span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.project-plan-request strong {
+  display: block;
+  font-size: 18px;
+}
+.project-plan-request p {
+  margin: 8px 0 0;
+  color: #4e5670;
+  line-height: 1.6;
+}
+.project-plan-request textarea,
+.project-plan-request input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  padding: 10px 12px;
+}
+.project-plan-request textarea {
+  resize: vertical;
+  min-height: 92px;
+}
+.project-plan-request .agent-change-submit,
+.project-plan-request .approval-feedback {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
 .workflow-summary {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(260px, .7fr);

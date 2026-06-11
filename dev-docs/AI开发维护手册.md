@@ -1272,3 +1272,11 @@ docs/runner-safety-acceptance.md
 - 为什么：MVP-0.2 后半段的 Agent config apply / version history / rollback dry-run / rollback review 已经具备 API、UI、helper、docs 和专项脚本覆盖，需要一个明确的一键验收入口和阶段状态，避免后续继续把同一安全闭环当作未完成核心缺口。
 - 影响模块：`scripts/verify-agent-config-safety-loop.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`dev-docs/下一步开发路线.md`、`dev-docs/AI开发维护手册.md`、`dev-docs/新窗口交接说明.md`。
 - 人类文档同步：不需要；这是验收入口和维护状态收口，不启用默认真实回滚写入、真实 Runner 执行、真实模型调用、云同步或完整运行时权限系统。
+
+## 2026-06-11 变更记录：MVP-0.3 项目计划审批与只读 Runner request queue
+
+- 改了什么：新增 `services/api/project-plan.js` 和 `POST /api/projects/:projectId/project-plan-requests`，在工作流页加入项目计划审批入口；批准 `project_plan` 审批后自动创建 frontend/backend/qa/docs/reviewer 五个 queued 任务和五条 `runner_request_readonly` 队列记录；扩展 Mock/SQLite flow、UI smoke 和 `scripts/verify-project-plan-flow.ps1` 验收。
+- 为什么：用户要的下一阶段是“输入项目想法 -> 主控/架构 Agent 出计划 -> 用户审批 -> 自动分工 -> Runner 执行请求队列”。当前只能做到本地 deterministic/mock 计划和只读队列，所以必须把审批状态机和只读 request queue 先做稳定，避免误开真实 Runner 或真实模型。
+- 影响模块：`services/api/project-plan.js`、`services/api/server.js`、`services/api/mock-data.js`、`scripts/sqlite/sqlite_write.py`、`apps/web/app.js`、`apps/web/styles.css`、`scripts/verify-project-plan-flow.ps1`、`scripts/verify-mock-flows.ps1`、`scripts/verify-sqlite-flows.ps1`、`scripts/verify-local-ui.ps1`、`docs/mvp-0.3-project-plan-flow-spec.md`、API/数据模型/Demo/脚本/路线/交接文档。
+- 人类文档同步：不需要；当前只是本地 Mock/SQLite 可验收闭环，不启用真实模型规划、真实 Agent 触发、真实 Runner 执行、本地项目文件写入、Git 修改、云同步或完整权限系统。
+- 维护注意：`project_plan` 审批的 `runnerJobId` 必须为空；Runner request queue records 必须带 `runner_request_readonly`，并且只能引用计划内任务。不要把这些记录当作可执行 Runner jobs。

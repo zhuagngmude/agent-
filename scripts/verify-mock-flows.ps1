@@ -144,6 +144,21 @@ function Assert-AgentConfigVersionHistoryNoSideEffects {
   Assert-Equal $VersionHistory.sideEffects.readsRawSecrets $false "Agent config version history should not read raw secrets."
 }
 
+function Assert-ProjectPlanNoRealSideEffects {
+  param(
+    [object]$SideEffects,
+    [string]$Prefix
+  )
+
+  Assert-Equal $SideEffects.writesProjectFiles $false "$Prefix should not write project files."
+  Assert-Equal $SideEffects.modifiesGit $false "$Prefix should not modify Git."
+  Assert-Equal $SideEffects.executesRunner $false "$Prefix should not execute Runner."
+  Assert-Equal $SideEffects.callsRealModel $false "$Prefix should not call real models."
+  Assert-Equal $SideEffects.readsRawSecrets $false "$Prefix should not read raw secrets."
+  Assert-Equal $SideEffects.makesNetworkRequests $false "$Prefix should not make network requests."
+  Assert-Equal $SideEffects.triggersAgents $false "$Prefix should not trigger Agents."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -153,9 +168,11 @@ function Test-ApiReady {
   }
 }
 
-$outLog = Join-Path $root "logs\mock-flow-api.out.log"
-$errLog = Join-Path $root "logs\mock-flow-api.err.log"
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outLog) | Out-Null
+$verifyLogDir = Join-Path ([System.IO.Path]::GetTempPath()) "agent-swarm-verify"
+New-Item -ItemType Directory -Force -Path $verifyLogDir | Out-Null
+$outLog = Join-Path $verifyLogDir "mock-flow-api.out.log"
+$errLog = Join-Path $verifyLogDir "mock-flow-api.err.log"
+$tempRuntimeStateFile = Join-Path $verifyLogDir "mock-runtime-state.json"
 
 if (Test-ApiReady) {
   throw "Port $port already has an API responding before verification started. This script will not attach to an existing service; stop that process or use a different isolated verification port."
@@ -164,8 +181,10 @@ if (Test-ApiReady) {
 Write-Step "Start isolated Mock API on port $port."
 $previousPort = $env:AGENT_SWARM_API_PORT
 $previousSource = $env:AGENT_SWARM_DASHBOARD_SOURCE
+$previousRuntimeStateFile = $env:AGENT_SWARM_RUNTIME_STATE_FILE
 $env:AGENT_SWARM_API_PORT = "$port"
 $env:AGENT_SWARM_DASHBOARD_SOURCE = "mock"
+$env:AGENT_SWARM_RUNTIME_STATE_FILE = $tempRuntimeStateFile
 $process = Start-Process `
   -WindowStyle Hidden `
   -FilePath "node" `
@@ -193,7 +212,8 @@ if (-not $ready) {
   }
   $env:AGENT_SWARM_API_PORT = $previousPort
   $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
-  throw "Mock API did not start on port $port. Check logs/mock-flow-api.out.log and logs/mock-flow-api.err.log"
+  $env:AGENT_SWARM_RUNTIME_STATE_FILE = $previousRuntimeStateFile
+  throw "Mock API did not start on port $port. Check $outLog and $errLog"
 }
 
 try {
@@ -220,6 +240,60 @@ try {
   $jobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
   $matchingJobs = @($jobs.jobs | Where-Object { $_.id -eq $approval.runnerJobId })
   Assert-True ($matchingJobs.Count -eq 1) "Runner job should appear in queue."
+
+  Write-Step "Verify MVP-0.3 project plan approval assigns Agents and queues read-only Runner requests."
+  $planId = "verify_mvp03_mock"
+  $planTaskPrefix = "task_${planId}_"
+  $planRequest = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/project-plan-requests" -Body @{
+    planId = $planId
+    idea = "Build a local customer lead tracker"
+    constraints = "Mock mode only; no real Runner; no real model calls"
+    requestedBy = "verify_mock_flows"
+  }
+  Assert-Equal $planRequest.approval.status "pending" "Project plan approval should start pending."
+  Assert-Equal $planRequest.approval.targetService "project_plan" "Project plan approval target service mismatch."
+  Assert-Equal $planRequest.approval.changeRequest.type "project_plan" "Project plan change request type mismatch."
+  Assert-Equal @($planRequest.plan.tasks).Count 5 "Project plan draft should include five tasks."
+  Assert-Equal @($planRequest.plan.runnerRequests).Count 5 "Project plan draft should include five Runner requests."
+  Assert-ProjectPlanNoRealSideEffects -SideEffects $planRequest.sideEffects -Prefix "Project plan draft request"
+  Assert-Equal $planRequest.sideEffects.createsTasks $false "Project plan draft should not create tasks before approval."
+  Assert-Equal $planRequest.sideEffects.createsRunnerJobs $false "Project plan draft should not create Runner jobs before approval."
+
+  $draftTasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $draftPlanTasks = @($draftTasks.tasks | Where-Object { $_.id -like "$planTaskPrefix*" })
+  Assert-Equal $draftPlanTasks.Count 0 "Project plan draft should not appear in task queue before approval."
+  $draftJobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $draftPlanJobs = @($draftJobs.jobs | Where-Object { $_.approvalId -eq $planRequest.approval.id })
+  Assert-Equal $draftPlanJobs.Count 0 "Project plan draft should not create Runner queue records before approval."
+
+  $planApproval = Invoke-Json -Method "POST" -Path "/api/approvals/$($planRequest.approval.id)/approve" -Body @{
+    secondConfirm = $true
+    confirmText = "Approve MVP-0.3 project plan verification."
+  }
+  Assert-Equal $planApproval.status "approved" "Project plan approval should approve."
+  Assert-Equal $planApproval.runnerJobId "" "Project plan approval should not create a single generic Runner job."
+  Assert-Equal @($planApproval.createdTaskIds).Count 5 "Project plan approval should create five tasks."
+  Assert-Equal @($planApproval.createdRunnerJobIds).Count 5 "Project plan approval should create five Runner request records."
+  Assert-ProjectPlanNoRealSideEffects -SideEffects $planApproval.sideEffects -Prefix "Project plan approval"
+
+  $approvedTasks = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/tasks"
+  $projectPlanTasks = @($approvedTasks.tasks | Where-Object { $_.id -like "$planTaskPrefix*" })
+  Assert-Equal $projectPlanTasks.Count 5 "Approved project plan tasks should appear in task queue."
+  foreach ($agentId in @("agent_frontend", "agent_backend", "agent_qa", "agent_docs", "agent_reviewer")) {
+    $assignedTasks = @($projectPlanTasks | Where-Object { $_.assignedAgentId -eq $agentId })
+    Assert-Equal $assignedTasks.Count 1 "Project plan should assign exactly one task to $agentId."
+    Assert-Equal $assignedTasks[0].status "queued" "Project plan task for $agentId should start queued."
+  }
+
+  $approvedJobs = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/runner/jobs"
+  $projectPlanJobs = @($approvedJobs.jobs | Where-Object { $_.approvalId -eq $planRequest.approval.id })
+  Assert-Equal $projectPlanJobs.Count 5 "Approved project plan should create five Runner queue records."
+  foreach ($job in $projectPlanJobs) {
+    Assert-Equal $job.status "queued" "Project plan Runner request should start queued."
+    Assert-True ($job.taskId -like "$planTaskPrefix*") "Project plan Runner request should reference a project plan task."
+    Assert-TextContains (@($job.operationTypes) -join "`n") "runner_request_readonly" "Project plan Runner request should be read-only."
+    Assert-TextContains $job.safetyNote "No command" "Project plan Runner request should document no command execution."
+  }
 
   Write-Step "Verify invalid Agent permission request is rejected."
   $invalidPermission = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agents/agent_reviewer/change-requests" -ExpectedStatus 422 -Body @{
@@ -417,4 +491,11 @@ try {
   }
   $env:AGENT_SWARM_API_PORT = $previousPort
   $env:AGENT_SWARM_DASHBOARD_SOURCE = $previousSource
+  $env:AGENT_SWARM_RUNTIME_STATE_FILE = $previousRuntimeStateFile
+  try {
+    Remove-Item -LiteralPath $tempRuntimeStateFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$tempRuntimeStateFile.tmp" -Force -ErrorAction SilentlyContinue
+  } catch {
+    Write-Warning "Failed to clean temp Mock runtime state: $($_.Exception.Message)"
+  }
 }

@@ -28,9 +28,17 @@ const {
   buildAgentConfigVersionHistory,
   noAgentConfigVersionHistorySideEffects,
 } = require("./agent-config-version-history");
+const {
+  buildProjectPlanApprovalFromRequest,
+  instantiateProjectPlanApproval,
+  isProjectPlanApproval,
+  noProjectPlanRequestSideEffects,
+} = require("./project-plan");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
-const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
+const runtimeStateFile = process.env.AGENT_SWARM_RUNTIME_STATE_FILE
+  ? path.resolve(process.env.AGENT_SWARM_RUNTIME_STATE_FILE)
+  : path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
 const dashboardSource = process.env.AGENT_SWARM_DASHBOARD_SOURCE || "mock";
 const projectRoot = path.resolve(__dirname, "..", "..");
 const sqliteDbFile = process.env.AGENT_SWARM_SQLITE_DB || defaultDbFile;
@@ -203,12 +211,21 @@ function serializeRuntimeState() {
     })),
     tasks: data.tasks.map((task) => ({
       id: task.id,
+      title: task.title || "",
+      description: task.description || "",
       status: task.status,
+      priority: task.priority || "",
+      assignedAgentId: task.assignedAgentId || "",
+      riskLevel: task.riskLevel || "",
+      relatedFiles: task.relatedFiles || [],
+      requiresApproval: task.requiresApproval === true,
+      dependsOn: task.dependsOn || [],
       startedAt: task.startedAt || "",
       completedAt: task.completedAt || "",
       failedAt: task.failedAt || "",
       cancelledAt: task.cancelledAt || "",
       failureReason: task.failureReason || "",
+      createdAt: task.createdAt || "",
       updatedAt: task.updatedAt || "",
     })),
     runnerJobs: data.runnerJobs.map((job) => ({ ...job })),
@@ -266,10 +283,14 @@ function applyRuntimeState(state) {
 
   if (Array.isArray(state.tasks)) {
     state.tasks.forEach((storedTask) => {
-      const task = findTask(storedTask.id);
-      if (!task) return;
+      let task = findTask(storedTask.id);
+      const isExistingTask = Boolean(task);
+      if (!task) {
+        task = { id: storedTask.id };
+        data.tasks.push(task);
+      }
 
-      [
+      const mutableTaskKeys = [
         "status",
         "startedAt",
         "completedAt",
@@ -277,7 +298,21 @@ function applyRuntimeState(state) {
         "cancelledAt",
         "failureReason",
         "updatedAt",
-      ].forEach((key) => {
+      ];
+      const dynamicTaskKeys = [
+        ...mutableTaskKeys,
+        "title",
+        "description",
+        "priority",
+        "assignedAgentId",
+        "riskLevel",
+        "relatedFiles",
+        "requiresApproval",
+        "dependsOn",
+        "createdAt",
+      ];
+
+      (isExistingTask ? mutableTaskKeys : dynamicTaskKeys).forEach((key) => {
         if (storedTask[key] !== undefined) {
           task[key] = storedTask[key];
         }
@@ -834,15 +869,27 @@ async function handleApprovalAction(req, res, approvalId, action) {
       });
       return;
     }
-    approval.status = "approved";
     let agentConfigApplication = null;
+    let projectPlanResult = null;
     if (approval.targetService === "agent_config") {
       approval.runnerJobId = "";
       agentConfigApplication = upsertAgentConfigApplicationFromApproval(approval);
+    } else if (isProjectPlanApproval(approval)) {
+      approval.runnerJobId = "";
+      projectPlanResult = instantiateProjectPlanApproval({
+        approval,
+        tasks: data.tasks,
+        runnerJobs: data.runnerJobs,
+      });
+      if (projectPlanResult.error) {
+        sendJson(res, 409, projectPlanResult);
+        return;
+      }
     } else {
       const runnerJob = upsertRunnerJobFromApproval(approval);
       approval.runnerJobId = runnerJob.id;
     }
+    approval.status = "approved";
     approval.approvedAt = new Date().toISOString();
     approval.updatedAt = approval.approvedAt;
     saveRuntimeState();
@@ -851,6 +898,16 @@ async function handleApprovalAction(req, res, approvalId, action) {
       status: approval.status,
       runnerJobId: approval.runnerJobId,
       agentConfigApplicationId: agentConfigApplication?.id || "",
+      createdTaskIds: projectPlanResult?.createdTaskIds || [],
+      createdRunnerJobIds: projectPlanResult?.createdRunnerJobIds || [],
+      sideEffects: projectPlanResult ? {
+        ...noProjectPlanRequestSideEffects(),
+        writesRuntimeState: true,
+        writesSqlite: false,
+        createsApproval: false,
+        createsTasks: projectPlanResult.createdTaskIds.length > 0,
+        createsRunnerJobs: projectPlanResult.createdRunnerJobIds.length > 0,
+      } : undefined,
     });
     return;
   }
@@ -880,6 +937,90 @@ async function handleApprovalAction(req, res, approvalId, action) {
   }
 
   sendJson(res, 404, { error: "unknown_approval_action" });
+}
+
+async function handleProjectPlanRequest(req, res, projectId) {
+  if (projectId !== data.projectId) {
+    sendJson(res, 404, { error: "project_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  const snapshot = sqliteReadEnabled() ? projectSnapshotResponse(() => null) : null;
+  let result = buildProjectPlanApprovalFromRequest({
+    projectId,
+    body,
+    agents: snapshot?.agents || data.agents,
+  });
+
+  if (result.error) {
+    sendJson(res, 422, {
+      ...result,
+      sideEffects: {
+        ...noProjectPlanRequestSideEffects(),
+        writesRuntimeState: false,
+        writesSqlite: false,
+        createsApproval: false,
+        createsTasks: false,
+        createsRunnerJobs: false,
+      },
+    });
+    return;
+  }
+
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("createProjectPlanRequest", {
+      projectId,
+      approval: result.approval,
+      plan: result.plan,
+    }));
+    return;
+  }
+
+  const existingApproval = findApproval(result.approval.id);
+  if (existingApproval && existingApproval.status !== "pending") {
+    sendJson(res, 409, {
+      error: "project_plan_approval_already_closed",
+      message: "Existing project plan approval is no longer pending.",
+      approval: existingApproval,
+      sideEffects: {
+        ...noProjectPlanRequestSideEffects(),
+        writesRuntimeState: false,
+        writesSqlite: false,
+        createsApproval: false,
+        createsTasks: false,
+        createsRunnerJobs: false,
+      },
+    });
+    return;
+  }
+
+  if (existingApproval) {
+    result = buildProjectPlanApprovalFromRequest({
+      projectId,
+      body,
+      agents: data.agents,
+      existingApproval,
+    });
+    Object.assign(existingApproval, result.approval);
+  } else {
+    data.approvals.push(result.approval);
+  }
+
+  saveRuntimeState();
+  sendJson(res, 201, {
+    approval: existingApproval || result.approval,
+    plan: result.plan,
+    sideEffects: {
+      ...noProjectPlanRequestSideEffects(),
+      writesRuntimeState: true,
+      writesSqlite: false,
+      createsApproval: !existingApproval,
+      createsTasks: false,
+      createsRunnerJobs: false,
+    },
+    message: "Project plan approval created. No Agent was triggered and no Runner request was executed.",
+  });
 }
 
 async function handleAgentChangeRequest(req, res, agentId) {
@@ -1412,6 +1553,12 @@ async function handleRequest(req, res) {
   if (req.method === "GET" && withProject(pathname, "/agent-config-applications")) {
     const snapshot = projectSnapshotResponse(() => null);
     sendJson(res, 200, { applications: snapshot?.agentConfigApplications || data.agentConfigApplications });
+    return;
+  }
+
+  const projectPlanRequest = pathname.match(/^\/api\/projects\/([^/]+)\/project-plan-requests$/);
+  if (req.method === "POST" && projectPlanRequest) {
+    await handleProjectPlanRequest(req, res, projectPlanRequest[1]);
     return;
   }
 

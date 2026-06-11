@@ -5,7 +5,7 @@ This file is the short AI/IDE handoff rule sheet for `agent-swarm`.
 ## Project
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.2, Web App + Mock API + local runtime state.
+- Current stage: MVP-0.3, Web App + Mock/SQLite state + project plan approval prototype.
 - Web App first, desktop `.exe` later.
 - Mock API first, real database later.
 - Read-only safety queues first, real Runner execution later.
@@ -43,6 +43,7 @@ scripts/README.md
 ## Runner Safety
 
 - Runner must not execute commands, write files, delete files, make network requests, or modify Git automatically.
+- MVP-0.3 project plan approvals may create read-only Runner request queue records only; those records are not executable jobs.
 - All local write/execute capability must go through Approval Service.
 - High-risk actions require second confirmation and a Git checkpoint.
 - `targetService=agent_config` approvals must not directly modify Agent config and must not create Runner jobs unless the user explicitly approves a later feature.

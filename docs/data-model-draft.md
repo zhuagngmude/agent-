@@ -187,6 +187,12 @@ projects
 - 如果依赖关系复杂，再拆 `task_dependencies`。
 - 如果需要完整状态历史，再由 `runtime_events` 或 `task_events` 承接。
 
+MVP-0.3 说明：
+
+- `project_plan` 审批通过后会创建五个 queued 任务，分别分配给 `agent_frontend`、`agent_backend`、`agent_qa`、`agent_docs` 和 `agent_reviewer`。
+- 计划草案创建阶段不得写入 `tasks`；只有用户批准 `target_service=project_plan` 的审批后才允许生成这些任务。
+- 这些任务只是 Agent 分工队列，不代表 Agent 已被真实触发，也不代表 Runner 可以执行本地命令。
+
 ### approvals
 
 用途：Approval Service 主表。Runner 和 Agent 配置变更都必须先进入这里。
@@ -247,6 +253,8 @@ projects
 
 - 只有 `approvals.status = approved` 的 Runner 审批可以生成。
 - `agent_config` 审批不得生成 Runner job。
+- MVP-0.3 的 `project_plan` 审批会复用该表保存只读 Runner request queue records；这些记录的 `operation_types` 必须包含 `runner_request_readonly`，必须关联计划内 `task_id`，并且 `checkpoint_commit` 为空。
+- `project_plan` 生成的 Runner request queue records 不是可执行 Runner job；不得执行命令、写文件、发网络请求、修改 Git、调用模型、触发 Agent 或读取 raw secret。
 - 后续真实执行前必须补充执行日志和回滚策略。
 
 ### agent_config_applications
@@ -385,6 +393,7 @@ projects
 说明：
 
 - MVP-0.2 暂不要求所有接口写事件表。
+- MVP-0.3 SQLite 模式下，`project_plan` 审批创建/更新、审批通过、计划任务创建和只读 Runner request queue record 创建都应写入 `runtime_events`，用于追踪本地状态机。
 - 接真实数据库时，审批、任务、Agent 配置应用等状态流转应优先写入事件。
 
 ## 5. 暂缓设计的表
