@@ -15,7 +15,7 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-mock-flows.ps1`: isolated Mock flow checks on `8789`.
 - `verify-sqlite-flows.ps1`: isolated SQLite flow checks on `8788`.
 - `verify-local-ui.ps1`: browser smoke for the running local trial on `8787/5175`.
-- `verify-model-gateway.ps1`: disabled Model Gateway and relay boundary checks.
+- `verify-model-gateway.ps1`: MVP-0.5 Model Gateway disabled and relay boundary checks.
 - `verify-agent-permissions.ps1`
 - `verify-agent-config-fields.ps1`
 - `verify-agent-config-dry-run.ps1`

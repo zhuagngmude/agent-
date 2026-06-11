@@ -16,6 +16,7 @@ Formal technical docs for `agent-swarm`.
 - [mvp-0.3-project-plan-flow-spec.md](./mvp-0.3-project-plan-flow-spec.md)
 - [mvp-0.4-execution-layer-plan.md](./mvp-0.4-execution-layer-plan.md)
 - [mvp-0.4-execution-layer-draft.md](./mvp-0.4-execution-layer-draft.md)
+- [mvp-0.5-model-gateway-roadmap.md](./mvp-0.5-model-gateway-roadmap.md)
 - [agent-permission-contract.md](./agent-permission-contract.md)
 
 ## Model Gateway Notes
@@ -33,4 +34,4 @@ Formal technical docs for `agent-swarm`.
 
 Verification scripts are documented in [../scripts/README.md](../scripts/README.md).
 
-Current stage: MVP-0.4 execution request review loop with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.
+Current stage: MVP-0.5 Model Gateway disabled boundary with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.
