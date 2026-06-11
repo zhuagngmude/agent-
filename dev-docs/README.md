@@ -9,6 +9,7 @@ Development notes, handoffs, and current working guidance.
 - [新窗口交接说明.md](./新窗口交接说明.md): continuation / handoff snapshot.
 - [下一步开发路线.md](./下一步开发路线.md): current roadmap snapshot.
 - [应用真正可用落地计划.md](./应用真正可用落地计划.md): staged path from the completed MVP-0.4 local loop to a truly usable application.
+- [真实模型接入准入规格.md](./真实模型接入准入规格.md): internal gate for entering the first real model-call design without enabling providers.
 - [UI第一版验收建议.md](./UI第一版验收建议.md): UI acceptance notes.
 - [前端交互反推架构调整.md](./前端交互反推架构调整.md): frontend-driven architecture notes.
 

@@ -9,6 +9,7 @@
 - 当前模式：Mock / SQLite / 本地 Web App
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
+- 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
 
 ## 先读顺序
 
@@ -19,6 +20,7 @@
 5. `docs/demo-checklist.md`
 6. `dev-docs/新窗口交接说明.md`
 7. `dev-docs/应用真正可用落地计划.md`
+8. `dev-docs/真实模型接入准入规格.md`
 
 ## 维护原则
 

@@ -5,10 +5,11 @@ This is the short operating guide for `agent-swarm`.
 ## Current Stage
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.3.
+- Current stage: MVP-0.4 stabilization.
 - Web App first, desktop later.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.
+- MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented.
 
 ## Read First
 
@@ -20,6 +21,8 @@ dev-docs/README.md
 dev-docs/新窗口交接说明.md
 dev-docs/下一步开发路线.md
 dev-docs/AI开发维护手册.md
+dev-docs/应用真正可用落地计划.md
+dev-docs/真实模型接入准入规格.md
 ```
 
 For local demo work, also read:
@@ -44,6 +47,7 @@ Do not add public plans or handoff docs to the project root; keep them in `dev-d
 
 - Runner must not execute commands, write files, delete files, make network requests, or modify Git automatically.
 - MVP-0.3 project plan approvals may create read-only Runner request queue records only.
+- Real model calls remain disabled until the real-model admission spec, feature flag, redaction, logging, cost tracking, and Model Gateway verification are updated in a separate implementation batch.
 - `targetService=agent_config` approvals still must not directly modify Agent config or create Runner jobs.
 - High-risk actions require second confirmation and a Git checkpoint.
 
