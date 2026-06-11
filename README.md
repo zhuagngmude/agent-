@@ -108,7 +108,7 @@ _internal/
 - `docs/module-stability-map.md`
 - `docs/agent-config-apply-dry-run-spec.md`
 
-下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先修复前端中文编码、抽出 mock 数据模型，并重点打磨审批与确认页面。
+下一阶段目标是 `MVP-0.2：前端工程化 + Mock 状态机 + Runner 审批原型`。优先把前端和文档统一到 UTF-8，抽出 mock 数据模型，并重点打磨审批与确认页面。
 
 ## 工程骨架
 
