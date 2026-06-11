@@ -72,28 +72,8 @@ function Assert-ModelGatewayFeatureFlags {
 
   Assert-Equal $FeatureFlags.manualConnectivityTestEnvVar "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST" "$Prefix should expose the manual connectivity env var name."
   Assert-True (($FeatureFlags.manualConnectivityTestRequested -eq $true) -or ($FeatureFlags.manualConnectivityTestRequested -eq $false)) "$Prefix should report the requested flag as a boolean."
-  Assert-Equal $FeatureFlags.manualConnectivityTestActive $false "$Prefix should not be active in MVP-0.6."
-  Assert-Equal $FeatureFlags.realProviderRequestsAllowed $false "$Prefix should not allow provider requests in MVP-0.6."
-}
-
-function Assert-ModelGatewayContract {
-  param(
-    [Parameter(Mandatory = $true)][object]$Contract,
-    [string]$Prefix = "Model Gateway contract"
-  )
-
-  Assert-Equal $Contract.version "mvp-0.6" "$Prefix should expose the frozen stage version."
-  Assert-Equal $Contract.boundary "disabled" "$Prefix should remain disabled."
-  Assert-Equal $Contract.requestShapes.dryRun.purpose "connectivity_check" "$Prefix dry-run purpose should be frozen."
-  Assert-Equal $Contract.requestShapes.connectivityTest.purpose "manual_connectivity_test" "$Prefix connectivity-test purpose should be frozen."
-  Assert-Equal $Contract.requestShapes.dryRun.blockedByDefault $true "$Prefix dry-run should remain blocked by default."
-  Assert-Equal $Contract.requestShapes.connectivityTest.blockedByDefault $true "$Prefix connectivity-test should remain blocked by default."
-  Assert-TextContains (@($Contract.requestShapes.connectivityTest.requiredFields) -join "`n") "secondConfirm" "$Prefix should require secondConfirm."
-  Assert-TextContains (@($Contract.requestShapes.connectivityTest.requiredFields) -join "`n") "confirmText" "$Prefix should require confirmText."
-  Assert-TextContains (@($Contract.requestShapes.connectivityTest.optionalFields) -join "`n") "timeoutMs" "$Prefix should keep timeoutMs optional."
-  Assert-TextContains (@($Contract.requestShapes.connectivityTest.optionalFields) -join "`n") "responseBodyLimitBytes" "$Prefix should keep responseBodyLimitBytes optional."
-  Assert-Equal @($Contract.providerCatalog).Count 4 "$Prefix should expose four provider entries."
-  Assert-Equal $Contract.providerCatalog[1].futureProviderAdapterId "openai_compat_manual_connectivity_adapter" "$Prefix should expose relay future adapter metadata."
+  Assert-Equal $FeatureFlags.manualConnectivityTestActive $false "$Prefix should not be active in MVP-0.5."
+  Assert-Equal $FeatureFlags.realProviderRequestsAllowed $false "$Prefix should not allow provider requests in MVP-0.5."
 }
 
 function Assert-DryRunNoSideEffects {
@@ -287,7 +267,6 @@ try {
   Write-Step "Verify status remains disabled."
   $gateway = Invoke-Json -Path "/api/model-gateway/status"
   Assert-Equal $gateway.enabled $false "Model Gateway should be disabled."
-  Assert-ModelGatewayContract -Contract $gateway.contract -Prefix "Status contract"
   Assert-Equal $gateway.realModelCallsAllowed $false "Real model calls should be disabled."
   Assert-Equal $gateway.safety.exposesApiKeysToFrontend $false "API keys should not be exposed to the frontend."
   Assert-Equal $gateway.safety.writesDatabase $false "Model Gateway status should not write the database."
@@ -593,8 +572,8 @@ process.stdout.write(JSON.stringify(cases));
     $flagBoundaryJson = node -e "const gateway = require('./services/api/model-gateway'); process.stdout.write(JSON.stringify(gateway.modelGatewayConnectivityTest({provider:'openai',model:'gpt-4.1-mini',purpose:'manual_connectivity_test',secondConfirm:true,confirmText:'local feature flag boundary'})));"
     $flagBoundary = $flagBoundaryJson | ConvertFrom-Json
     Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestRequested $true "Manual connectivity env var should be reported as requested when set."
-    Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.6."
-    Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.6."
+    Assert-Equal $flagBoundary.featureFlags.manualConnectivityTestActive $false "Manual connectivity env var should not activate connectivity tests in MVP-0.5."
+    Assert-Equal $flagBoundary.featureFlags.realProviderRequestsAllowed $false "Manual connectivity env var should not allow provider requests in MVP-0.5."
     Assert-DisabledConnectivityAdapter -ConnectivityTest $flagBoundary -ExpectedProviderAdapterId "openai_disabled_connectivity_adapter" -Prefix "Manual connectivity env var boundary"
     Assert-ConnectivityTestNoSideEffects -ConnectivityTest $flagBoundary -Prefix "Manual connectivity env var boundary"
   } finally {
