@@ -1196,54 +1196,61 @@ docs/runner-safety-acceptance.md
 - Impacted modules: `docs/agent-config-apply-dry-run-spec.md`, `docs/api-draft.md`, `docs/data-model-draft.md`, `docs/runner-safety-acceptance.md`, `docs/demo-checklist.md`, `docs/module-stability-map.md`, roadmap, maintenance, and handoff docs.
 - Human docs sync: not required; this is documentation/specification only and does not implement a dry-run endpoint, real Agent config writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
 
-## 2026-06-10 Change log: Agent config apply disabled dry-run endpoint
+## 2026-06-10 变更记录：Agent 配置 apply 禁用态 dry-run endpoint
 
-- What changed: implemented `POST /api/agent-config-applications/:applicationId/dry-run` as a disabled preview endpoint and expanded Mock/SQLite flow verification to assert all-false side effects and no Agent config mutation.
-- Why: the real Agent config apply gate should exist as a locked, testable boundary before any future commit can enable real writes.
-- Impacted modules: `services/api/server.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/README.md`, `scripts/README.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `docs/demo-checklist.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this keeps the boundary disabled and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+- 改了什么：实现禁用态 `POST /api/agent-config-applications/:applicationId/dry-run` 预览 endpoint，并扩展 Mock/SQLite flow 验证，断言全 false sideEffects 和 Agent 配置不变。
+- 为什么：真实 Agent 配置 apply 闸门必须先作为锁定且可测试的边界存在，之后的提交才可以考虑启用真实写入。
+- 影响模块：`services/api/server.js`、`scripts/verify-mock-flows.ps1`、`scripts/verify-sqlite-flows.ps1`、`services/api/README.md`、`scripts/README.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`docs/demo-checklist.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；本次保持边界禁用，不启用真实 Agent 配置写入、`agent_config_versions` 写入、Runner 执行、真实模型调用、云同步或完整运行时权限。
 
-## 2026-06-10 Change log: Agent config dry-run negative helper checks
+## 2026-06-10 变更记录：Agent 配置 dry-run 反向 helper 检查
 
-- What changed: exported the Agent config dry-run builder for local helper verification and added `scripts/verify-agent-config-dry-run.ps1` for negative precondition checks.
-- Why: some unsafe states, such as an application linked to an unapproved source approval or an approval with a Runner job, should be covered without creating impossible states through public HTTP flows.
-- Impacted modules: `services/api/server.js`, `scripts/verify-agent-config-dry-run.ps1`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/agent-config-apply-dry-run-spec.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is disabled dry-run regression only and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+- 改了什么：导出 Agent 配置 dry-run builder 用于本地 helper 验证，并新增 `scripts/verify-agent-config-dry-run.ps1` 覆盖反向前置条件。
+- 为什么：某些不安全状态，例如 application 关联未批准来源审批，或审批带 Runner job，应该在不通过公开 HTTP flow 构造不可能状态的前提下被覆盖。
+- 影响模块：`services/api/server.js`、`scripts/verify-agent-config-dry-run.ps1`、`scripts/verify-mock-flows.ps1`、`scripts/verify-sqlite-flows.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/agent-config-apply-dry-run-spec.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是禁用态 dry-run 回归，不启用真实 Agent 配置写入、`agent_config_versions` 写入、Runner 执行、真实模型调用、云同步或完整运行时权限。
 
-## 2026-06-10 Change log: Agent config real apply gate helper
+## 2026-06-10 变更记录：Agent 配置真实 apply 闸门 helper
 
-- What changed: added `buildAgentConfigRealApplyGate(...)` and `scripts/verify-agent-config-apply-gate.ps1` to verify future real-apply preconditions while keeping the feature gate disabled.
-- Why: before any later commit writes `agents` or `agent_config_versions`, the project needs an executable gate proving dry-run proof, approval status, no Runner job, target Agent, human confirmation, Git checkpoint, rollback acceptance, and all-false side effects.
-- Impacted modules: `services/api/server.js`, `scripts/verify-agent-config-apply-gate.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is helper-only gate verification and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+- 改了什么：新增 `buildAgentConfigRealApplyGate(...)` 和 `scripts/verify-agent-config-apply-gate.ps1`，在功能闸门保持禁用时验证未来真实 apply 前置条件。
+- 为什么：任何后续提交写 `agents` 或 `agent_config_versions` 前，项目需要一个可执行闸门证明 dry-run proof、审批状态、无 Runner job、目标 Agent、人类确认、Git checkpoint、rollback acceptance 和全 false sideEffects。
+- 影响模块：`services/api/server.js`、`scripts/verify-agent-config-apply-gate.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/agent-config-apply-dry-run-spec.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是 helper-only 闸门验证，不启用真实 Agent 配置写入、`agent_config_versions` 写入、Runner 执行、真实模型调用、云同步或完整运行时权限。
 
-## 2026-06-10 Change log: Agent config change-plan field whitelist
+## 2026-06-10 变更记录：Agent 配置 change-plan 字段白名单
 
-- What changed: added `services/api/agent-config-fields.js` and `scripts/verify-agent-config-fields.ps1`, and wired `changePlanValidation` into Agent config dry-run and real apply gate helpers.
-- Why: future real Agent config writes need a narrow executable whitelist before any write path exists, so higher-trust Agent profiles cannot smuggle secrets, Runner/tool/file/command/Git/network fields, parent/reporting changes, forbidden capabilities, or `all=true` through a change plan.
-- Impacted modules: `services/api/agent-config-fields.js`, `services/api/server.js`, `scripts/verify-agent-config-fields.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is helper-only field validation and does not enable real Agent config writes, `agent_config_versions` writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+- 改了什么：新增 `services/api/agent-config-fields.js` 和 `scripts/verify-agent-config-fields.ps1`，并把 `changePlanValidation` 接入 Agent 配置 dry-run 与真实 apply gate helper。
+- 为什么：未来真实 Agent 配置写入前必须先有窄白名单，避免高信任 Agent profile 通过 change plan 塞入 secret、Runner/tool/file/command/Git/network 字段、父子/汇报关系变更、禁止 capability 或 `all=true`。
+- 影响模块：`services/api/agent-config-fields.js`、`services/api/server.js`、`scripts/verify-agent-config-fields.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是 helper-only 字段验证，不启用真实 Agent 配置写入、`agent_config_versions` 写入、Runner 执行、真实模型调用、云同步或完整运行时权限。
 
-## 2026-06-10 Change log: Agent config transaction plan helper
+## 2026-06-10 变更记录：Agent 配置事务计划 helper
 
-- What changed: added `services/api/agent-config-transaction-plan.js` and `scripts/verify-agent-config-transaction-plan.ps1`, and exposed a no-write `transactionPlan` preview from `buildAgentConfigRealApplyGate(...)`.
-- Why: before any real SQLite write exists, the future apply path needs an executable transaction contract covering `agents`, `agent_config_versions`, `agent_config_applications`, `runtime_events`, version increment, duplicate-apply guard, and rollback-on-any-failure behavior.
-- Impacted modules: `services/api/agent-config-transaction-plan.js`, `services/api/server.js`, `scripts/verify-agent-config-transaction-plan.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is helper-only transaction planning and does not enable real Agent config writes, `agent_config_versions` writes, SQLite/runtime-state writes, Runner execution, real model calls, cloud sync, or broad runtime permissions.
+- 改了什么：新增 `services/api/agent-config-transaction-plan.js` 和 `scripts/verify-agent-config-transaction-plan.ps1`，并从 `buildAgentConfigRealApplyGate(...)` 暴露 no-write `transactionPlan` 预览。
+- 为什么：在任何真实 SQLite 写入存在前，未来 apply path 需要可执行事务契约，覆盖 `agents`、`agent_config_versions`、`agent_config_applications`、`runtime_events`、版本递增、重复 apply 防护和任意失败即 rollback。
+- 影响模块：`services/api/agent-config-transaction-plan.js`、`services/api/server.js`、`scripts/verify-agent-config-transaction-plan.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是 helper-only 事务规划，不启用真实 Agent 配置写入、`agent_config_versions` 写入、SQLite/runtime-state 写入、Runner 执行、真实模型调用、云同步或完整运行时权限。
 
-## 2026-06-11 Change log: Agent config rollback request helper
+## 2026-06-11 变更记录：Agent 配置回滚请求 helper
 
-- What changed: added `services/api/agent-config-rollback-request.js` and `scripts/verify-agent-config-rollback-request.ps1` to define and verify the helper-only Agent config rollback request contract.
-- Why: rollback must be a new approved Agent config change and future version, not a delete, overwrite, direct `agents` update, Runner job, or hidden SQLite write. The helper makes those rules executable before any route or real rollback implementation exists.
-- Impacted modules: `services/api/agent-config-rollback-request.js`, `scripts/verify-agent-config-rollback-request.ps1`, `scripts/README.md`, `docs/demo-checklist.md`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is helper-only rollback request validation and does not create approvals/applications, write Agent config, write `agent_config_versions`, write SQLite/runtime state, create Runner jobs, execute Runner, call models, cloud sync, or change runtime permissions.
+- 改了什么：新增 `services/api/agent-config-rollback-request.js` 和 `scripts/verify-agent-config-rollback-request.ps1`，定义并验证 helper-only 的 Agent 配置回滚请求契约。
+- 为什么：回滚必须是新的已批准 Agent 配置变更和未来版本，不能是删除、覆盖、直接更新 `agents`、Runner job 或隐藏 SQLite 写入。helper 在任何路由或真实回滚实现存在前，让这些规则可执行。
+- 影响模块：`services/api/agent-config-rollback-request.js`、`scripts/verify-agent-config-rollback-request.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是 helper-only 回滚请求验证，不创建审批/application，不写 Agent 配置，不写 `agent_config_versions`，不写 SQLite/runtime state，不创建 Runner job，不执行 Runner，不调用模型，不启用云同步或改变运行时权限。
 
-## 2026-06-11 Change log: Agent config rollback request disabled route
+## 2026-06-11 变更记录：Agent 配置回滚请求禁用态路由
 
-- What changed: added disabled `POST /api/agent-config-applications/:applicationId/rollback-request`, added a Web UI rollback request precheck button for applied Agent config application records, and expanded Mock/SQLite flow verification for the route.
-- Why: the UI and API need a visible safe boundary before any future rollback approval creation exists. The route proves that current app state lacks real version history and therefore must remain `requestReady=false` and `feature_disabled`.
-- Impacted modules: `services/api/server.js`, `apps/web/app.js`, `scripts/verify-mock-flows.ps1`, `scripts/verify-sqlite-flows.ps1`, `services/api/agent-config-rollback-request.js`, `docs/api-draft.md`, `docs/agent-config-apply-dry-run-spec.md`, `docs/demo-checklist.md`, `scripts/README.md`, `services/api/README.md`, roadmap, maintenance, and handoff docs.
-- Human docs sync: not required; this is disabled route/UI preview only and does not create approvals/applications, write Agent config, write `agent_config_versions`, write SQLite/runtime state, create Runner jobs, execute Runner, call models, cloud sync, or change runtime permissions.
+- 改了什么：新增禁用态 `POST /api/agent-config-applications/:applicationId/rollback-request`，为 applied Agent 配置 application 记录新增 Web UI rollback request precheck 按钮，并扩展 Mock/SQLite flow 验证。
+- 为什么：未来任何回滚审批创建存在前，UI 和 API 需要一个可见安全边界。该路由证明当前 app state 缺少真实版本历史，因此必须保持 `requestReady=false` 和 `feature_disabled`。
+- 影响模块：`services/api/server.js`、`apps/web/app.js`、`scripts/verify-mock-flows.ps1`、`scripts/verify-sqlite-flows.ps1`、`services/api/agent-config-rollback-request.js`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`docs/demo-checklist.md`、`scripts/README.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是禁用态路由/UI 预览，不创建审批/application，不写 Agent 配置，不写 `agent_config_versions`，不写 SQLite/runtime state，不创建 Runner job，不执行 Runner，不调用模型，不启用云同步或改变运行时权限。
+
+## 2026-06-11 变更记录：Agent 配置版本历史来源 helper
+
+- 改了什么：新增 `services/api/agent-config-version-history.js` 和 `scripts/verify-agent-config-version-history.ps1`，定义并验证只读 Agent 配置版本历史来源契约。
+- 为什么：回滚请求路由当前证明 app flow 中没有真实版本历史。在加入任何 SQLite 读取路由前，项目需要纯 helper 来规范化版本行、按 Agent 过滤、选择 current/restore 来源，并拒绝不安全 snapshot。
+- 影响模块：`services/api/agent-config-version-history.js`、`scripts/verify-agent-config-version-history.ps1`、`scripts/README.md`、`docs/demo-checklist.md`、`docs/api-draft.md`、`docs/agent-config-apply-dry-run-spec.md`、`docs/data-model-draft.md`、`services/api/README.md`、路线、维护和交接文档。
+- 人类文档同步：不需要；这是 helper-only 来源验证，不直接读 SQLite，不暴露路由，不创建审批/application，不写 Agent 配置，不写 `agent_config_versions`，不写 SQLite/runtime state，不创建 Runner job，不执行 Runner，不调用模型，不启用云同步或改变运行时权限。
 
 ## 2026-06-10 Change log: Module stability map
 

@@ -28,6 +28,7 @@ verify-agent-config-dry-run.ps1
 verify-agent-config-apply-gate.ps1
 verify-agent-config-transaction-plan.ps1
 verify-agent-config-rollback-request.ps1
+verify-agent-config-version-history.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -50,23 +51,25 @@ sqlite/
 - AI 自启动的自动验收脚本不得复用 `8787`，也不得连接一个已经存在的未知进程。
 - `verify-sqlite-flows.ps1` 使用隔离端口 `8788`；`verify-mock-flows.ps1` 使用隔离端口 `8789`。如果对应端口启动前已经有 API 响应，脚本会直接失败，而不是误连旧服务。
 
-`verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。It also checks that invalid Agent permission change requests are rejected before approval creation, that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes, and that Agent config dry-run stays feature-disabled with all side effects false.
+`verify-mock-flows.ps1` 会在隔离端口 `8789` 启动 Mock API，验证 Mock API 的关键状态流转，并在结束后重置本地 runtime state。它还会检查：非法 Agent permission change request 在创建审批前被拒绝；已批准的 Agent config 变更只创建 `pending_apply` application 记录，不创建 Runner job，也不进行真实 Agent 配置写入；Agent config dry-run 保持 feature-disabled，且所有 sideEffects 为 false。
 
-`verify-sqlite-flows.ps1` 会在隔离端口 `8788` 启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。It also checks that invalid Agent permission change requests are rejected before SQLite writes, that approved Agent config changes only create `pending_apply` application records without Runner jobs or real Agent config writes, and that Agent config dry-run stays feature-disabled with all side effects false.
+`verify-sqlite-flows.ps1` 会在隔离端口 `8788` 启动 SQLite 模式 API，验证 Dashboard、任务、审批、Runner job、Agent 配置应用/取消和 reset 状态重建。它还会检查：非法 Agent permission change request 在 SQLite 写入前被拒绝；已批准的 Agent config 变更只创建 `pending_apply` application 记录，不创建 Runner job，也不进行真实 Agent 配置写入；Agent config dry-run 保持 feature-disabled，且所有 sideEffects 为 false。
 
 `verify-model-gateway.ps1` 会验证当前已运行 API 的 Model Gateway 禁用态、dry-run、connectivity-test disabled stub、preflight failure paths、disabled adapter registry、openai_compat relay interface、cheng.pink request builder、feature flag 边界和全 false sideEffects。该脚本不打开浏览器、不读取真实 key、不发真实 provider 请求，也不启动或停止本地服务。
 
-`verify-agent-permissions.ps1` validates the local Agent permission profile helper. It expands mock profiles, rejects `all=true`, rejects unknown capabilities, rejects forbidden Agent capabilities, and checks all validation side effects stay false. It does not start local services, change Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+`verify-agent-permissions.ps1` 验证本地 Agent 权限 profile helper：展开 mock profile，拒绝 `all=true`、未知 capability 和禁止 capability，并确认所有验证 sideEffects 都是 false。它不会启动本地服务、修改 Agent 配置、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-fields.ps1` validates the future Agent config write field whitelist helper without starting services. It covers allowed fields, unsupported fields, forbidden field names, forbidden secret/prompt/provider/local-path values, invalid field value shapes, forbidden permission capabilities, `all=true`, and dry-run/apply-gate integration. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+`verify-agent-config-fields.ps1` 验证未来 Agent 配置真实写入前的字段白名单 helper。覆盖允许字段、未支持字段、禁止字段名、secret/prompt/provider/local-path 等禁止值、非法字段形状、禁止权限 capability、`all=true`，以及 dry-run/apply-gate 集成。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-dry-run.ps1` validates the local Agent config dry-run helper without starting services. It covers blocked preview, missing second confirmation, missing confirm text, non-`pending_apply` application, unapproved source approval, source approval with a Runner job, wrong target service, missing target Agent, and all-false side effects. It does not write Agent config, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+`verify-agent-config-dry-run.ps1` 验证本地 Agent 配置 dry-run helper。覆盖禁用态预览、缺少二次确认、缺少确认文本、非 `pending_apply` application、未批准来源审批、来源审批带 Runner job、错误 target service、缺少目标 Agent，以及全 false sideEffects。它不会写 Agent 配置、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-apply-gate.ps1` validates the future real Agent config apply gate helper without starting services. It proves that all real-apply preconditions can be checked while the feature gate remains closed: even valid inputs keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+`verify-agent-config-apply-gate.ps1` 验证未来真实应用 Agent 配置前的闸门 helper。它证明真实 apply 的前置条件可以被检查，但功能闸门仍关闭：即使输入有效，也必须保持 `ok=false`、`gateReady=false`、`canApply=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-transaction-plan.ps1` validates the future real Agent config apply transaction plan helper without starting services. It proves the planned write set would update `agents`, insert `agent_config_versions`, mark the application applied, and insert `runtime_events` in one transaction, while still keeping `canWrite=false` and all side effects false. It does not write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, or read secrets.
+`verify-agent-config-transaction-plan.ps1` 验证未来真实写入的事务计划 helper。它证明计划写入集将来必须在一个事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`，但当前仍保持 `canWrite=false` 和全 false sideEffects。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
-`verify-agent-config-rollback-request.ps1` validates the direct helper Agent config rollback request contract without starting services. It proves a valid helper input can draft a future approval/application/version while still keeping `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. Mock and SQLite flow scripts cover the disabled HTTP route, which stays `requestReady=false` until real version history exists.
+`verify-agent-config-rollback-request.ps1` 验证直接 helper 级别的 Agent 配置回滚请求契约。它证明有效输入可以起草未来的审批/application/版本，但当前仍必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。Mock 和 SQLite flow 脚本会覆盖禁用态 HTTP 路由；在真实版本历史接入前，该路由保持 `requestReady=false`。
+
+`verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。它不会直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -124,49 +127,58 @@ This script is acceptance verification, not a real connectivity test. It must no
 
 ## verify-agent-config-dry-run.ps1
 
-`verify-agent-config-dry-run.ps1` is the dedicated Agent config dry-run helper contract check.
+`verify-agent-config-dry-run.ps1` 是 Agent 配置 dry-run helper 的专用契约检查。
 
-- `services/api/server.js` exports `buildAgentConfigApplyDryRun(...)` for local helper verification without starting the API server.
-- Valid pending applications must still return `ok=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
-- Invalid dry-run inputs must be reported without side effects: missing second confirmation, missing confirm text, non-pending application, unapproved approval, approval with Runner job, wrong target service, and missing target Agent.
-- The helper check does not start local services, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+- `services/api/server.js` 导出 `buildAgentConfigApplyDryRun(...)`，用于不启动 API server 的本地 helper 验证。
+- 有效的 pending application 仍必须返回 `ok=false`、`canApply=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。
+- 无效 dry-run 输入必须在无 sideEffects 的情况下报告：缺少二次确认、缺少确认文本、非 pending application、未批准审批、审批带 Runner job、错误 target service、缺少目标 Agent。
+- 这个 helper 检查不会启动本地服务、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。
 
 ## verify-agent-config-fields.ps1
 
-`verify-agent-config-fields.ps1` is the dedicated Agent config change-plan field whitelist check.
+`verify-agent-config-fields.ps1` 是 Agent 配置 change-plan 字段白名单的专用检查。
 
-- `services/api/agent-config-fields.js` owns allowed fields for future real writes: `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`.
-- Forbidden fields include secrets/API keys, provider headers/responses, prompts, Runner/tool/command/file/Git/network fields, workspace paths, parent/reporting relationship fields, and broad raw-secret tokens.
-- Permission changes still use `services/api/agent-permissions.js`, so forbidden capabilities such as `canExecuteRunnerJob`, raw secret access, and `all=true` are rejected.
-- `buildAgentConfigApplyDryRun(...)` and `buildAgentConfigRealApplyGate(...)` include the field validation result, but still keep real write side effects false.
-- The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+- `services/api/agent-config-fields.js` 负责未来真实写入允许字段：`permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`。
+- 禁止字段包括 secret/API key、provider header/response、prompt、Runner/tool/command/file/Git/network 字段、workspace 路径、父子/汇报关系字段，以及宽泛 raw-secret token。
+- Permission 变更仍使用 `services/api/agent-permissions.js`，因此 `canExecuteRunnerJob`、raw secret access、`all=true` 等禁止 capability 会被拒绝。
+- `buildAgentConfigApplyDryRun(...)` 和 `buildAgentConfigRealApplyGate(...)` 会包含字段验证结果，但真实写入 sideEffects 仍保持 false。
+- 这个 helper 检查不会启动本地服务、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。
 
 ## verify-agent-config-apply-gate.ps1
 
-`verify-agent-config-apply-gate.ps1` is the dedicated future real-apply gate contract check.
+`verify-agent-config-apply-gate.ps1` 是未来真实 apply 闸门的专用契约检查。
 
-- `services/api/server.js` exports `buildAgentConfigRealApplyGate(...)` for local helper verification without starting the API server.
-- Valid preconditions may return `preconditionsReady=true`, but must still return `ok=false`, `gateReady=false`, `canApply=false`, and `blockedReasons=["feature_disabled"]`.
-- The gate requires a matching no-side-effect dry-run result, approved `agent_config` source approval, no Runner job, target Agent, second confirmation, requestedBy, Git checkpoint, and rollback-plan acceptance.
-- Invalid gate inputs must be reported without side effects: missing requestedBy, missing Git checkpoint, missing rollback acceptance, missing dry-run proof, mismatched dry-run proof, dry-run validation errors, dry-run side effects, and source approval with Runner job.
-- The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+- `services/api/server.js` 导出 `buildAgentConfigRealApplyGate(...)`，用于不启动 API server 的本地 helper 验证。
+- 有效前置条件可以返回 `preconditionsReady=true`，但仍必须返回 `ok=false`、`gateReady=false`、`canApply=false` 和 `blockedReasons=["feature_disabled"]`。
+- 闸门要求匹配且无 sideEffects 的 dry-run 结果、已批准的 `agent_config` 来源审批、无 Runner job、目标 Agent、二次确认、requestedBy、Git checkpoint 和 rollback-plan acceptance。
+- 无效 gate 输入必须在无 sideEffects 的情况下报告：缺少 requestedBy、缺少 Git checkpoint、缺少 rollback acceptance、缺少 dry-run proof、dry-run proof 不匹配、dry-run validation errors、dry-run sideEffects、来源审批带 Runner job。
+- 这个 helper 检查不会启动本地服务、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。
 
 ## verify-agent-config-transaction-plan.ps1
 
-`verify-agent-config-transaction-plan.ps1` is the dedicated future real-write transaction plan contract check.
+`verify-agent-config-transaction-plan.ps1` 是未来真实写入事务计划的专用契约检查。
 
-- `services/api/agent-config-transaction-plan.js` owns the helper-only transaction plan for a later real apply implementation.
-- A valid plan may return `planReady=true`, but must still return `ok=false`, `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
-- The planned write set must be one transaction: update `agents`, insert `agent_config_versions`, mark `agent_config_applications` applied, and insert `runtime_events`.
-- The plan must require version increment by exactly 1, `agent_id + version` uniqueness, rollback on any failure, pending application status at write time, and approved `agent_config` source approval without Runner job.
-- The helper check does not start local services, write Agent config, write versions, write SQLite/runtime state, create approvals/Runner jobs, execute Runner, call models, read raw secrets, or mutate Agent config.
+- `services/api/agent-config-transaction-plan.js` 负责后续真实 apply 实现前的 helper-only 事务计划。
+- 有效计划可以返回 `planReady=true`，但仍必须返回 `ok=false`、`canWrite=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。
+- 计划写入集必须是一个事务：更新 `agents`、插入 `agent_config_versions`、标记 `agent_config_applications` applied、插入 `runtime_events`。
+- 计划必须要求版本号严格 +1、`agent_id + version` 唯一、任意失败即 rollback、写入时 application 仍是 pending、来源 `agent_config` 审批已批准且没有 Runner job。
+- 这个 helper 检查不会启动本地服务、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。
 
 ## verify-agent-config-rollback-request.ps1
 
-`verify-agent-config-rollback-request.ps1` is the dedicated Agent config rollback request contract check.
+`verify-agent-config-rollback-request.ps1` 是 Agent 配置回滚请求的专用契约检查。
 
-- `services/api/agent-config-rollback-request.js` owns the disabled rollback request draft for a later rollback flow.
-- A valid request may return `requestReady=true`, but must still return `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects.
-- The helper requires an applied original application, approved `agent_config` source approval without Runner job, target Agent, current/restore versions that belong to the target Agent, restore version older than current version, second confirmation, requester, reason, and at least one changed field.
-- `POST /api/agent-config-applications/:applicationId/rollback-request` is a disabled preview route covered by `verify-mock-flows.ps1` and `verify-sqlite-flows.ps1`; normal route calls stay `requestReady=false` until real version history exists.
-- Rollback must draft a new approval, new application, and future new version. It must not delete or overwrite version history, directly update `agents`, create approvals, create applications, create Runner jobs, execute Runner, call models, write SQLite/runtime state, or read raw secrets.
+- `services/api/agent-config-rollback-request.js` 负责后续回滚 flow 的禁用态回滚请求草稿。
+- 有效请求可以返回 `requestReady=true`，但仍必须返回 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。
+- helper 要求原 application 已 applied、来源 `agent_config` 审批已批准且没有 Runner job、目标 Agent 存在、current/restore 版本属于目标 Agent、restore 版本早于 current 版本、二次确认、requester、reason，以及至少一个变更字段。
+- `POST /api/agent-config-applications/:applicationId/rollback-request` 是禁用态预览路由，由 `verify-mock-flows.ps1` 和 `verify-sqlite-flows.ps1` 覆盖；真实版本历史存在前，普通路由调用保持 `requestReady=false`。
+- 回滚必须起草新的审批、新 application 和未来新版本。它不得删除或覆盖版本历史、直接更新 `agents`、创建审批、创建 application、创建 Runner job、执行 Runner、调用模型、写 SQLite/runtime state 或读取 raw secret。
+
+## verify-agent-config-version-history.ps1
+
+`verify-agent-config-version-history.ps1` 是 Agent 配置版本历史只读来源的专用检查。
+
+- `services/api/agent-config-version-history.js` 负责后续版本历史/回滚来源读取前的 helper-only 规范化。
+- helper 接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，并默认选择最新旧版本作为 restore source。
+- snapshot 输出只允许 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`；secret/prompt/provider/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值必须被拒绝。
+- 这个 helper 检查不会启动本地服务、直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。

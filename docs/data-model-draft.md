@@ -155,6 +155,7 @@ projects
 - `config_snapshot` 不得包含 API Key、模型 Key 明文或本地敏感路径。
 - 回滚不得直接删除版本记录；必须重新创建审批和新的版本。
 - 真实写入必须和 `agents` 当前态更新处于同一事务；失败时不得产生半写入版本。
+- `services/api/agent-config-version-history.js` 当前只是只读 helper，用于规范化已加载的版本行并选择回滚来源；它不直接读取 SQLite、不暴露 HTTP 路由、不写该表。
 
 ### tasks
 

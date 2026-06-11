@@ -467,39 +467,47 @@ MVP-0.2 约束：
 }
 ```
 
-### Agent config real apply gate helper
+### Agent 配置真实 apply 闸门 helper
 
-Current status: helper-only, no HTTP route, no real write.
+当前状态：helper-only，没有 HTTP 路由，没有真实写入。
 
-`services/api/server.js` exports `buildAgentConfigRealApplyGate(...)` for future real-apply contract verification. This helper checks the dry-run proof, source approval, target Agent, second confirmation, requestedBy, Git checkpoint, rollback acceptance, and all-false side effects.
+`services/api/server.js` 导出 `buildAgentConfigRealApplyGate(...)`，用于验证未来真实 apply 的契约。这个 helper 会检查 dry-run proof、来源审批、目标 Agent、二次确认、requestedBy、Git checkpoint、rollback acceptance 和全 false sideEffects。
 
-Even when all preconditions are present, MVP-0.2 must return `preconditionsReady=true` but keep `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. A later real apply implementation must be a separate feature-flagged commit and must not reuse this helper as permission to write `agents` or `agent_config_versions` by itself.
+即使所有前置条件都齐全，MVP-0.2 也只能返回 `preconditionsReady=true`，同时保持 `ok=false`、`gateReady=false`、`canApply=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。后续真实 apply 必须是单独的 feature-flagged commit，不能把这个 helper 本身当成写 `agents` 或 `agent_config_versions` 的授权。
 
-### Agent config change-plan field whitelist helper
+### Agent 配置 change-plan 字段白名单 helper
 
-Current status: helper-only, no HTTP route, no real write.
+当前状态：helper-only，没有 HTTP 路由，没有真实写入。
 
-`services/api/agent-config-fields.js` exports `validateAgentConfigChangePlan(...)`. The current allowed future-write fields are `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`. The helper rejects unsupported fields, API keys, raw secrets, tokens, authorization/provider headers, provider responses, prompts, local private paths, Runner/tool/command/file/Git/network/workspace fields, parent/reporting relationship fields, forbidden Agent capabilities, and `all=true`.
+`services/api/agent-config-fields.js` 导出 `validateAgentConfigChangePlan(...)`。当前允许的未来写入字段只有 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`。这个 helper 会拒绝未支持字段、API key、raw secret、token、authorization/provider header、provider response、prompt、本地私有路径、Runner/tool/command/file/Git/network/workspace 字段、父子/汇报关系字段、禁止 Agent capability 和 `all=true`。
 
-`POST /api/agent-config-applications/:applicationId/dry-run` and `buildAgentConfigRealApplyGate(...)` include the helper result as `changePlanValidation`. This only tightens the disabled safety boundary; it does not enable Agent config writes.
+`POST /api/agent-config-applications/:applicationId/dry-run` 和 `buildAgentConfigRealApplyGate(...)` 都会把这个 helper 的结果放在 `changePlanValidation`。这只是收紧禁用态安全边界，不代表启用 Agent 配置写入。
 
-### Agent config real-write transaction plan helper
+### Agent 配置真实写入事务计划 helper
 
-Current status: helper-only, no HTTP route, no SQLite write.
+当前状态：helper-only，没有 HTTP 路由，没有 SQLite 写入。
 
-`services/api/agent-config-transaction-plan.js` exports `buildAgentConfigApplyTransactionPlan(...)`. The helper previews the future real-write transaction: update `agents`, insert `agent_config_versions`, mark `agent_config_applications` applied, and insert `runtime_events` in one transaction.
+`services/api/agent-config-transaction-plan.js` 导出 `buildAgentConfigApplyTransactionPlan(...)`。这个 helper 预览未来真实写入事务：在同一个事务内更新 `agents`、插入 `agent_config_versions`、标记 `agent_config_applications` applied，并插入 `runtime_events`。
 
-Even when the plan is valid, MVP-0.2 must return `ok=false`, `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all side effects false. The helper must not call SQLite, write runtime state, create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
+即使计划有效，MVP-0.2 也必须返回 `ok=false`、`canWrite=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。这个 helper 不得调用 SQLite、写 runtime state、创建 Runner job、执行 Runner、调用模型、读取 raw secret、修改文件或修改 Git。
 
-### Agent config rollback request helper
+### Agent 配置回滚请求 helper
 
-Current status: disabled HTTP preview route plus helper, no approval creation, no SQLite write.
+当前状态：禁用态 HTTP 预览路由加 helper；不创建审批，不写 SQLite。
 
-`services/api/agent-config-rollback-request.js` exports `buildAgentConfigRollbackRequest(...)`. The helper validates a future rollback request against an applied original application, an approved `agent_config` source approval without Runner job, the target Agent, current and restore versions that belong to that Agent, restore-version ordering, second confirmation, requester, reason, and changed fields.
+`services/api/agent-config-rollback-request.js` 导出 `buildAgentConfigRollbackRequest(...)`。这个 helper 会根据已 applied 的原 application、已批准且没有 Runner job 的 `agent_config` 来源审批、目标 Agent、属于该 Agent 的 current/restore 版本、restore 版本顺序、二次确认、requester、reason 和变更字段来验证未来回滚请求。
 
-`POST /api/agent-config-applications/:applicationId/rollback-request` is a disabled preview route for the currently selected applied application. In MVP-0.2 the route reads application, source approval, and target Agent only. Because real `agent_config_versions` are not written yet, normal Mock/SQLite route calls must return `requestReady=false` with missing current/restore version validation errors while still reporting `feature_disabled`.
+`POST /api/agent-config-applications/:applicationId/rollback-request` 是针对当前 selected applied application 的禁用态预览路由。MVP-0.2 中，这个路由只读取 application、来源审批和目标 Agent。由于真实 `agent_config_versions` 还没有写入，普通 Mock/SQLite 路由调用必须返回 `requestReady=false`，带 current/restore 版本缺失的验证错误，同时仍报告 `feature_disabled`。
 
-Even when a direct helper test uses valid version inputs, MVP-0.2 must return `ok=false`, `requestReady=true`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, draft-only approval/application objects, rollback rules, and all side effects false. The helper and route must not create approvals, create applications, write `agents`, write `agent_config_versions`, call SQLite writes, write runtime state, create Runner jobs, execute Runner, call models, read raw secrets, modify files, or modify Git.
+即使直接 helper 测试传入有效版本，MVP-0.2 也必须返回 `ok=false`、`requestReady=true`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]`、只作为草稿的 approval/application 对象、rollback rules 和全 false sideEffects。helper 和路由不得创建审批、创建 application、写 `agents`、写 `agent_config_versions`、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型、读取 raw secret、修改文件或修改 Git。
+
+### Agent 配置版本历史来源 helper
+
+当前状态：helper-only，没有 HTTP 路由，不直接读 SQLite，不写入。
+
+`services/api/agent-config-version-history.js` 导出 `buildAgentConfigVersionHistory(...)`。这个 helper 只接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON 形式的 `config_snapshot` / `changes`，按目标 Agent 过滤，按版本号倒序排列，选择当前版本，并选择请求指定的恢复版本或默认选择最新的旧版本作为回滚来源。
+
+这个 helper 只暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents` 这几个 `configSnapshot` 字段。它会拒绝 secret/API key/provider/prompt/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值。它不得直接读 SQLite、暴露 HTTP 路由、创建回滚审批/application、写 `agents`、写 `agent_config_versions`、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取 raw secret。
 
 ## Tasks
 

@@ -27,21 +27,24 @@ agent-permissions.js
 agent-config-fields.js
 agent-config-transaction-plan.js
 agent-config-rollback-request.js
+agent-config-version-history.js
 model-gateway.js
 model-gateway-adapters.js
 ```
 
-`agent-permissions.js` owns the mock Agent permission profile boundary. `POST /api/agents/:agentId/change-requests` validates `changeType=permission` before creating an approval. Safe profiles create an Agent config approval with `permissionValidation` recorded in `changeRequest`; forbidden capabilities, unknown capabilities, unsupported profiles, and `all=true` return `422 agent_permission_validation_failed` without writing runtime state or SQLite.
+`agent-permissions.js` 负责 mock Agent 权限 profile 边界。`POST /api/agents/:agentId/change-requests` 在创建审批前验证 `changeType=permission`。安全 profile 会创建 Agent 配置审批，并把 `permissionValidation` 记录到 `changeRequest`；禁止 capability、未知 capability、未支持 profile 和 `all=true` 会返回 `422 agent_permission_validation_failed`，不写 runtime state 或 SQLite。
 
-`agent-config-fields.js` owns the helper-only Agent config change-plan whitelist. Current allowed future-write fields are `permissions`, `model`, `status`, `maxSubAgents`, and `canSpawnSubAgents`. It rejects unsupported fields, secret/API-key/provider/prompt/local-path content, Runner/tool/command/file/Git/network/workspace fields, parent/reporting relationship fields, forbidden Agent capabilities, and `all=true`. It does not write Agent config or persist anything.
+`agent-config-fields.js` 负责 helper-only 的 Agent 配置 change-plan 白名单。当前允许的未来写入字段只有 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`。它会拒绝未支持字段、secret/API key/provider/prompt/local-path 内容、Runner/tool/command/file/Git/network/workspace 字段、父子/汇报关系字段、禁止 Agent capability 和 `all=true`。它不写 Agent 配置，也不持久化任何内容。
 
-`POST /api/agent-config-applications/:applicationId/dry-run` is implemented as a disabled Agent config apply preview. It reads the current application, source approval, and target Agent, then returns `dryRun=true`, `canApply=false`, `blockedReasons=["feature_disabled"]`, write/rollback plans, and all-false side effects. It must not write `agents`, `agent_config_versions`, SQLite/runtime state, approvals, Runner jobs, runtime events, call models, execute Runner, or read raw secrets.
+`POST /api/agent-config-applications/:applicationId/dry-run` 当前是禁用态的 Agent 配置 apply 预览。它读取当前 application、来源审批和目标 Agent，然后返回 `dryRun=true`、`canApply=false`、`blockedReasons=["feature_disabled"]`、write/rollback plan 和全 false sideEffects。它不得写 `agents`、`agent_config_versions`、SQLite/runtime state、审批、Runner job、runtime event，不得调用模型、执行 Runner 或读取原始密钥。
 
-`buildAgentConfigRealApplyGate(...)` is a helper-only future real-apply gate. It can prove that dry-run proof, source approval, target Agent, second confirmation, requestedBy, Git checkpoint, and rollback acceptance are present, but MVP-0.2 must still return `ok=false`, `gateReady=false`, `canApply=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not be wired to real Agent config writes until a later explicit feature-flagged commit.
+`buildAgentConfigRealApplyGate(...)` 是 helper-only 的未来真实 apply 闸门。它可以证明 dry-run proof、来源审批、目标 Agent、二次确认、requestedBy、Git checkpoint 和 rollback acceptance 都存在，但 MVP-0.2 仍必须返回 `ok=false`、`gateReady=false`、`canApply=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。在后续明确 feature flag 的提交前，不得把它接到真实 Agent 配置写入。
 
-`agent-config-transaction-plan.js` owns the helper-only future real-write transaction plan. It can preview that a later implementation must update `agents`, insert `agent_config_versions`, mark the application applied, and insert `runtime_events` in one transaction, but MVP-0.2 must still keep `canWrite=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. It must not call SQLite or write runtime state directly.
+`agent-config-transaction-plan.js` 负责 helper-only 的未来真实写入事务计划。它可以预览后续实现必须在一个事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`；但 MVP-0.2 仍必须保持 `canWrite=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。它不得直接调用 SQLite 或写 runtime state。
 
-`agent-config-rollback-request.js` owns the disabled future rollback request draft. `POST /api/agent-config-applications/:applicationId/rollback-request` reads application, source approval, and target Agent, then returns a blocked preview. Since MVP-0.2 does not write or read real version history through the app flow yet, normal route calls stay `requestReady=false` with missing version validation errors. The route and helper must keep `ok=false`, `canCreateApproval=false`, `blockedReasons=["feature_disabled"]`, and all-false side effects. They must not create approvals/applications, write Agent config, write versions, call SQLite writes, write runtime state, create Runner jobs, execute Runner, call models, or read raw secrets.
+`agent-config-rollback-request.js` 负责禁用态的未来回滚请求草稿。`POST /api/agent-config-applications/:applicationId/rollback-request` 读取 application、来源审批和目标 Agent，然后返回 blocked 预览。由于 MVP-0.2 还没有在 app flow 中写入或读取真实版本历史，普通路由调用会保持 `requestReady=false`，并返回缺少版本的验证错误。路由和 helper 必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。它们不得创建审批/application、写 Agent 配置、写版本、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取原始密钥。
+
+`agent-config-version-history.js` 负责 helper-only 的未来 Agent 配置版本历史只读来源。它规范化已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，按目标 Agent 过滤，按版本排序，选择当前版本和可恢复版本，并只暴露允许的 config snapshot 字段。它不得直接读 SQLite、暴露路由、写 Agent 配置、写版本、调用 SQLite 写入、写 runtime state、创建审批/application、创建 Runner job、执行 Runner、调用模型或读取原始密钥。
 
 `model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. `model-gateway-adapters.js` owns the disabled provider adapter registry and stub for OpenAI, Anthropic, and Google Gemini. These modules must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 
