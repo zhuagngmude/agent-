@@ -1,31 +1,28 @@
 # AGENTS.md
 
-This file is the short AI/IDE handoff rule sheet for `agent-swarm`.
+This is the short operating guide for `agent-swarm`.
 
-## Project
+## Current Stage
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.3, Web App + Mock/SQLite state + project plan approval prototype.
-- Web App first, desktop `.exe` later.
-- Mock API first, real database later.
-- Read-only safety queues first, real Runner execution later.
+- Current stage: MVP-0.3.
+- Web App first, desktop later.
+- Mock / SQLite first, real database later.
+- Read-only safety queues first, real Runner later.
 
 ## Read First
 
 Before changing code in a fresh session, read:
 
 ```text
+docs/README.md
+dev-docs/README.md
 dev-docs/新窗口交接说明.md
 dev-docs/下一步开发路线.md
 dev-docs/AI开发维护手册.md
-docs/api-draft.md
-docs/data-model-draft.md
-docs/sqlite-seed-plan.md
-docs/tech-stack-notes.md
-docs/runner-safety-acceptance.md
 ```
 
-For local demo and regression checks, also read:
+For local demo work, also read:
 
 ```text
 docs/demo-checklist.md
@@ -34,36 +31,33 @@ scripts/README.md
 
 ## Do Not Touch Or Commit
 
-- Do not touch or commit `design/image2/` unless the user explicitly asks.
-- Do not commit `data/mock/runtime-state.json` or `data/mock/runtime-state.json.tmp`.
-- Do not read, modify, or commit `_internal/` unless the user explicitly asks.
-- Do not commit logs, secrets, API keys, local credentials, generated builds, or dependency folders.
-- Do not add planning, research, retrospective, or handoff documents to the project root; put them in `dev-docs/`.
+- `design/image2/`
+- `data/mock/runtime-state.json`
+- `data/local/`
+- `logs/`
+- `.playwright-cli/`
+- `_internal/`
+
+Do not add public plans or handoff docs to the project root; keep them in `dev-docs/`.
 
 ## Runner Safety
 
 - Runner must not execute commands, write files, delete files, make network requests, or modify Git automatically.
-- MVP-0.3 project plan approvals may create read-only Runner request queue records only; those records are not executable jobs.
-- All local write/execute capability must go through Approval Service.
+- MVP-0.3 project plan approvals may create read-only Runner request queue records only.
+- `targetService=agent_config` approvals still must not directly modify Agent config or create Runner jobs.
 - High-risk actions require second confirmation and a Git checkpoint.
-- `targetService=agent_config` approvals must not directly modify Agent config and must not create Runner jobs unless the user explicitly approves a later feature.
 
 ## Development Workflow
 
 - Prefer small, verifiable changes.
 - Use `rg` / `rg --files` for search.
-- Use `apply_patch` for manual file edits.
-- Keep edits scoped to the requested feature or bug.
+- Use `apply_patch` for manual edits.
 - Update docs when behavior changes:
-  - `dev-docs/下一步开发路线.md` for roadmap/status.
-  - `dev-docs/AI开发维护手册.md` for AI-facing maintenance notes.
-  - `docs/api-draft.md` for API/state shape changes.
-  - `docs/data-model-draft.md` for database model changes.
-  - `docs/tech-stack-notes.md` for technology-stack decisions.
-  - `docs/runner-safety-acceptance.md` for Runner execution safety changes.
-- Put public development plans, research notes, retrospectives, and decision drafts in `dev-docs/`, not in the project root.
-- Commit after completing a verifiable feature, bug fix, or important docs update.
-- Do not commit every tiny edit; commit meaningful checkpoints.
+  - `docs/api-draft.md` for API/state shape changes
+  - `docs/data-model-draft.md` for data model changes
+  - `docs/demo-checklist.md` for demo/verification changes
+  - `dev-docs/下一步开发路线.md` for roadmap/status changes
+  - `dev-docs/AI开发维护手册.md` for AI-facing maintenance notes
 
 ## Useful Checks
 
@@ -71,6 +65,7 @@ scripts/README.md
 node --check apps\web\app.js
 node --check services\api\server.js
 node --check services\api\mock-data.js
+powershell -ExecutionPolicy Bypass -File scripts\verify-project-plan-flow.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 git status --short
@@ -78,29 +73,14 @@ git status --short
 
 ## Local Run
 
-SQLite local trial:
-
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-local.ps1
 powershell -ExecutionPolicy Bypass -File scripts\status-local.ps1
 powershell -ExecutionPolicy Bypass -File scripts\stop-local.ps1
 ```
 
-Development Mock mode:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\start-dev.ps1
-```
-
-Mock API default:
+Mock default:
 
 ```text
 http://127.0.0.1:8787
 ```
-
-Port policy:
-
-- Keep `8787` for human local trial and manual development (`start-local.ps1`, `start-dev.ps1`, web default API, and checks against the currently running local trial).
-- AI self-contained verification scripts must not reuse `8787` or attach to an already-running unknown service.
-- `scripts/verify-sqlite-flows.ps1` uses isolated port `8788`; `scripts/verify-mock-flows.ps1` uses isolated port `8789`.
-- `scripts/verify-local-ui.ps1` and `scripts/verify-model-gateway.ps1` only check the currently running local trial on `8787`; they must not start or stop services.

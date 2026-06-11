@@ -1,20 +1,19 @@
 # dev-docs
 
-开发过程资料目录。
+Development process docs and handoff material.
 
-这里放可以进入 Git、但不适合堆在项目根目录的开发文档：
+## Index
 
-- 项目说明和路线。
-- AI 开发维护规则。
-- 新窗口交接说明。
-- 前端交互反推和验收建议。
-- 阶段计划、技术决策草案、复盘记录。
+- [人类说明书.md](./人类说明书.md): current user-facing project guide.
+- [AI开发维护手册.md](./AI开发维护手册.md): current AI operating guide.
+- [新窗口交接说明.md](./新窗口交接说明.md): current continuation / handoff snapshot.
+- [UI第一版验收建议.md](./UI第一版验收建议.md): UI acceptance advice.
+- [前端交互反推架构调整.md](./前端交互反推架构调整.md): frontend-driven architecture notes.
 
-目录边界：
+## Boundary
 
-- 根目录只保留入口和宪法类文件，例如 `README.md`、`AGENTS.md`。
-- `docs/` 放正式 API、Demo、架构契约等可公开技术文档。
-- `dev-docs/` 放开发过程资料，可以提交。
-- `_internal/` 放不提交的本地内部资料，已被 `.gitignore` 忽略。
+- `docs/` holds formal technical specs and acceptance docs.
+- `dev-docs/` holds working notes, handoffs, and guidance.
+- `_internal/` is ignored local material and should not be committed.
 
-注意：不要把真实密钥、账号、客户资料或敏感私密内容放进 `dev-docs/`。这类内容应放在项目外部安全位置，或按用户明确要求放入 `_internal/`。
+Keep secrets and customer data out of this directory.
