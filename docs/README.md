@@ -17,8 +17,6 @@ Formal technical docs for `agent-swarm`.
 - [mvp-0.4-execution-layer-plan.md](./mvp-0.4-execution-layer-plan.md)
 - [mvp-0.4-execution-layer-draft.md](./mvp-0.4-execution-layer-draft.md)
 - [mvp-0.5-model-gateway-roadmap.md](./mvp-0.5-model-gateway-roadmap.md)
-- [mvp-0.6-to-1.0-roadmap.md](./mvp-0.6-to-1.0-roadmap.md)
-- [mvp-0.6-to-1.0-plan-book.md](./mvp-0.6-to-1.0-plan-book.md)
 - [agent-permission-contract.md](./agent-permission-contract.md)
 
 ## Model Gateway Notes
