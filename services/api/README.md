@@ -30,7 +30,9 @@ agent-config-rollback-request.js
 agent-config-version-history.js
 model-gateway.js
 model-gateway-adapters.js
+model-gateway-provider-config.js
 model-gateway-project-plan.js
+model-gateway-redaction.js
 project-plan.js
 ```
 
@@ -56,9 +58,15 @@ Feature-gated SQLite real apply is wired only through `POST /api/agent-config-ap
 
 Provider adapter work currently stops at the disabled adapter registry and stub. Future real adapters must stay behind the Model Gateway service boundary, enforce timeout and response-size limits, return only coarse redacted status fields, and be implemented one provider at a time. Do not add provider SDK imports or real provider network calls in this stage.
 
-`model-gateway-project-plan.js` is the helper-only admission builder for the future `project_plan_generation` model request. It validates the fixed business request shape, rejects client-controlled API keys, base URLs, headers, provider bodies, prompts, stream settings, files, tool calls, and Runner job ids, and always returns `ok=false`, `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all false sideEffects. It is not wired to an API route and must not import provider SDKs, make provider network requests, write state, create tasks, create approvals, create Runner jobs, trigger Agents, log prompts/results, or read raw secrets.
+`model-gateway-provider-config.js` is the disabled provider config resolver for the future `project_plan_generation` model request. It currently supports only `openai_compat` metadata, reports env var names plus configured / missing / invalid status, keeps `realProviderRequestsAllowed=false`, and must not return raw keys, key suffixes, masked key fragments, raw base URLs, normalized base URLs, or endpoint URLs. It must not import provider SDKs, read raw secrets into responses, write state, create tasks/approvals/Runner jobs, trigger Agents, make network requests, or log prompts/results.
 
-The future formal Model Gateway entrypoint is documented in `../../dev-docs/Model Gateway正式入口设计.md`. It is design-only: no route is wired, no provider config resolver reads raw keys, no SQLite / runtime-state writes occur, and no provider request is attempted.
+`model-gateway-project-plan.js` is the helper-only admission builder for the future `project_plan_generation` model request. It validates the fixed business request shape, rejects client-controlled API keys, base URLs, headers, provider bodies, prompts, stream settings, files, tool calls, and Runner job ids, and always returns `ok=false`, `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all false sideEffects. It must not import provider SDKs, make provider network requests, write state, create tasks, create approvals, create Runner jobs, trigger Agents, log prompts/results, or read raw secrets.
+
+`model-gateway-redaction.js` is the disabled redaction / response limiter helper and safe `model_calls` record draft builder. It redacts key-like strings, bearer auth values and URLs, enforces byte limits, and returns `modelCallRecordReady=false` / `canWrite=false`. It must not store raw prompts, raw provider request/response/error bodies, headers, model reasoning or key material.
+
+`POST /api/projects/:projectId/project-plan-model-requests` is now wired only as a disabled route draft. It calls the project-plan admission helper and returns `route="project_plan_model_requests_disabled"`, `routeEnabled=false`, `routeMode="feature_disabled"`, `projectIdSource="url_path"` and `bodyProjectIdIgnored` metadata. It must not create approvals, tasks, Runner requests, runtime events or `model_calls`, and it must not call a provider.
+
+The future formal Model Gateway entrypoint is documented in `../../dev-docs/Model Gateway正式入口设计.md`. The current route is still disabled-only: no SQLite / runtime-state writes occur, no `model_calls` records are written, and no provider request is attempted.
 
 `project-plan.js` owns the MVP-0.4 local project planning loop. `POST /api/projects/:projectId/project-plan-requests` builds a deterministic local `project_plan` approval from a user idea and constraints. The draft may persist an approval in Mock runtime state or SQLite, but it must not create tasks or Runner request records before approval. Approving that `project_plan` approval creates five queued tasks for `agent_frontend`, `agent_backend`, `agent_qa`, `agent_docs`, and `agent_reviewer`, plus five read-only Runner request queue records with `runner_request_readonly`. These queue records are not executable Runner jobs: they must not execute commands, write files, make network requests, modify Git, call models, trigger Agents, or read raw secrets. Mock and SQLite approval paths both validate that plan tasks and Runner requests have IDs, no duplicate IDs, and that each Runner request references a planned task and stays read-only.
 

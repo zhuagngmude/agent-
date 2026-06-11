@@ -11,6 +11,9 @@ const {
   modelGatewayStatus,
 } = require("./model-gateway");
 const {
+  buildProjectPlanGenerationModelRequest,
+} = require("./model-gateway-project-plan");
+const {
   agentPermissionProfiles,
   validateAgentCapabilities,
 } = require("./agent-permissions");
@@ -1258,6 +1261,33 @@ async function handleProjectPlanRequest(req, res, projectId) {
   });
 }
 
+async function handleProjectPlanModelRequest(req, res, projectId) {
+  const body = await readBody(req);
+  if (projectId !== data.projectId) {
+    sendJson(res, 404, {
+      ok: false,
+      error: "project_not_found",
+      message: "Project not found.",
+    });
+    return;
+  }
+
+  const result = buildProjectPlanGenerationModelRequest({
+    ...body,
+    projectId,
+  });
+
+  sendJson(res, 200, {
+    ...result,
+    route: "project_plan_model_requests_disabled",
+    routeImplemented: true,
+    routeEnabled: false,
+    routeMode: "feature_disabled",
+    projectIdSource: "url_path",
+    bodyProjectIdIgnored: body.projectId !== undefined,
+  });
+}
+
 async function handleAgentChangeRequest(req, res, agentId) {
   const body = await readBody(req);
   const permissionValidation = validatePermissionChangeRequest(body);
@@ -1828,6 +1858,12 @@ async function handleRequest(req, res) {
   const projectPlanRequest = pathname.match(/^\/api\/projects\/([^/]+)\/project-plan-requests$/);
   if (req.method === "POST" && projectPlanRequest) {
     await handleProjectPlanRequest(req, res, projectPlanRequest[1]);
+    return;
+  }
+
+  const projectPlanModelRequest = pathname.match(/^\/api\/projects\/([^/]+)\/project-plan-model-requests$/);
+  if (req.method === "POST" && projectPlanModelRequest) {
+    await handleProjectPlanModelRequest(req, res, projectPlanModelRequest[1]);
     return;
   }
 

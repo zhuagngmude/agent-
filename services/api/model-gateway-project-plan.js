@@ -1,5 +1,6 @@
 const projectPlanPurpose = "project_plan_generation";
 const realModelProjectPlanFlagEnvVar = "AGENT_SWARM_ENABLE_REAL_MODEL_PROJECT_PLAN";
+const { resolveModelGatewayProviderConfig } = require("./model-gateway-provider-config");
 
 const defaultProjectPlanProvider = "openai_compat";
 const defaultProjectPlanModel = "gpt-5.4-mini";
@@ -56,6 +57,8 @@ function sideEffects() {
     logsPromptOrResult: false,
     storesProviderResponse: false,
     readsRawSecrets: false,
+    returnsRawSecrets: false,
+    makesNetworkRequests: false,
     modifiesGit: false,
     writesProjectFiles: false,
   };
@@ -134,6 +137,11 @@ function buildProjectPlanGenerationModelRequest(request = {}, options = {}) {
   const validationErrors = [];
   const blockingCategories = [];
   const flags = featureFlags();
+  const providerConfig = resolveModelGatewayProviderConfig({
+    provider,
+    model,
+    purpose: projectPlanPurpose,
+  }, options.providerConfigOptions || {});
 
   if (!projectId) {
     validationErrors.push("projectId is required.");
@@ -178,6 +186,7 @@ function buildProjectPlanGenerationModelRequest(request = {}, options = {}) {
     requestShape: "project_plan_generation_v1",
     requestValid,
     validationErrors,
+    providerConfig,
     featureFlags: flags,
     blockingCategories: uniqueBlockingCategories,
     realProviderRequestAttempted: false,

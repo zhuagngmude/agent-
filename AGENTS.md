@@ -10,7 +10,7 @@ This is the short operating guide for `agent-swarm`.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.
 - MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented and accepted.
-- Stage 2 currently has a `model_calls` data-model draft plus a future Model Gateway entrypoint / provider config / key-storage design; no table, route, raw-key read, provider SDK, or real provider request is enabled.
+- Stage 2 currently has a `model_calls` data-model draft plus a future Model Gateway entrypoint / provider config / key-storage design; provider config resolver, redaction helper, and a disabled `project-plan-model-requests` route draft are in place, but no table, raw-key read, provider SDK, or real provider request is enabled.
 
 ## Read First
 
@@ -48,7 +48,7 @@ Do not add public plans or handoff docs to the project root; keep them in `dev-d
 
 - Runner must not execute commands, write files, delete files, make network requests, or modify Git automatically.
 - MVP-0.3 project plan approvals may create read-only Runner request queue records only.
-- Real model calls remain disabled until the real-model admission spec, feature flag, redaction, logging, cost tracking, and Model Gateway verification are updated in a separate implementation batch.
+- Real model calls remain disabled until the real-model admission spec, feature flag, redaction, logging, cost tracking, Model Gateway verification, and `model_calls` persistence design are updated in a separate implementation batch.
 - `targetService=agent_config` approvals still must not directly modify Agent config or create Runner jobs.
 - High-risk actions require second confirmation and a Git checkpoint.
 

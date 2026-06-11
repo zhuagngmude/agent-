@@ -64,6 +64,7 @@
 - `GET /api/model-gateway/status`
 - `POST /api/model-gateway/dry-run`
 - `POST /api/model-gateway/connectivity-test`
+- `POST /api/projects/:projectId/project-plan-model-requests`
 
 行为要点：
 
@@ -71,12 +72,15 @@
 - `connectivity-test` 必须保持 `blocked / feature_disabled / realProviderRequestAttempted=false`。
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` 目前只是一项被报告的请求标志，不会把真实 provider 请求打开。
 - `openai_compat` 只能作为禁用态 relay 元数据出现。
-- `services/api/model-gateway-project-plan.js` 只是 helper-only 的 `project_plan_generation` 准入构造器，不接 route，不写状态，不调用 provider。
+- `services/api/model-gateway-project-plan.js` 是 helper-only 的 `project_plan_generation` 准入构造器，不写状态，不调用 provider。
+- `services/api/model-gateway-provider-config.js` 只解析后端 provider 配置的粗粒度状态，不返回 raw key、key suffix、masked fragment、base URL 原文或 endpoint URL。
+- `services/api/model-gateway-redaction.js` 只提供脱敏、限长和安全 `model_calls` 记录草稿；当前 `modelCallRecordReady=false`、`canWrite=false`。
 
-阶段 2 未来入口草案：
+阶段 2 禁用态入口草案：
 
-- 候选 route：`POST /api/projects/:projectId/project-plan-model-requests`
-- 当前状态：未实现。
+- route：`POST /api/projects/:projectId/project-plan-model-requests`
+- 当前状态：已接入禁用态草案，只返回 `blocked / feature_disabled`。
+- 当前行为：验证固定 `project_plan_generation` 请求形态，报告后端 provider 配置粗粒度状态，但不创建审批、不创建任务、不创建 Runner request、不写 runtime event、不写 `model_calls`、不调用 provider。
 - 未来行为：只能通过后端 Model Gateway 生成 `project_plan_generation` 模型调用，并且只把结构化结果写入 `project_plan` 审批草案。
 - 禁止：客户端 API key、base URL、headers、provider body、prompt template、system prompt、stream、tools、files、Runner job id。
 - Provider 配置只允许后端配置来源；状态响应不得返回 key、key suffix、masked key fragment 或 base URL 原文。
@@ -133,7 +137,9 @@ Runner request records are still read-only with respect to real execution, but t
 - `services/api/agent-config-version-history.js`
 - `services/api/model-gateway.js`
 - `services/api/model-gateway-adapters.js`
+- `services/api/model-gateway-provider-config.js`
 - `services/api/model-gateway-project-plan.js`
+- `services/api/model-gateway-redaction.js`
 - `services/api/project-plan.js`
 
 这些 helper 都必须维持全 false sideEffects，不能偷偷写 SQLite、写 runtime state、创建审批、创建 Runner job、执行 Runner、调用真实模型或读取原始密钥。

@@ -10,7 +10,7 @@
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
-- 阶段 2 当前已完成 `model_calls` 结构草案和 `Model Gateway正式入口设计.md`；未建表、未新增 route、未导入 SDK、未读取 raw key、未发 provider 请求。
+- 阶段 2 当前已完成 `model_calls` 结构草案、`Model Gateway正式入口设计.md`、provider config resolver helper、redaction / response limiter helper 和禁用态 route 草案；未建表、未写 `model_calls`、未导入 SDK、未读取或返回 raw key、未发 provider 请求。
 
 ## 先读顺序
 
@@ -33,6 +33,7 @@
 - 改路标或阶段状态就更新 `dev-docs/下一步开发路线.md`。
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
+- 当前阶段 2 的下一步是 `model_calls` Mock / SQLite 记录写入设计和迁移草案，不要把真实 provider 调用和 Runner 执行混进同一次提交。
 
 ## 受保护范围
 

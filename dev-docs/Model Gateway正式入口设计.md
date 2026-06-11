@@ -42,9 +42,12 @@
 
 - 已有 `model_calls` 结构草案。
 - 已有 `project_plan_generation` helper-only 准入构造器。
+- 已有 provider config resolver helper，当前只返回 disabled / metadata，不返回 raw key、key suffix、masked fragment、base URL 原文或 endpoint URL。
+- 已有 redaction / response limiter helper 和安全 `model_calls` 记录草稿，当前不写表、不写 Mock / SQLite。
+- 已接入 `POST /api/projects/:projectId/project-plan-model-requests` 禁用态 route 草案。
 - Model Gateway 仍是 disabled。
 - `AGENT_SWARM_ENABLE_REAL_MODEL_PROJECT_PLAN` 当前只能被报告，不能激活真实调用。
-- 本文只补正式入口设计和 provider 配置 / Key 存储方案。
+- 本文只补正式入口设计和 provider 配置 / Key 存储方案；当前实现仍不发 provider 请求，不写 `model_calls`。
 
 ## 第一条正式入口草案
 
@@ -54,7 +57,7 @@
 POST /api/projects/:projectId/project-plan-model-requests
 ```
 
-当前不实现该 route。进入实现时，它必须保持以下规则：
+当前只实现禁用态 route 草案。它必须保持以下规则：
 
 - 只允许 `purpose=project_plan_generation`。
 - 只允许为 `projectId` 所属本地项目生成 `project_plan` 审批草案。
@@ -62,6 +65,21 @@ POST /api/projects/:projectId/project-plan-model-requests
 - 即使 feature flag 开启，也不得在审批前创建任务或 Runner request。
 - route 不得接受 API key、base URL、headers、provider body、prompt template、system prompt、stream、tools、files 或 Runner job id。
 - route 不得由 Agent、Runner、后台任务或页面加载自动触发；第一版必须是用户明确动作触发。
+
+禁用态草案当前只允许：
+
+- 返回 `routeImplemented=true`、`routeEnabled=false`、`routeMode=feature_disabled`。
+- 报告 `projectIdSource=url_path`，并在 body 提交 `projectId` 时返回 `bodyProjectIdIgnored=true`。
+- 调用 request builder 和 provider config resolver 做禁用态校验。
+- 返回全 false sideEffects、`realProviderRequestAttempted=false`、`providerResponseStored=false`。
+
+禁用态草案当前禁止：
+
+- 创建审批。
+- 创建任务或 Runner request。
+- 写 Mock / SQLite / runtime state。
+- 写 `model_calls` 或 runtime event。
+- 调用真实 provider。
 
 允许的客户端请求字段：
 
@@ -321,9 +339,9 @@ feature disabled / blocked 时：
 
 1. 保持现有 disabled Model Gateway 验证通过。
 2. 保持 `model-gateway-project-plan.js` helper-only。
-3. 增加 provider config resolver helper，但只返回 disabled / metadata，不读取或暴露 raw key。
-4. 增加 route 层禁用态草案测试，仍返回 `feature_disabled`。
-5. 增加 `model_calls` Mock / SQLite 记录写入设计和迁移草案。
-6. 增加 redaction / response limiter helper。
+3. 增加 provider config resolver helper，但只返回 disabled / metadata，不读取或暴露 raw key。（已落地）
+4. 增加 route 层禁用态草案测试，仍返回 `feature_disabled`。（已落地）
+5. 增加 redaction / response limiter helper。（已落地）
+6. 增加 `model_calls` Mock / SQLite 记录写入设计和迁移草案。
 7. 增加真实 provider adapter 实现，默认 feature flag 关闭。
 8. 只在用户明确批准并提供本地 env 后，运行一次固定用途真实调用。
