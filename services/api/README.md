@@ -33,6 +33,7 @@ model-gateway-adapters.js
 model-gateway-provider-config.js
 model-gateway-project-plan.js
 model-gateway-redaction.js
+model-gateway-model-calls.js
 project-plan.js
 ```
 
@@ -63,6 +64,8 @@ Provider adapter work currently stops at the disabled adapter registry and stub.
 `model-gateway-project-plan.js` is the helper-only admission builder for the future `project_plan_generation` model request. It validates the fixed business request shape, rejects client-controlled API keys, base URLs, headers, provider bodies, prompts, stream settings, files, tool calls, and Runner job ids, and always returns `ok=false`, `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all false sideEffects. It must not import provider SDKs, make provider network requests, write state, create tasks, create approvals, create Runner jobs, trigger Agents, log prompts/results, or read raw secrets.
 
 `model-gateway-redaction.js` is the disabled redaction / response limiter helper and safe `model_calls` record draft builder. It redacts key-like strings, bearer auth values and URLs, enforces byte limits, and returns `modelCallRecordReady=false` / `canWrite=false`. It must not store raw prompts, raw provider request/response/error bodies, headers, model reasoning or key material.
+
+`model-gateway-model-calls.js` is the helper-only `model_calls` write / migration draft builder. It mirrors the future Mock / SQLite field semantics, status flow, and audit link while keeping `canWrite=false`. It must not write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, call provider SDKs, or store raw prompts, provider payloads, or key material.
 
 `POST /api/projects/:projectId/project-plan-model-requests` is now wired only as a disabled route draft. It calls the project-plan admission helper and returns `route="project_plan_model_requests_disabled"`, `routeEnabled=false`, `routeMode="feature_disabled"`, `projectIdSource="url_path"` and `bodyProjectIdIgnored` metadata. It must not create approvals, tasks, Runner requests, runtime events or `model_calls`, and it must not call a provider.
 

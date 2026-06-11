@@ -75,6 +75,7 @@
 - `services/api/model-gateway-project-plan.js` 是 helper-only 的 `project_plan_generation` 准入构造器，不写状态，不调用 provider。
 - `services/api/model-gateway-provider-config.js` 只解析后端 provider 配置的粗粒度状态，不返回 raw key、key suffix、masked fragment、base URL 原文或 endpoint URL。
 - `services/api/model-gateway-redaction.js` 只提供脱敏、限长和安全 `model_calls` 记录草稿；当前 `modelCallRecordReady=false`、`canWrite=false`。
+- `services/api/model-gateway-model-calls.js` 只维护未来 `model_calls` 写入 / 迁移草案；当前 `modelCallRecordReady=false`、`canWrite=false`，不写 SQLite / runtime state / provider。
 
 阶段 2 禁用态入口草案：
 
@@ -140,6 +141,7 @@ Runner request records are still read-only with respect to real execution, but t
 - `services/api/model-gateway-provider-config.js`
 - `services/api/model-gateway-project-plan.js`
 - `services/api/model-gateway-redaction.js`
+- `services/api/model-gateway-model-calls.js`
 - `services/api/project-plan.js`
 
 这些 helper 都必须维持全 false sideEffects，不能偷偷写 SQLite、写 runtime state、创建审批、创建 Runner job、执行 Runner、调用真实模型或读取原始密钥。

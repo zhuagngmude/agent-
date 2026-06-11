@@ -1,8 +1,8 @@
 # Module Stability Map
 
-Date: 2026-06-10
+Date: 2026-06-12
 
-Stage: MVP-0.2 maintenance map. This document explains which parts of the repository are stable anchors, which parts may be refactored, and which parts are runtime/local artifacts. It is a guide for future cleanup, deletion, and extension work.
+Stage: MVP-0.4 accepted; Stage 2 real-model admission design has started. This document explains which parts of the repository are stable anchors, which parts may be refactored, and which parts are runtime/local artifacts. It is a guide for future cleanup, deletion, and extension work.
 
 This document is documentation only. It does not enable real Runner execution, real model calls, cloud sync, full permissions, or secret access.
 
@@ -38,7 +38,16 @@ docs/module-stability-map.md
 services/api/server.js
 services/api/model-gateway.js
 services/api/model-gateway-adapters.js
+services/api/project-plan.js
 services/api/agent-permissions.js
+services/api/agent-config-fields.js
+services/api/agent-config-transaction-plan.js
+services/api/agent-config-rollback-request.js
+services/api/agent-config-version-history.js
+services/api/model-gateway-provider-config.js
+services/api/model-gateway-project-plan.js
+services/api/model-gateway-redaction.js
+services/api/model-gateway-model-calls.js
 services/api/mock-data.js
 services/api/db/
 scripts/verify-model-gateway.ps1

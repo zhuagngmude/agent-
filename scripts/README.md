@@ -16,7 +16,7 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-sqlite-flows.ps1`: isolated SQLite flow checks on `8788`.
 - `verify-local-ui.ps1`: browser smoke for the running local trial on `8787/5175`.
 - `verify-model-gateway.ps1`: disabled Model Gateway and relay boundary checks.
-- `verify-real-model-admission.ps1`: disabled project-plan model request admission checks, provider config resolver checks, redaction / safe-record checks, and isolated disabled route checks; no provider calls.
+- `verify-real-model-admission.ps1`: disabled project-plan model request admission checks, provider config resolver checks, redaction / safe-record checks, model_calls write-draft helper checks, and isolated disabled route checks; no provider calls.
 - `verify-agent-permissions.ps1`
 - `verify-agent-config-fields.ps1`
 - `verify-agent-config-dry-run.ps1`

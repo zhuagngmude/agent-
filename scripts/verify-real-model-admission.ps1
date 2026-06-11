@@ -249,6 +249,7 @@ try {
   $casesJson = node -e @'
 const { buildProjectPlanGenerationModelRequest } = require('./services/api/model-gateway-project-plan');
 const { resolveModelGatewayProviderConfig } = require('./services/api/model-gateway-provider-config');
+const { buildModelCallWriteDraft } = require('./services/api/model-gateway-model-calls');
 const { buildSafeModelCallRecordDraft, redactModelGatewayText } = require('./services/api/model-gateway-redaction');
 
 const base = {
@@ -316,7 +317,27 @@ const cases = {
       structuredSummary: 'Plan summary sk-record-secret https://api.cheng.pink/v1 Authorization: Bearer route-token',
       summaryLimitBytes: 128
     })
-  }
+  },
+  modelCallWriteDraft: buildModelCallWriteDraft({
+    projectId: 'project_agent_swarm',
+    requestHash: 'sha256:plan-request-envelope-001',
+    provider: 'openai_compat',
+    model: 'gpt-5.4-mini',
+    purpose: 'project_plan_generation',
+    requestSource: 'server_config',
+    responseSchemaVersion: 1,
+    createdBy: 'verify_real_model_admission',
+    status: 'blocked',
+    errorCategory: 'feature_disabled',
+    durationMs: 25,
+    tokenUsage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+    costEstimate: { amount: 0.02, currency: 'usd' },
+    relatedApprovalId: 'approval_model_call_plan_001',
+    relatedAgentRunId: 'agent_run_model_call_plan_001',
+    relatedTaskId: 'task_model_call_plan_001',
+    structuredSummary: 'Model call write draft summary sk-record-secret https://api.cheng.pink/v1 Authorization: Bearer route-token',
+    summaryLimitBytes: 128
+  })
 };
 process.env[flagEnv] = 'true';
 cases.flagRequested = buildProjectPlanGenerationModelRequest(base, { providerConfigOptions: { env: providerEnv } });
@@ -448,6 +469,41 @@ process.stdout.write(JSON.stringify(cases));
   Assert-TextNotContains $cases.redaction.recordDraft.structuredSummary "https://api.cheng.pink" "Safe record draft should redact URL."
   Assert-RedactionSideEffects -Result $cases.redaction.recordDraft -Prefix "Safe record draft"
   Assert-NoRawSecretsInJson -Value $cases.redaction -Prefix "Redaction helpers"
+
+  Write-Step "Verify model-call write draft stays helper-only."
+  Assert-Equal $cases.modelCallWriteDraft.ok $false "Model call write draft should not be ok."
+  Assert-Equal $cases.modelCallWriteDraft.result "blocked" "Model call write draft should remain blocked."
+  Assert-Equal $cases.modelCallWriteDraft.writeDraft $true "Model call write draft should identify itself as a draft."
+  Assert-Equal $cases.modelCallWriteDraft.canWrite $false "Model call write draft should not be write-ready."
+  Assert-Equal $cases.modelCallWriteDraft.modelCallRecordReady $false "Model call write draft should not be write-ready."
+  Assert-Equal $cases.modelCallWriteDraft.planReady $true "Model call write draft should be internally coherent."
+  Assert-Equal $cases.modelCallWriteDraft.realProviderRequestAttempted $false "Model call write draft should not attempt provider requests."
+  Assert-Equal $cases.modelCallWriteDraft.providerResponseStored $false "Model call write draft should not store provider responses."
+  Assert-TextContains (@($cases.modelCallWriteDraft.blockedReasons) -join "`n") "feature_disabled" "Model call write draft should remain feature-disabled."
+  Assert-NoSideEffects -Result $cases.modelCallWriteDraft -Prefix "Model call write draft"
+  Assert-Equal $cases.modelCallWriteDraft.requestShape "model_call_write_draft_v1" "Model call write draft should expose the fixed draft shape."
+  Assert-Equal $cases.modelCallWriteDraft.request.provider "openai_compat" "Model call write draft should use the fixed provider."
+  Assert-Equal $cases.modelCallWriteDraft.request.model "gpt-5.4-mini" "Model call write draft should use the fixed model."
+  Assert-Equal $cases.modelCallWriteDraft.request.requestSource "server_config" "Model call write draft should use server-config source."
+  Assert-Equal $cases.modelCallWriteDraft.migrationDraft.table "model_calls" "Model call migration draft should target model_calls."
+  Assert-Equal $cases.modelCallWriteDraft.migrationDraft.sharedStorageSemantics $true "Model call migration draft should share storage semantics."
+  Assert-Equal $cases.modelCallWriteDraft.migrationDraft.sameTransactionWithRuntimeEvents $true "Model call migration draft should keep runtime events in the same transaction."
+  Assert-Equal $cases.modelCallWriteDraft.storagePlan.mock.table "model_calls" "Mock storage plan should target model_calls."
+  Assert-Equal $cases.modelCallWriteDraft.storagePlan.sqlite.table "model_calls" "SQLite storage plan should target model_calls."
+  Assert-Equal $cases.modelCallWriteDraft.storagePlan.sqlite.transaction.required $true "SQLite storage plan should require a transaction."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.insertModelCall $true "Model call write draft should preview model_call insertion."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.updateModelCallStatus $true "Model call write draft should preview status updates."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.insertRuntimeEvent $true "Model call write draft should preview runtime event writes."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.createApproval $false "Model call write draft should not create approvals."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.createTask $false "Model call write draft should not create tasks."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.createRunnerJob $false "Model call write draft should not create Runner jobs."
+  Assert-Equal $cases.modelCallWriteDraft.writeSet.callRealModel $false "Model call write draft should not call real models."
+  Assert-Equal $cases.modelCallWriteDraft.recordDraft.modelCallRecordReady $false "Nested safe record draft should not be write-ready."
+  Assert-Equal $cases.modelCallWriteDraft.recordDraft.canWrite $false "Nested safe record draft should not write."
+  Assert-Equal $cases.modelCallWriteDraft.recordDraft.redactionApplied $true "Nested safe record draft should report redaction."
+  Assert-TextContains (@($cases.modelCallWriteDraft.failureGuards) -join "`n") "runtime_events must mirror every model call status transition." "Model call write draft should preview the runtime event guard."
+  Assert-RedactionSideEffects -Result $cases.modelCallWriteDraft.recordDraft -Prefix "Model call write draft record"
+  Assert-NoRawSecretsInJson -Value $cases.modelCallWriteDraft -Prefix "Model call write draft"
 
   Write-Step "Verify feature flag request cannot activate real provider calls."
   Assert-Equal $cases.flagRequested.featureFlags.realModelProjectPlanRequested $true "Feature flag request should be reported."

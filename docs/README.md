@@ -33,4 +33,4 @@ Formal technical docs for `agent-swarm`.
 
 Verification scripts are documented in [../scripts/README.md](../scripts/README.md).
 
-Current stage: MVP-0.4 accepted; Stage 2 real-model admission design has started with `model_calls` as a draft plus disabled helper / route prep. No real Runner, no real model calls, no cloud sync.
+Current stage: MVP-0.4 accepted; Stage 2 real-model admission design is now closed as a disabled-only scaffold with `model_calls` as a draft plus helper / route prep, and the helper-only `model_calls` write / migration draft scaffold is in place. No real Runner, no real model calls, no cloud sync.

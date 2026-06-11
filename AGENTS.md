@@ -5,12 +5,12 @@ This is the short operating guide for `agent-swarm`.
 ## Current Stage
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.4 accepted; Stage 2 real-model admission design has started.
+- Current stage: MVP-0.4 accepted; Stage 2 real-model admission design is closed as helper-only scaffolding.
 - Web App first, desktop later.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.
 - MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented and accepted.
-- Stage 2 currently has a `model_calls` data-model draft plus a future Model Gateway entrypoint / provider config / key-storage design; provider config resolver, redaction helper, and a disabled `project-plan-model-requests` route draft are in place, but no table, raw-key read, provider SDK, or real provider request is enabled.
+- Stage 2 currently has a `model_calls` data-model draft plus a future Model Gateway entrypoint / provider config / key-storage design; provider config resolver, redaction helper, a disabled `project-plan-model-requests` route draft, and helper-only `model_calls` write / migration scaffolding are in place, but no table, raw-key read, provider SDK, or real provider request is enabled.
 
 ## Read First
 

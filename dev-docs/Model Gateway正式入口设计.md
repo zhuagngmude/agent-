@@ -44,8 +44,9 @@
 - 已有 `project_plan_generation` helper-only 准入构造器。
 - 已有 provider config resolver helper，当前只返回 disabled / metadata，不返回 raw key、key suffix、masked fragment、base URL 原文或 endpoint URL。
 - 已有 redaction / response limiter helper 和安全 `model_calls` 记录草稿，当前不写表、不写 Mock / SQLite。
+- 已有 helper-only `model_calls` 写入 / 迁移草案 scaffold，当前仍不建表、不落盘。
 - 已接入 `POST /api/projects/:projectId/project-plan-model-requests` 禁用态 route 草案。
-- 下一小步是 `model_calls` Mock / SQLite 写入草案：先定义固定请求信封、状态流转、runtime event 关联和事务边界，再进入实际迁移。
+- `model_calls` Mock / SQLite 写入 / 迁移草案已落地为 helper-only scaffold；固定请求信封、状态流转、runtime event 关联和事务边界已经定义清楚，后续若要进入真实写入必须单独开实现批次。
 - Model Gateway 仍是 disabled。
 - `AGENT_SWARM_ENABLE_REAL_MODEL_PROJECT_PLAN` 当前只能被报告，不能激活真实调用。
 - 本文只补正式入口设计和 provider 配置 / Key 存储方案；当前实现仍不发 provider 请求，不写 `model_calls`。
