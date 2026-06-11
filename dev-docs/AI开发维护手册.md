@@ -4,10 +4,11 @@
 
 ## 当前项目状态
 
-- 当前阶段：MVP-0.3
-- 当前闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue
+- 当前阶段：MVP-0.4 稳定化
+- 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计
 - 当前模式：Mock / SQLite / 本地 Web App
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
+- 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 
 ## 先读顺序
 
@@ -17,6 +18,7 @@
 4. `docs/data-model-draft.md`
 5. `docs/demo-checklist.md`
 6. `dev-docs/新窗口交接说明.md`
+7. `dev-docs/应用真正可用落地计划.md`
 
 ## 维护原则
 
