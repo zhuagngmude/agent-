@@ -171,7 +171,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 - `verify-agent-config-apply-gate.ps1` 会独立覆盖未来真实 apply 前置闸门：即使 dry-run、二次确认、requestedBy、Git checkpoint 和 rollback acceptance 都满足，也只能返回 `preconditionsReady=true`，但 `gateReady=false`、`canApply=false`、`feature_disabled` 和全 false sideEffects 必须保持不变。
 - `verify-agent-config-transaction-plan.ps1` 会独立覆盖未来真实写入事务计划：计划写入集必须是同一事务内更新 `agents`、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`，但当前仍只能 `canWrite=false`、`feature_disabled` 和全 false sideEffects。
 - `verify-agent-config-rollback-request.ps1` 会独立覆盖直接 helper 级别的 Agent 配置回滚请求契约；Mock 和 SQLite flow 脚本也会覆盖禁用态 `POST /api/agent-config-applications/:applicationId/rollback-request` 路由。在真实版本历史存在前，该路由必须保持 `requestReady=false`。
-- `verify-agent-config-version-history.ps1` 会独立覆盖只读 Agent 配置版本历史来源 helper：只规范化已经加载好的版本行，验证目标 Agent 过滤、版本排序、current/restore 选择、snapshot 字段白名单、禁止字段/值和全 false sideEffects；它不得直接读 SQLite、暴露路由、写版本、创建回滚审批、执行 Runner、调用模型或读取密钥。
+- `verify-agent-config-version-history.ps1` 会独立覆盖只读 Agent 配置版本历史来源 helper：只规范化已经加载好的版本行，验证目标 Agent 过滤、版本排序、current/restore 选择、snapshot 字段白名单、禁止字段/值和全 false sideEffects。Mock/SQLite flow 还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由；该路由不得写版本、创建回滚审批、执行 Runner、调用模型或读取密钥。
 - Agent 配置真实写入前必须先通过 `docs/agent-config-apply-dry-run-spec.md` 定义的 dry-run / rollback 验收；当前本地 Demo 不得写入 `agents` 或 `agent_config_versions`。
 - Agent permission change request 必须在创建审批前先运行 mock profile 验证。安全 profile 可以创建 pending `agent_config` 审批；`canExecuteRunnerJob` 等禁止 capability 必须返回 422，并且不得创建审批、写 runtime 或写 SQLite。
 - Model Gateway status 和 dry-run 必须保持禁用态，不调用真实 provider，不写状态，不触发 Agent 或 Runner。

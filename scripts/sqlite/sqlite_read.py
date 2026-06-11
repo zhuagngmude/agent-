@@ -137,6 +137,22 @@ def agent_config_application_row_to_api(row):
     }
 
 
+def agent_config_version_row_to_api(row):
+    return {
+        "id": row["id"],
+        "projectId": row["project_id"],
+        "agentId": row["agent_id"],
+        "version": row["version"],
+        "approvalId": row["approval_id"],
+        "applicationId": row["application_id"],
+        "configSnapshot": from_json(row["config_snapshot"], {}),
+        "changes": from_json(row["changes"], []),
+        "appliedBy": row["applied_by"],
+        "appliedAt": row["applied_at"],
+        "createdAt": row["created_at"],
+    }
+
+
 def workflow_row_to_api(row):
     return {
         "id": row["id"],
@@ -328,6 +344,16 @@ with sqlite3.connect(db_file) as connection:
         """,
         agent_config_application_row_to_api,
     )
+    agent_config_versions = fetch_mapped_list(
+        connection,
+        """
+        SELECT *
+        FROM agent_config_versions
+        WHERE project_id = ?
+        ORDER BY agent_id, version DESC, created_at DESC
+        """,
+        agent_config_version_row_to_api,
+    )
     workflows = fetch_mapped_list(
         connection,
         """
@@ -394,6 +420,7 @@ with sqlite3.connect(db_file) as connection:
         "runnerStatus": runner_status,
         "runnerJobs": runner_jobs,
         "agentConfigApplications": applications,
+        "agentConfigVersions": agent_config_versions,
         "gitCheckpoints": git_checkpoints,
         "knowledgeUpdates": knowledge_updates,
     }

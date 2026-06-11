@@ -69,7 +69,7 @@ sqlite/
 
 `verify-agent-config-rollback-request.ps1` 验证直接 helper 级别的 Agent 配置回滚请求契约。它证明有效输入可以起草未来的审批/application/版本，但当前仍必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。Mock 和 SQLite flow 脚本会覆盖禁用态 HTTP 路由；在真实版本历史接入前，该路由保持 `requestReady=false`。
 
-`verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。它不会直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
+`verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。Mock/SQLite flow 脚本还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -179,6 +179,7 @@ This script is acceptance verification, not a real connectivity test. It must no
 `verify-agent-config-version-history.ps1` 是 Agent 配置版本历史只读来源的专用检查。
 
 - `services/api/agent-config-version-history.js` 负责后续版本历史/回滚来源读取前的 helper-only 规范化。
+- `GET /api/agents/:agentId/config-version-history` 是只读路由；Mock 模式返回空历史，SQLite 模式只读 snapshot 中的 `agent_config_versions`。
 - helper 接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，并默认选择最新旧版本作为 restore source。
 - snapshot 输出只允许 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`；secret/prompt/provider/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值必须被拒绝。
 - 这个 helper 检查不会启动本地服务、直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。

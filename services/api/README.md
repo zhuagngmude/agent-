@@ -44,7 +44,7 @@ model-gateway-adapters.js
 
 `agent-config-rollback-request.js` 负责禁用态的未来回滚请求草稿。`POST /api/agent-config-applications/:applicationId/rollback-request` 读取 application、来源审批和目标 Agent，然后返回 blocked 预览。由于 MVP-0.2 还没有在 app flow 中写入或读取真实版本历史，普通路由调用会保持 `requestReady=false`，并返回缺少版本的验证错误。路由和 helper 必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。它们不得创建审批/application、写 Agent 配置、写版本、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取原始密钥。
 
-`agent-config-version-history.js` 负责 helper-only 的未来 Agent 配置版本历史只读来源。它规范化已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，按目标 Agent 过滤，按版本排序，选择当前版本和可恢复版本，并只暴露允许的 config snapshot 字段。它不得直接读 SQLite、暴露路由、写 Agent 配置、写版本、调用 SQLite 写入、写 runtime state、创建审批/application、创建 Runner job、执行 Runner、调用模型或读取原始密钥。
+`agent-config-version-history.js` 负责 Agent 配置版本历史只读来源。`GET /api/agents/:agentId/config-version-history` 在 Mock 模式返回空历史，在 SQLite 模式从 snapshot 只读 `agent_config_versions` 后交给 helper 规范化。它支持 camelCase 和 SQLite 风格 snake_case 字段，按目标 Agent 过滤，按版本排序，选择当前版本和可恢复版本，并只暴露允许的 config snapshot 字段。它不得写 Agent 配置、写版本、调用 SQLite 写入、写 runtime state、创建审批/application、创建 Runner job、执行 Runner、调用模型或读取原始密钥。
 
 `model-gateway.js` owns the disabled Model Gateway boundary: provider metadata, env var presence checks, dry-run validation, feature flag metadata, and the disabled connectivity-test stub. `model-gateway-adapters.js` owns the disabled provider adapter registry and stub for OpenAI, Anthropic, and Google Gemini. These modules must not import provider SDKs, make OpenAI/Anthropic/Gemini requests, write SQLite/runtime state, create tasks/approvals/Runner jobs, trigger Agents, or log prompts/results.
 

@@ -501,13 +501,24 @@ MVP-0.2 约束：
 
 即使直接 helper 测试传入有效版本，MVP-0.2 也必须返回 `ok=false`、`requestReady=true`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]`、只作为草稿的 approval/application 对象、rollback rules 和全 false sideEffects。helper 和路由不得创建审批、创建 application、写 `agents`、写 `agent_config_versions`、调用 SQLite 写入、写 runtime state、创建 Runner job、执行 Runner、调用模型、读取 raw secret、修改文件或修改 Git。
 
-### Agent 配置版本历史来源 helper
+### GET /api/agents/:agentId/config-version-history
 
-当前状态：helper-only，没有 HTTP 路由，不直接读 SQLite，不写入。
+用途：读取单个 Agent 的 Agent 配置版本历史，并规范化为回滚来源预览。当前是只读接口，不写 `agents`、不写 `agent_config_versions`、不创建回滚审批或 application。
+
+Query：
+
+- `restoreVersion`：可选。指定希望恢复到的旧版本号；必须早于 current version。
+
+当前状态：
+
+- Mock 模式：返回空版本历史，`rollbackSourceReady=false`。
+- SQLite 模式：从 snapshot 中只读 `agent_config_versions`，再交给 `buildAgentConfigVersionHistory(...)` 规范化。
+- 当前 seed 仍没有真实版本记录，所以正常本地 flow 仍返回空版本历史。
+- 缺少 Agent 返回 `404 agent_not_found`，且 sideEffects 全 false。
 
 `services/api/agent-config-version-history.js` 导出 `buildAgentConfigVersionHistory(...)`。这个 helper 只接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON 形式的 `config_snapshot` / `changes`，按目标 Agent 过滤，按版本号倒序排列，选择当前版本，并选择请求指定的恢复版本或默认选择最新的旧版本作为回滚来源。
 
-这个 helper 只暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents` 这几个 `configSnapshot` 字段。它会拒绝 secret/API key/provider/prompt/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值。它不得直接读 SQLite、暴露 HTTP 路由、创建回滚审批/application、写 `agents`、写 `agent_config_versions`、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取 raw secret。
+这个 helper 只暴露 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents` 这几个 `configSnapshot` 字段。它会拒绝 secret/API key/provider/prompt/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值。接口和 helper 都不得创建回滚审批/application、写 `agents`、写 `agent_config_versions`、写 runtime state、创建 Runner job、执行 Runner、调用模型或读取 raw secret。
 
 ## Tasks
 

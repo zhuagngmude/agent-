@@ -241,7 +241,7 @@ scripts/verify-agent-config-rollback-request.ps1
 scripts/verify-agent-config-version-history.ps1
 ```
 
-`buildAgentConfigVersionHistory(...)` 是未来回滚来源选择的只读 source helper。它只接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，选择 current version 和 restore candidates，并保持全 false sideEffects。它不是 SQLite reader，不是 HTTP route，也不创建回滚请求。
+`buildAgentConfigVersionHistory(...)` 是回滚来源选择的只读 source helper。`GET /api/agents/:agentId/config-version-history` 是对应只读 HTTP route：Mock 模式返回空历史，SQLite 模式从 snapshot 只读 `agent_config_versions` 后交给 helper 规范化。它支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，选择 current version 和 restore candidates，并保持全 false sideEffects。它不创建回滚请求，不写 SQLite，不写版本。
 
 回滚必须：
 
@@ -283,6 +283,7 @@ scripts/verify-agent-config-version-history.ps1
 - 事务计划保持 `canWrite=false` / `feature_disabled`，同时证明未来写入集和 rollback-on-failure 保护规则。
 - 回滚请求 helper 已存在，并由 `scripts/verify-agent-config-rollback-request.ps1` 覆盖。
 - 版本历史来源 helper 已存在，并由 `scripts/verify-agent-config-version-history.ps1` 覆盖。
+- 版本历史只读路由已存在，并由 Mock 和 SQLite flow 覆盖。
 - 禁用态回滚请求路由已存在，并由 Mock 和 SQLite 验证覆盖。
 - 回滚请求可以对有效输入报告 `requestReady=true`，同时仍保持 `ok=false`、`canCreateApproval=false` 和 `feature_disabled`。
 - Mock/SQLite 回滚请求路由在真实版本历史存在前保持 `requestReady=false`。

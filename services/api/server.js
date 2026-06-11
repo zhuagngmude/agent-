@@ -24,6 +24,10 @@ const {
   buildAgentConfigRollbackRequest,
   noAgentConfigRollbackRequestSideEffects,
 } = require("./agent-config-rollback-request");
+const {
+  buildAgentConfigVersionHistory,
+  noAgentConfigVersionHistorySideEffects,
+} = require("./agent-config-version-history");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "runtime-state.json");
@@ -1044,6 +1048,38 @@ async function handleAgentConfigRollbackRequest(req, res, applicationId) {
   }));
 }
 
+function handleAgentConfigVersionHistory(res, agentId, restoreVersion) {
+  const snapshot = sqliteReadEnabled() ? projectSnapshotResponse(() => null) : null;
+  const agents = snapshot?.agents || data.agents;
+  const versions = snapshot?.agentConfigVersions || [];
+  const agent = agents.find((item) => item.id === agentId);
+
+  if (!agent) {
+    sendJson(res, 404, {
+      error: "agent_not_found",
+      ok: false,
+      versionHistory: true,
+      readOnly: true,
+      canWrite: false,
+      agentId: "",
+      validationErrors: ["target agent is required."],
+      currentVersion: null,
+      restoreVersion: null,
+      restoreCandidates: [],
+      versions: [],
+      rollbackSourceReady: false,
+      sideEffects: noAgentConfigVersionHistorySideEffects(),
+    });
+    return;
+  }
+
+  sendJson(res, 200, buildAgentConfigVersionHistory({
+    agent,
+    versions,
+    restoreVersion,
+  }));
+}
+
 async function handleAgentConfigApplicationCancel(req, res, applicationId) {
   const body = await readBody(req);
   if (sqliteReadEnabled()) {
@@ -1307,6 +1343,12 @@ async function handleRequest(req, res) {
     return;
   }
 
+  const agentConfigVersionHistory = pathname.match(/^\/api\/agents\/([^/]+)\/config-version-history$/);
+  if (req.method === "GET" && agentConfigVersionHistory) {
+    handleAgentConfigVersionHistory(res, agentConfigVersionHistory[1], url.searchParams.get("restoreVersion"));
+    return;
+  }
+
   const agentConfigApplicationApply = pathname.match(/^\/api\/agent-config-applications\/([^/]+)\/apply$/);
   if (req.method === "POST" && agentConfigApplicationApply) {
     await handleAgentConfigApplicationApply(req, res, agentConfigApplicationApply[1]);
@@ -1430,7 +1472,9 @@ module.exports = {
   buildAgentConfigApplyDryRun,
   buildAgentConfigApplyTransactionPlan,
   buildAgentConfigRollbackRequest,
+  buildAgentConfigVersionHistory,
   noAgentConfigApplyGateSideEffects,
   noAgentConfigDryRunSideEffects,
   noAgentConfigRollbackRequestSideEffects,
+  noAgentConfigVersionHistorySideEffects,
 };

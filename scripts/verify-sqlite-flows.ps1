@@ -129,6 +129,22 @@ function Assert-AgentConfigRollbackRequestNoSideEffects {
   Assert-Equal $RollbackRequest.sideEffects.readsRawSecrets $false "Agent config rollback request should not read raw secrets."
 }
 
+function Assert-AgentConfigVersionHistoryNoSideEffects {
+  param([object]$VersionHistory)
+
+  Assert-Equal $VersionHistory.sideEffects.writesAgents $false "Agent config version history should not write Agents."
+  Assert-Equal $VersionHistory.sideEffects.writesAgentConfigVersions $false "Agent config version history should not write versions."
+  Assert-Equal $VersionHistory.sideEffects.writesAgentConfigApplications $false "Agent config version history should not write applications."
+  Assert-Equal $VersionHistory.sideEffects.writesRuntimeEvents $false "Agent config version history should not write runtime events."
+  Assert-Equal $VersionHistory.sideEffects.writesSqlite $false "Agent config version history should not write SQLite."
+  Assert-Equal $VersionHistory.sideEffects.writesRuntimeState $false "Agent config version history should not write runtime state."
+  Assert-Equal $VersionHistory.sideEffects.createsApprovals $false "Agent config version history should not create approvals."
+  Assert-Equal $VersionHistory.sideEffects.createsRunnerJobs $false "Agent config version history should not create Runner jobs."
+  Assert-Equal $VersionHistory.sideEffects.executesRunner $false "Agent config version history should not execute Runner."
+  Assert-Equal $VersionHistory.sideEffects.callsRealModel $false "Agent config version history should not call models."
+  Assert-Equal $VersionHistory.sideEffects.readsRawSecrets $false "Agent config version history should not read raw secrets."
+}
+
 function Test-ApiReady {
   try {
     $health = Invoke-Json -Method "GET" -Path "/api/health"
@@ -332,6 +348,19 @@ try {
   Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "current version is required." "SQLite Agent config rollback request should require current version."
   Assert-TextContains (@($rollbackRequest.validationErrors) -join "`n") "restore version is required." "SQLite Agent config rollback request should require restore version."
   Assert-AgentConfigRollbackRequestNoSideEffects -RollbackRequest $rollbackRequest
+  $versionHistory = Invoke-Json -Method "GET" -Path "/api/agents/agent_reviewer/config-version-history"
+  Assert-Equal $versionHistory.versionHistory $true "SQLite Agent config version history should identify itself."
+  Assert-Equal $versionHistory.readOnly $true "SQLite Agent config version history should be read-only."
+  Assert-Equal $versionHistory.canWrite $false "SQLite Agent config version history should not allow writes."
+  Assert-Equal $versionHistory.agentId "agent_reviewer" "SQLite Agent config version history should target the requested Agent."
+  Assert-Equal @($versionHistory.versions).Count 0 "SQLite Agent config version history should be empty until real versions exist."
+  Assert-Equal $versionHistory.rollbackSourceReady $false "SQLite Agent config version history should not be rollback-source ready without versions."
+  Assert-AgentConfigVersionHistoryNoSideEffects -VersionHistory $versionHistory
+  $missingVersionHistory = Invoke-JsonExpectStatus -Method "GET" -Path "/api/agents/missing_agent/config-version-history" -ExpectedStatus 404
+  Assert-Equal $missingVersionHistory.error "agent_not_found" "Missing SQLite Agent config version history should return safe not found."
+  Assert-Equal $missingVersionHistory.versionHistory $true "Missing SQLite Agent config version history should identify itself."
+  Assert-Equal $missingVersionHistory.canWrite $false "Missing SQLite Agent config version history should not allow writes."
+  Assert-AgentConfigVersionHistoryNoSideEffects -VersionHistory $missingVersionHistory
   $missingRollbackRequest = Invoke-JsonExpectStatus -Method "POST" -Path "/api/agent-config-applications/missing_application/rollback-request" -ExpectedStatus 404 -Body @{
     secondConfirm = $true
     confirmText = "Verify missing sqlite rollback request stays safe."
