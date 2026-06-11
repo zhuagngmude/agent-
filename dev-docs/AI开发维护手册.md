@@ -53,6 +53,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-mock-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-agent-config-safety-loop.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-model-gateway.ps1
+powershell -ExecutionPolicy Bypass -File scripts\verify-real-model-admission.ps1
 powershell -ExecutionPolicy Bypass -File scripts\verify-local-ui.ps1
 git diff --check
 ```

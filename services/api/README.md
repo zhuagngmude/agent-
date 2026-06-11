@@ -30,6 +30,7 @@ agent-config-rollback-request.js
 agent-config-version-history.js
 model-gateway.js
 model-gateway-adapters.js
+model-gateway-project-plan.js
 project-plan.js
 ```
 
@@ -54,6 +55,8 @@ Feature-gated SQLite real apply is wired only through `POST /api/agent-config-ap
 `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` is currently a visible request flag only. Even when that environment variable is `true`, MVP-0.2 must keep `manualConnectivityTestActive=false` and `realProviderRequestsAllowed=false`.
 
 Provider adapter work currently stops at the disabled adapter registry and stub. Future real adapters must stay behind the Model Gateway service boundary, enforce timeout and response-size limits, return only coarse redacted status fields, and be implemented one provider at a time. Do not add provider SDK imports or real provider network calls in this stage.
+
+`model-gateway-project-plan.js` is the helper-only admission builder for the future `project_plan_generation` model request. It validates the fixed business request shape, rejects client-controlled API keys, base URLs, headers, provider bodies, prompts, stream settings, files, tool calls, and Runner job ids, and always returns `ok=false`, `result=blocked`, `errorCategory=feature_disabled`, `realProviderRequestAttempted=false`, and all false sideEffects. It is not wired to an API route and must not import provider SDKs, make provider network requests, write state, create tasks, create approvals, create Runner jobs, trigger Agents, log prompts/results, or read raw secrets.
 
 `project-plan.js` owns the MVP-0.4 local project planning loop. `POST /api/projects/:projectId/project-plan-requests` builds a deterministic local `project_plan` approval from a user idea and constraints. The draft may persist an approval in Mock runtime state or SQLite, but it must not create tasks or Runner request records before approval. Approving that `project_plan` approval creates five queued tasks for `agent_frontend`, `agent_backend`, `agent_qa`, `agent_docs`, and `agent_reviewer`, plus five read-only Runner request queue records with `runner_request_readonly`. These queue records are not executable Runner jobs: they must not execute commands, write files, make network requests, modify Git, call models, trigger Agents, or read raw secrets. Mock and SQLite approval paths both validate that plan tasks and Runner requests have IDs, no duplicate IDs, and that each Runner request references a planned task and stays read-only.
 
