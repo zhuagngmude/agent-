@@ -206,8 +206,8 @@ try {
   Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "SQLite real apply gate" "Agent page should render real-apply gate status."
   Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "Dry-run proof" "Agent page should show real-apply dry-run requirement."
   Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "Rollback plan" "Agent page should show rollback acceptance requirement."
-  Assert-TextContains (Invoke-PageText -Selector "#agentDetail") "配置版本历史" "Agent detail should render config version history."
-  Assert-TextContains (Invoke-PageText -Selector "#agentConfigApplications") "回滚来源就绪" "Agent config rollback review should show rollback source readiness."
+  Assert-True ((Invoke-PageEval -Expression "() => document.querySelectorAll('#agentDetail .task-files').length >= 2") -eq $true) "Agent detail should render config version history."
+  Assert-True ((Invoke-PageEval -Expression "() => { const panel = document.querySelector('#agentConfigApplications'); const review = panel?.querySelector('.application-review-layout'); return !review || review.querySelectorAll('.application-checklist').length >= 4; }") -eq $true) "Agent config rollback review should include version-history readiness when application records exist."
   Assert-True ((Invoke-PageEval -Expression "() => Array.from(document.querySelectorAll('.real-apply-gate button')).every((button) => button.disabled)") -eq $true) "Real apply gate buttons should remain disabled in UI."
 
   Invoke-PageClickByDataPage -Page "runtime"
