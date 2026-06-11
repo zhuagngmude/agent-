@@ -50,3 +50,7 @@ Turn the existing disabled Model Gateway skeleton into a clearly named stage wit
 - Cloud sync
 - Full RBAC/ABAC
 
+## Next Stage Anchor
+
+- [MVP-0.6 to MVP-1.0 Roadmap](./mvp-0.6-to-1.0-roadmap.md)
+- [MVP-0.6 to MVP-1.0 Plan Book](./mvp-0.6-to-1.0-plan-book.md)
