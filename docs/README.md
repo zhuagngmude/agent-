@@ -14,6 +14,7 @@ Formal technical docs for `agent-swarm`.
 
 - [agent-config-apply-dry-run-spec.md](./agent-config-apply-dry-run-spec.md)
 - [mvp-0.3-project-plan-flow-spec.md](./mvp-0.3-project-plan-flow-spec.md)
+- [mvp-0.4-execution-layer-plan.md](./mvp-0.4-execution-layer-plan.md)
 - [mvp-0.4-execution-layer-draft.md](./mvp-0.4-execution-layer-draft.md)
 - [agent-permission-contract.md](./agent-permission-contract.md)
 
