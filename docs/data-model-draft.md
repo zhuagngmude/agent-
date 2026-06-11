@@ -2,7 +2,7 @@
 
 日期：2026-06-11
 
-这是一份当前态的数据模型草案，只描述 MVP-0.2 / MVP-0.3 已经用到或马上要落地的核心表，不实现数据库。
+这是一份当前态的数据模型草案，只描述 MVP-0.2 到 MVP-0.4 已经用到的核心表，以及阶段 2 真实模型调用准入设计中需要先固定的记录结构。本文不等于数据库迁移已经实现。
 
 ## 设计目标
 
@@ -10,6 +10,7 @@
 - 让审批、任务、Runner 请求、Agent 配置变化和回滚都能追溯。
 - 保持 `project_id` 贯穿核心对象，先单项目实现，后续再扩展多项目。
 - 任何敏感内容都不要进入快照、日志或版本表。
+- 模型调用记录必须先固定脱敏、成本、错误和审计边界，再允许任何真实 provider 请求进入实现。
 
 ## 命名规范
 
@@ -96,6 +97,56 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 - 记录任务、审批、Runner 请求、Agent 配置应用等状态变化。
 - 以后如果要追责或回放，本表是第一入口。
 
+### `model_calls`
+
+阶段：阶段 2 结构草案。当前不建表、不写入、不调用真实 provider。
+
+模型调用记录表。核心字段：`id`, `project_id`, `purpose`, `provider`, `provider_adapter_id`, `model`, `status`, `request_source`, `request_hash`, `response_schema_version`, `token_usage`, `cost_estimate`, `duration_ms`, `error_category`, `redaction_applied`, `structured_summary`, `related_approval_id`, `related_agent_run_id`, `related_task_id`, `runtime_event_id`, `created_by`, `started_at`, `completed_at`, `failed_at`, `created_at`, `updated_at`。
+
+第一条允许进入设计的 `purpose` 只有：
+
+- `project_plan_generation`
+
+后续 `task_breakdown`、`review_summary` 或 Agent Run 相关用途必须另写准入规格和验收脚本，不能复用第一条链路偷偷放开。
+
+状态草案：
+
+- `blocked`
+- `pending`
+- `running`
+- `succeeded`
+- `failed`
+
+关键约束：
+
+- `model_calls` 只记录后端 Model Gateway 固定形态请求，不记录 UI 自由 prompt。
+- `provider` 和 `model` 必须来自后端白名单或后端配置，不能来自前端自由提交。
+- `request_hash` 只能是脱敏后、固定请求摘要的哈希，不能还原 prompt、headers、key 或 provider body。
+- `token_usage` 只能保存 provider 返回且已安全解析后的粗粒度 JSON，例如 `prompt_tokens`、`completion_tokens`、`total_tokens`。
+- `cost_estimate` 只能保存本地估算值和币种，不保存账单凭据。
+- `structured_summary` 只能保存结构化、脱敏、限长后的业务摘要；第一条链路只允许保存 project plan 摘要。
+- `error_category` 必须使用粗粒度分类，例如 `feature_disabled`、`missing_key`、`invalid_request`、`unsupported_provider`、`unsupported_model`、`timeout`、`provider_unavailable`、`network_error`、`response_body_limit`、`redaction_failed`、`unknown`。
+- `runtime_event_id` 可关联模型调用状态变化审计，但 runtime event 也只能保存脱敏前后状态。
+
+禁止保存或返回：
+
+- raw API key、key suffix、masked key fragment。
+- raw request headers、raw response headers。
+- raw provider request body、raw provider response body。
+- raw prompt、完整 prompt template、system prompt。
+- raw provider error、原始堆栈、provider 内部错误体。
+- model reasoning text。
+- 文件内容、本地敏感路径、Runner job 上下文。
+
+副作用边界：
+
+- 创建或更新 `model_calls` 不得直接创建任务。
+- 不得直接创建 Runner job。
+- 不得触发 Agent。
+- 不得写项目文件。
+- 不得修改 Git。
+- 不得执行 Runner。
+
 ### `runner_status`
 
 本地 Runner 连接状态的只读展示。核心字段：`id`, `project_id`, `connected`, `runner_id`, `version`, `workspace_path`, `permissions`, `last_heartbeat_at`, `created_at`, `updated_at`。
@@ -104,18 +155,20 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 - `users` / `teams` / `memberships`
 - `api_keys`
-- `model_calls`
 - `token_usage_events`
 - `billing_records`
 - `cloud_sync_jobs`
 - `runner_execution_logs`
+
+说明：`model_calls` 已进入阶段 2 结构草案，但 SQLite 建表、Mock / SQLite 写入、真实 provider 调用和 token usage 独立事件表仍暂缓。
 
 ## 迁移顺序
 
 1. 先保留 Mock 结构兼容的 SQLite。
 2. 先落 `projects`, `agents`, `agent_relationships`, `tasks`, `approvals`, `workflows`。
 3. 再补 `agent_config_versions`, `agent_config_applications`, `runtime_events`, `runner_jobs`。
-4. 最后再考虑云端数据库映射。
+4. 阶段 2 先只固定 `model_calls` 结构草案；建表和写入必须等 Model Gateway 正式入口、脱敏、成本、错误分类和验证脚本都补齐后再做。
+5. 最后再考虑云端数据库映射。
 
 ## 已定稿的几条规则
 

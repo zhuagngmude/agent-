@@ -71,6 +71,7 @@
 - `connectivity-test` 必须保持 `blocked / feature_disabled / realProviderRequestAttempted=false`。
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` 目前只是一项被报告的请求标志，不会把真实 provider 请求打开。
 - `openai_compat` 只能作为禁用态 relay 元数据出现。
+- `services/api/model-gateway-project-plan.js` 只是 helper-only 的 `project_plan_generation` 准入构造器，不接 route，不写状态，不调用 provider。
 
 ## 常规只读路由
 
@@ -124,6 +125,7 @@ Runner request records are still read-only with respect to real execution, but t
 - `services/api/agent-config-version-history.js`
 - `services/api/model-gateway.js`
 - `services/api/model-gateway-adapters.js`
+- `services/api/model-gateway-project-plan.js`
 - `services/api/project-plan.js`
 
 这些 helper 都必须维持全 false sideEffects，不能偷偷写 SQLite、写 runtime state、创建审批、创建 Runner job、执行 Runner、调用真实模型或读取原始密钥。
@@ -134,6 +136,7 @@ Runner request records are still read-only with respect to real execution, but t
 - `scripts/verify-mock-flows.ps1`
 - `scripts/verify-sqlite-flows.ps1`
 - `scripts/verify-model-gateway.ps1`
+- `scripts/verify-real-model-admission.ps1`
 - `scripts/verify-agent-permissions.ps1`
 - `scripts/verify-agent-config-safety-loop.ps1`
 

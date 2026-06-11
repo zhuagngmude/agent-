@@ -5,11 +5,12 @@ This is the short operating guide for `agent-swarm`.
 ## Current Stage
 
 - Work in `F:\projects\agent-swarm`.
-- Current stage: MVP-0.4 stabilization.
+- Current stage: MVP-0.4 accepted; Stage 2 real-model admission design has started.
 - Web App first, desktop later.
 - Mock / SQLite first, real database later.
 - Read-only safety queues first, real Runner later.
-- MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented.
+- MVP-0.3 project plan approvals and MVP-0.4 execution request lifecycle / runtime event auditing are already implemented and accepted.
+- Stage 2 currently only has a `model_calls` data-model draft and admission boundaries; no table, route, provider SDK, or real provider request is enabled.
 
 ## Read First
 

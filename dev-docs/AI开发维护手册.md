@@ -4,12 +4,13 @@
 
 ## 当前项目状态
 
-- 当前阶段：MVP-0.4 稳定化
+- 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已开始
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计
 - 当前模式：Mock / SQLite / 本地 Web App
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
+- 阶段 2 当前只完成 `model_calls` 结构草案；未建表、未新增 route、未导入 SDK、未发 provider 请求。
 
 ## 先读顺序
 
@@ -30,6 +31,7 @@
 - 改验收流程就更新 `docs/demo-checklist.md` 和 `scripts/README.md`。
 - 改路标或阶段状态就更新 `dev-docs/下一步开发路线.md`。
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
+- 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 
 ## 受保护范围
 

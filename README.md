@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 当前阶段：MVP-0.4 稳定化
+- 当前阶段：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已开始
 - 当前模式：Web App + Mock/SQLite 状态机 + 项目计划审批 + execution request 审查和审计
 - 明确不做：真实 Runner 执行、真实模型调用、云同步、完整权限系统
 
@@ -19,6 +19,8 @@
 用户输入项目想法后，工作流页会生成本地确定性 `project_plan` 审批草案。审批通过后，系统会自动拆成五个 queued 任务，分别分配给 `agent_frontend`、`agent_backend`、`agent_qa`、`agent_docs`、`agent_reviewer`，并生成五条只读 Runner request queue 记录。
 
 在 MVP-0.4 中，execution request 审查视图、生命周期流转和 runtime events 审计闭环已经完成。Mock / SQLite flow 都覆盖该链路。
+
+阶段 2 当前只进入准入设计：`model_calls` 记录结构已有草案，但仍不建表、不接 provider、不调用真实模型。
 
 这些链路仍然不调用真实模型，不执行真实 Runner，不写本地项目文件，不改 Git。
 
