@@ -36,4 +36,4 @@ Formal technical docs for `agent-swarm`.
 
 Verification scripts are documented in [../scripts/README.md](../scripts/README.md).
 
-Current stage: MVP-0.5 Model Gateway disabled boundary with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.
+Current stage: MVP-0.6 Model Gateway contract freeze with Mock / SQLite state, no real Runner, no real model calls, no cloud sync.

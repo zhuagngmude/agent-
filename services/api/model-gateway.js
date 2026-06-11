@@ -2,23 +2,15 @@ const {
   disabledProviderAdapterRegistry,
   disabledProviderConnectivityAdapter,
 } = require("./model-gateway-adapters");
-
-const modelGatewayProviders = [
-  { id: "openai", label: "OpenAI", envVar: "AGENT_SWARM_OPENAI_API_KEY" },
-  {
-    id: "openai_compat",
-    label: "OpenAI-compatible Relay",
-    envVar: "AGENT_SWARM_OPENAI_COMPAT_API_KEY",
-    baseUrlEnvVar: "AGENT_SWARM_OPENAI_COMPAT_BASE_URL",
-    requiresBaseUrl: true,
-  },
-  { id: "anthropic", label: "Anthropic", envVar: "AGENT_SWARM_ANTHROPIC_API_KEY" },
-  { id: "google", label: "Google Gemini", envVar: "AGENT_SWARM_GOOGLE_API_KEY" },
-];
+const {
+  modelGatewayContract,
+  modelGatewayRequestShapes,
+  providerCatalogById,
+} = require("./model-gateway-contract");
 const manualConnectivityTestFlagEnvVar = "AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST";
 
 function providerById(providerId) {
-  return modelGatewayProviders.find((item) => item.id === providerId);
+  return providerCatalogById(providerId);
 }
 
 function providerAdapterPolicy(providerId) {
@@ -47,7 +39,7 @@ function parsePositiveInteger(value, fallback) {
 }
 
 function baseUrlStatus(provider, options = {}) {
-  if (!provider?.requiresBaseUrl) {
+  if (!provider?.baseUrlRequired) {
     return {
       required: false,
       envVar: "",
@@ -134,20 +126,22 @@ function preflightErrorCategory(blockingCategories) {
 }
 
 function modelGatewayStatus() {
+  const contract = modelGatewayContract();
   return {
+    contract,
     enabled: false,
     realModelCallsAllowed: false,
     gatewayMode: "disabled",
     serviceBoundary: "server_only",
     featureFlags: modelGatewayFeatureFlags(),
-    providers: modelGatewayProviders.map((provider) => ({
+    providers: contract.providerCatalog.map((provider) => ({
       id: provider.id,
       label: provider.label,
-      keyEnvVar: provider.envVar,
-      configured: Boolean(process.env[provider.envVar]),
+      keyEnvVar: provider.keyEnvVar,
+      configured: Boolean(process.env[provider.keyEnvVar]),
       baseUrlEnvVar: provider.baseUrlEnvVar || "",
-      baseUrlConfigured: provider.requiresBaseUrl ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
-      baseUrlRequired: provider.requiresBaseUrl === true,
+      baseUrlConfigured: provider.baseUrlRequired ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
+      baseUrlRequired: provider.baseUrlRequired === true,
       providerAdapterId: disabledProviderAdapterRegistry[provider.id]?.providerAdapterId || "",
       providerAdapterMode: disabledProviderAdapterRegistry[provider.id]?.mode || "disabled",
       futureProviderAdapterId: disabledProviderAdapterRegistry[provider.id]?.futureProviderAdapterId || "",
@@ -170,9 +164,7 @@ function modelGatewayStatus() {
       makesNetworkRequests: false,
     },
     blockedReasons: [
-      "Real model calls are disabled in MVP-0.5.",
-      "Approval, logging, cost tracking, and key-safety rules are not ready.",
-      "This endpoint only reports provider configuration boundaries.",
+      ...contract.blockedReasons,
     ],
   };
 }
@@ -201,7 +193,7 @@ function modelGatewayConnectivityPreflight(request, options = {}) {
       ? true
       : options.acceptanceOnlyKeyConfigured === false
         ? false
-        : Boolean(process.env[provider.envVar])
+        : Boolean(process.env[provider.keyEnvVar])
     : false;
   const modelSupported = Boolean(adapterPolicy && model && model === adapterPolicy.connectivityTestModel);
   const timeoutWithinLimit = timeoutMs <= maxTimeoutMs;
@@ -340,17 +332,17 @@ function modelGatewayDryRun(request) {
     requestValid: validationErrors.length === 0,
     validationErrors,
     providerSupported: Boolean(provider),
-    keyEnvVar: provider?.envVar || "",
-    keyConfigured: provider ? Boolean(process.env[provider.envVar]) : false,
+    keyEnvVar: provider?.keyEnvVar || "",
+    keyConfigured: provider ? Boolean(process.env[provider.keyEnvVar]) : false,
     baseUrlEnvVar: provider?.baseUrlEnvVar || "",
-    baseUrlConfigured: provider?.requiresBaseUrl ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
-    baseUrlRequired: provider?.requiresBaseUrl === true,
+    baseUrlConfigured: provider?.baseUrlRequired ? Boolean(process.env[provider.baseUrlEnvVar]) : false,
+    baseUrlRequired: provider?.baseUrlRequired === true,
     featureFlags: modelGatewayFeatureFlags(),
     realModelCallsAllowed: false,
     wouldCallProvider: false,
     blockedReasons: [
       "Dry-run does not call real providers.",
-      "Real model calls are disabled in MVP-0.5.",
+      "Real model calls are disabled in MVP-0.6.",
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
     ],
     sideEffects: {
@@ -388,7 +380,7 @@ function modelGatewayConnectivityTest(request) {
     validationErrors: preflight.validationErrors,
     providerSupported: Boolean(provider),
     modelSupported: preflight.modelSupported,
-    keyEnvVar: provider?.envVar || "",
+    keyEnvVar: provider?.keyEnvVar || "",
     keyConfigured: preflight.keyConfigured,
     baseUrlEnvVar: preflight.baseUrlEnvVar,
     baseUrlConfigured: preflight.baseUrlConfigured,
@@ -407,7 +399,7 @@ function modelGatewayConnectivityTest(request) {
     durationMs: adapterResult.durationMs,
     redactionApplied: adapterResult.redactionApplied,
     blockedReasons: [
-      "Manual connectivity test is specification-only in MVP-0.5.",
+      "Manual connectivity test is specification-only in MVP-0.6.",
       "Provider SDKs are not loaded and provider network requests are disabled.",
       "Approval, logging, cost tracking, and key-safety rules are not ready.",
     ],
@@ -431,4 +423,6 @@ module.exports = {
   modelGatewayConnectivityPreflight,
   modelGatewayDryRun,
   modelGatewayStatus,
+  modelGatewayContract,
+  modelGatewayRequestShapes,
 };

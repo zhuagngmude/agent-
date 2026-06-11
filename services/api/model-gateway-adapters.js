@@ -2,47 +2,26 @@ const disabledAdapterName = "disabled_provider_connectivity_adapter";
 const openAiCompatRelayAdapterName = "openai_compat_relay_connectivity_adapter_interface";
 const chengRelayManualPingModel = "gpt-5.4-mini";
 const chengRelayManualPingEndpointPath = "/v1/chat/completions";
+const {
+  modelGatewayProviderCatalog,
+} = require("./model-gateway-contract");
 
-const disabledProviderAdapterRegistry = {
-  openai: {
-    providerAdapterId: "openai_disabled_connectivity_adapter",
-    provider: "openai",
-    providerLabel: "OpenAI",
-    mode: "disabled",
-    connectivityTestModel: "gpt-4.1-mini",
-    maxTimeoutMs: 5000,
-    maxResponseBodyLimitBytes: 4096,
-  },
-  openai_compat: {
-    providerAdapterId: "openai_compat_disabled_connectivity_adapter",
-    futureProviderAdapterId: "openai_compat_manual_connectivity_adapter",
-    provider: "openai_compat",
-    providerLabel: "OpenAI-compatible Relay",
-    mode: "disabled",
-    futureMode: "interface_disabled",
-    connectivityTestModel: chengRelayManualPingModel,
-    maxTimeoutMs: 5000,
-    maxResponseBodyLimitBytes: 4096,
-  },
-  anthropic: {
-    providerAdapterId: "anthropic_disabled_connectivity_adapter",
-    provider: "anthropic",
-    providerLabel: "Anthropic",
-    mode: "disabled",
-    connectivityTestModel: "claude-3-5-haiku-latest",
-    maxTimeoutMs: 5000,
-    maxResponseBodyLimitBytes: 4096,
-  },
-  google: {
-    providerAdapterId: "google_disabled_connectivity_adapter",
-    provider: "google",
-    providerLabel: "Google Gemini",
-    mode: "disabled",
-    connectivityTestModel: "gemini-1.5-flash",
-    maxTimeoutMs: 5000,
-    maxResponseBodyLimitBytes: 4096,
-  },
-};
+const disabledProviderAdapterRegistry = Object.fromEntries(
+  modelGatewayProviderCatalog.map((provider) => [
+    provider.id,
+    {
+      providerAdapterId: provider.providerAdapterId,
+      provider: provider.id,
+      providerLabel: provider.label,
+      mode: provider.providerAdapterMode,
+      futureProviderAdapterId: provider.futureProviderAdapterId || "",
+      futureMode: provider.futureProviderAdapterMode || "",
+      connectivityTestModel: provider.connectivityTestModel,
+      maxTimeoutMs: provider.maxTimeoutMs,
+      maxResponseBodyLimitBytes: provider.maxResponseBodyLimitBytes,
+    },
+  ])
+);
 
 function disabledProviderConnectivityAdapter(request) {
   const providerAdapter = disabledProviderAdapterRegistry[request.provider] || null;
@@ -62,7 +41,7 @@ function disabledProviderConnectivityAdapter(request) {
     durationMs: 0,
     redactionApplied: true,
     blockedReasons: [
-      "Provider adapter is disabled in MVP-0.5.",
+      "Provider adapter is disabled in MVP-0.6.",
       "Real provider requests are blocked by the Model Gateway feature flag boundary.",
     ],
   };
@@ -264,7 +243,7 @@ function openAiCompatRelayConnectivityAdapter(request) {
     blockedReasons: [
       "OpenAI-compatible relay adapter is interface-only in this checkpoint.",
       "Relay endpoint shape and model name must be confirmed before any real request.",
-      "Real provider requests remain blocked by the MVP-0.5 Model Gateway feature flag boundary.",
+      "Real provider requests remain blocked by the MVP-0.6 Model Gateway feature flag boundary.",
     ],
   };
 }
