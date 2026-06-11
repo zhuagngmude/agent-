@@ -246,3 +246,12 @@ Model Gateway manual connectivity test currently has only a disabled backend stu
 - `docs/deepseek-provider-info-checklist.md` records only non-secret facts from official DeepSeek documentation.
 - DeepSeek may be considered a first real-provider candidate later, but no local demo step may call DeepSeek yet.
 - Demo verification must still pass without real DeepSeek credentials, SDK imports, network calls, stored provider responses, prompt/result logs, token usage, cost, or raw provider errors.
+
+## Agent Config Real Apply
+
+- `scripts/verify-agent-config-real-apply-sqlite.ps1` covers the feature-gated SQLite real apply path.
+- With `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY` absent, apply remains status-only and must not write `agents` or `agent_config_versions`.
+- With `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`, real apply still requires SQLite mode, dry-run proof, second confirmation, `requestedBy`, Git checkpoint acknowledgement, and rollback acceptance.
+- A successful real apply must update `agents`, insert `agent_config_versions`, mark the application applied, and write a runtime event in one SQLite transaction.
+- Real apply must not create Runner jobs, execute Runner, call models, create approvals, modify files/Git, or read raw secrets.
+- The verification script uses isolated port `8790`; automated checks must not occupy the human local trial port `8787`.

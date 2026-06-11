@@ -32,6 +32,137 @@ def bool_from_int(value):
     return bool(value)
 
 
+ALLOWED_AGENT_CONFIG_FIELDS = {
+    "permissions",
+    "model",
+    "status",
+    "maxSubAgents",
+    "canSpawnSubAgents",
+}
+
+AGENT_CONFIG_FIELD_COLUMNS = {
+    "permissions": "permissions",
+    "model": "model",
+    "status": "status",
+    "maxSubAgents": "max_sub_agents",
+    "canSpawnSubAgents": "can_spawn_sub_agents",
+}
+
+FORBIDDEN_AGENT_CONFIG_FIELD_TOKENS = [
+    "apikey",
+    "authorization",
+    "command",
+    "env",
+    "file",
+    "git",
+    "header",
+    "network",
+    "parent",
+    "prompt",
+    "providerresponse",
+    "rawsecret",
+    "reportsto",
+    "runner",
+    "secret",
+    "token",
+    "tool",
+    "workspace",
+]
+
+FORBIDDEN_AGENT_CONFIG_VALUE_TOKENS = [
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer ",
+    "raw_secret",
+    "rawsecret",
+    "secret",
+    "provider_response",
+    "providerresponse",
+    "prompt",
+    "/users/",
+]
+
+AGENT_PERMISSION_PROFILES = {
+    "architect_admin": [
+        "canViewProject",
+        "canReadKnowledge",
+        "canPlanArchitecture",
+        "canDraftTasks",
+        "canDraftWorkflow",
+        "canReviewArchitecture",
+        "canProposeModelUse",
+        "canCreateTasks",
+        "canAssignTasks",
+        "canAssignAgents",
+        "canSpawnSubAgents",
+        "canSetTaskPriority",
+        "canRequestAgentConfigChange",
+        "canRequestExecution",
+        "canRequestModelConnectivity",
+        "canRequestModelCall",
+        "canReferenceSecretPresence",
+        "canRequestSecretUse",
+    ],
+    "executor_agent": [
+        "canViewProject",
+        "canReadKnowledge",
+        "canDraftTasks",
+        "canRequestExecution",
+        "canRequestFileWrite",
+        "canRequestCommand",
+        "canRequestGitOperation",
+    ],
+    "reviewer_agent": [
+        "canViewProject",
+        "canReadKnowledge",
+        "canReviewArchitecture",
+        "canReviewApproval",
+        "canRecommendApproval",
+    ],
+    "all_agents_full_management": [
+        "canViewProject",
+        "canReadKnowledge",
+        "canPlanArchitecture",
+        "canDraftTasks",
+        "canDraftWorkflow",
+        "canReviewArchitecture",
+        "canProposeModelUse",
+        "canCreateTasks",
+        "canAssignTasks",
+        "canAssignAgents",
+        "canSpawnSubAgents",
+        "canSetTaskPriority",
+        "canRequestAgentConfigChange",
+        "canRequestExecution",
+        "canRequestFileWrite",
+        "canRequestCommand",
+        "canRequestNetwork",
+        "canRequestGitOperation",
+        "canRequestModelConnectivity",
+        "canRequestModelCall",
+        "canReviewApproval",
+        "canRecommendApproval",
+        "canReferenceSecretPresence",
+        "canRequestSecretUse",
+    ],
+}
+
+KNOWN_AGENT_CAPABILITIES = sorted(set(sum(AGENT_PERMISSION_PROFILES.values(), [])))
+
+FORBIDDEN_AGENT_CAPABILITIES = [
+    "canApproveHighRisk",
+    "canApproveOwnRequest",
+    "canExecuteRunnerJob",
+    "canWriteFiles",
+    "canDeleteFiles",
+    "canExecuteCommands",
+    "canModifyGit",
+    "canMakeNetworkRequests",
+    "canAccessRawSecrets",
+]
+
+
 def runtime_event(connection, entity_type, entity_id, event_type, before_state, after_state, actor="api", reason=""):
     created_at = now()
     event_id = f"runtime_event_{entity_type}_{entity_id}_{event_type}_{created_at.replace(':', '').replace('-', '')}_{uuid.uuid4().hex[:8]}"
@@ -128,6 +259,177 @@ def application_row_to_api(row):
         "createdAt": pick(row, "created_at"),
         "updatedAt": pick(row, "updated_at"),
     }
+
+
+def agent_row_to_config_snapshot(row):
+    return {
+        "permissions": from_json(row["permissions"], []),
+        "model": pick(row, "model"),
+        "status": row["status"],
+        "maxSubAgents": row["max_sub_agents"],
+        "canSpawnSubAgents": bool_from_int(row["can_spawn_sub_agents"]),
+    }
+
+
+def field_token(field):
+    return "".join(ch for ch in str(field).lower() if ch.isalnum())
+
+
+def split_permission_text(value):
+    if isinstance(value, list):
+        result = []
+        for item in value:
+            result.extend(split_permission_text(item))
+        return result
+    if not isinstance(value, str):
+        return []
+    parts = []
+    for item in value.replace(",", "/").replace("\n", "/").split("/"):
+        text = item.strip()
+        if text:
+            parts.append(text)
+    return parts
+
+
+def unique(values):
+    result = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
+
+
+def normalize_permissions(value):
+    if isinstance(value, dict) and value.get("all") is True:
+        return None, ["all=true is not a valid Agent permission contract."]
+    if isinstance(value, str) and value.strip() in AGENT_PERMISSION_PROFILES:
+        return list(AGENT_PERMISSION_PROFILES[value.strip()]), []
+
+    capabilities = unique(split_permission_text(value))
+    validation_errors = []
+    if len(capabilities) == 0:
+        validation_errors.append("permissions change must include a profile or explicit capabilities.")
+    for capability in capabilities:
+        if capability not in KNOWN_AGENT_CAPABILITIES:
+            validation_errors.append(f"unknown capability: {capability}")
+        if capability in FORBIDDEN_AGENT_CAPABILITIES:
+            validation_errors.append(f"forbidden Agent capability: {capability}")
+    return capabilities, validation_errors
+
+
+def validate_non_permission_value_safety(change):
+    text = json.dumps({"before": change.get("before"), "after": change.get("after")}, ensure_ascii=False).lower()
+    validation_errors = []
+    for token in FORBIDDEN_AGENT_CONFIG_VALUE_TOKENS:
+        if token in text:
+            validation_errors.append("change plan contains forbidden Agent config content.")
+            break
+    if ":\\users\\" in text:
+        validation_errors.append("change plan must not contain local private paths.")
+    return validation_errors
+
+
+def validate_agent_config_changes(changes):
+    validation_errors = []
+    normalized = []
+    if not isinstance(changes, list) or len(changes) == 0:
+        return [], ["changes must be a non-empty array."]
+
+    for index, change in enumerate(changes):
+        if not isinstance(change, dict):
+            validation_errors.append(f"change {index} must be an object.")
+            continue
+        field = change.get("field", "")
+        if not isinstance(field, str) or not field.strip():
+            validation_errors.append(f"change {index} field is required.")
+            continue
+        field = field.strip()
+        token = field_token(field)
+        if any(item in token for item in FORBIDDEN_AGENT_CONFIG_FIELD_TOKENS):
+            validation_errors.append(f"forbidden Agent config field: {field}")
+            continue
+        if field not in ALLOWED_AGENT_CONFIG_FIELDS:
+            validation_errors.append(f"unsupported Agent config field: {field}")
+            continue
+
+        value = change.get("after")
+        if field == "permissions":
+            value, permission_errors = normalize_permissions(value)
+            validation_errors.extend(permission_errors)
+        else:
+            validation_errors.extend(validate_non_permission_value_safety(change))
+        if field == "model" and not isinstance(value, str):
+            validation_errors.append("model change must use a string value.")
+        if field == "status" and value not in ["running", "idle", "waiting", "failed", "disabled"]:
+            validation_errors.append("status change must use a supported Agent status.")
+        if field == "maxSubAgents":
+            try:
+                value = int(value)
+            except Exception:
+                validation_errors.append("maxSubAgents change must be an integer between 0 and 20.")
+            if isinstance(value, int) and (value < 0 or value > 20):
+                validation_errors.append("maxSubAgents change must be an integer between 0 and 20.")
+        if field == "canSpawnSubAgents" and not isinstance(value, bool):
+            validation_errors.append("canSpawnSubAgents change must use a boolean value.")
+
+        normalized.append({"field": field, "value": value})
+
+    return normalized, validation_errors
+
+
+def all_agent_config_side_effects_false(side_effects):
+    expected = [
+        "writesAgents",
+        "writesAgentConfigVersions",
+        "writesRuntimeEvents",
+        "writesSqlite",
+        "writesRuntimeState",
+        "createsApprovals",
+        "createsRunnerJobs",
+        "executesRunner",
+        "callsRealModel",
+        "readsRawSecrets",
+    ]
+    return isinstance(side_effects, dict) and all(side_effects.get(key) is False for key in expected)
+
+
+def validate_real_apply_body(body, application_id, approval_id, agent_id):
+    validation_errors = []
+    dry_run = body.get("dryRun")
+    git_checkpoint = body.get("gitCheckpoint")
+
+    if body.get("secondConfirm") is not True:
+        validation_errors.append("secondConfirm=true is required.")
+    if not body.get("confirmText"):
+        validation_errors.append("confirmText is required.")
+    if not (body.get("requestedBy") or body.get("appliedBy")):
+        validation_errors.append("requestedBy is required.")
+    if not isinstance(git_checkpoint, dict) or git_checkpoint.get("created") is not True or not git_checkpoint.get("commit"):
+        validation_errors.append("gitCheckpoint.created=true and gitCheckpoint.commit are required.")
+    if body.get("rollbackPlanAccepted") is not True:
+        validation_errors.append("rollbackPlanAccepted=true is required.")
+    if not isinstance(dry_run, dict):
+        validation_errors.append("dryRun result is required before real apply.")
+        return validation_errors
+
+    if dry_run.get("applicationId") != application_id:
+        validation_errors.append("dryRun applicationId must match application.")
+    if dry_run.get("approvalId") != approval_id:
+        validation_errors.append("dryRun approvalId must match source approval.")
+    if dry_run.get("agentId") != agent_id:
+        validation_errors.append("dryRun agentId must match target Agent.")
+    if dry_run.get("dryRun") is not True or dry_run.get("ok") is not False or dry_run.get("canApply") is not False:
+        validation_errors.append("dryRun must be the current feature-disabled preview.")
+    if "feature_disabled" not in (dry_run.get("blockedReasons") or []):
+        validation_errors.append("dryRun must include feature_disabled.")
+    if len(dry_run.get("validationErrors") or []) != 0:
+        validation_errors.append("dryRun must have no validation errors.")
+    if not isinstance(dry_run.get("changePlanValidation"), dict) or dry_run["changePlanValidation"].get("ok") is not True:
+        validation_errors.append("dryRun change plan must pass Agent config field validation.")
+    if not all_agent_config_side_effects_false(dry_run.get("sideEffects")):
+        validation_errors.append("dryRun side effects must all be false.")
+
+    return validation_errors
 
 
 def fetch_one(connection, sql, params):
@@ -490,6 +792,164 @@ def agent_config_application_action(connection):
     return {"statusCode": 200, "body": {"application": updated, "message": message}}
 
 
+def agent_config_application_real_apply(connection):
+    application_id = args["applicationId"]
+    body = args.get("body", {})
+    row = fetch_one(connection, "SELECT * FROM agent_config_applications WHERE id = ? AND project_id = ?", (application_id, project_id))
+    if row is None:
+        return {"statusCode": 404, "body": {"error": "agent_config_application_not_found"}}
+
+    before_application = application_row_to_api(row)
+    approval = fetch_one(connection, "SELECT * FROM approvals WHERE id = ? AND project_id = ?", (row["approval_id"], project_id))
+    if approval is None:
+        return {"statusCode": 409, "body": {"error": "source_approval_not_found", "message": "Agent config application must reference an existing approval."}}
+
+    approval_api = approval_row_to_api(approval)
+    agent = fetch_one(connection, "SELECT * FROM agents WHERE id = ? AND project_id = ?", (row["agent_id"], project_id))
+    if agent is None:
+        return {"statusCode": 409, "body": {"error": "target_agent_not_found", "message": "Agent config application target Agent must exist."}}
+
+    if before_application["status"] != "pending_apply":
+        return {"statusCode": 409, "body": {"error": "application_not_pending_apply", "message": f"Agent config application cannot real-apply from status {before_application['status']}."}}
+    if approval_api["status"] != "approved" or approval_api["targetService"] != "agent_config" or approval_api["runnerJobId"]:
+        return {"statusCode": 409, "body": {"error": "application_preconditions_failed", "message": "Agent config real apply requires approved agent_config approval without Runner job."}}
+
+    validation_errors = validate_real_apply_body(body, application_id, row["approval_id"], row["agent_id"])
+    normalized_changes, change_errors = validate_agent_config_changes(before_application["changes"])
+    validation_errors.extend(change_errors)
+    if validation_errors:
+        return {"statusCode": 409, "body": {"error": "agent_config_real_apply_preconditions_failed", "validationErrors": validation_errors}}
+
+    timestamp = now()
+    applied_by = body.get("requestedBy") or body.get("appliedBy") or "local_user"
+    before_agent_snapshot = agent_row_to_config_snapshot(agent)
+    after_agent_snapshot = dict(before_agent_snapshot)
+    updates = {}
+
+    for change in normalized_changes:
+        field = change["field"]
+        value = change["value"]
+        after_agent_snapshot[field] = value
+        if field == "permissions":
+            updates[AGENT_CONFIG_FIELD_COLUMNS[field]] = as_json(value)
+        elif field == "canSpawnSubAgents":
+            updates[AGENT_CONFIG_FIELD_COLUMNS[field]] = 1 if value else 0
+        else:
+            updates[AGENT_CONFIG_FIELD_COLUMNS[field]] = value
+
+    if not updates:
+        return {"statusCode": 409, "body": {"error": "agent_config_real_apply_empty_write_set", "message": "Agent config real apply requires at least one allowed field update."}}
+
+    updates["updated_at"] = timestamp
+    assignments = ", ".join(f"{column} = ?" for column in updates)
+    connection.execute(
+        f"UPDATE agents SET {assignments} WHERE id = ? AND project_id = ?",
+        [*updates.values(), row["agent_id"], project_id],
+    )
+    if connection.total_changes <= 0:
+        return {"statusCode": 409, "body": {"error": "target_agent_not_updated", "message": "Target Agent update did not apply."}}
+
+    next_version_row = fetch_one(
+        connection,
+        "SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM agent_config_versions WHERE agent_id = ? AND project_id = ?",
+        (row["agent_id"], project_id),
+    )
+    next_version = int(next_version_row["next_version"])
+    version_id = f"agent_config_version_{application_id}_{next_version}"
+    existing_version = fetch_one(
+        connection,
+        "SELECT id FROM agent_config_versions WHERE agent_id = ? AND version = ?",
+        (row["agent_id"], next_version),
+    )
+    if existing_version is not None:
+        return {"statusCode": 409, "body": {"error": "agent_config_version_conflict", "message": "Agent config version already exists."}}
+
+    connection.execute(
+        """
+        INSERT INTO agent_config_versions (
+          id, project_id, agent_id, version, approval_id, application_id,
+          config_snapshot, changes, applied_by, applied_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            version_id,
+            project_id,
+            row["agent_id"],
+            next_version,
+            row["approval_id"],
+            application_id,
+            as_json(after_agent_snapshot),
+            as_json(before_application["changes"]),
+            applied_by,
+            timestamp,
+            timestamp,
+        ),
+    )
+
+    connection.execute(
+        """
+        UPDATE agent_config_applications
+        SET status = ?, applied_at = ?, applied_by = ?, apply_confirm_text = ?, updated_at = ?
+        WHERE id = ? AND project_id = ? AND status = ?
+        """,
+        ("applied", timestamp, applied_by, body["confirmText"], timestamp, application_id, project_id, "pending_apply"),
+    )
+
+    updated = application_row_to_api(fetch_one(connection, "SELECT * FROM agent_config_applications WHERE id = ? AND project_id = ?", (application_id, project_id)))
+    runtime_event(
+        connection,
+        "agent_config_application",
+        application_id,
+        "real_applied",
+        {
+            "application": before_application,
+            "agentConfig": before_agent_snapshot,
+        },
+        {
+            "application": updated,
+            "agentConfig": after_agent_snapshot,
+            "version": next_version,
+            "versionId": version_id,
+        },
+        actor=applied_by,
+        reason="agent_config_real_apply",
+    )
+
+    return {
+        "statusCode": 200,
+        "body": {
+            "application": updated,
+            "version": {
+                "id": version_id,
+                "projectId": project_id,
+                "agentId": row["agent_id"],
+                "version": next_version,
+                "approvalId": row["approval_id"],
+                "applicationId": application_id,
+                "configSnapshot": after_agent_snapshot,
+                "changes": before_application["changes"],
+                "appliedBy": applied_by,
+                "appliedAt": timestamp,
+                "createdAt": timestamp,
+            },
+            "sideEffects": {
+                "writesAgents": True,
+                "writesAgentConfigVersions": True,
+                "writesAgentConfigApplications": True,
+                "writesRuntimeEvents": True,
+                "writesSqlite": True,
+                "writesRuntimeState": False,
+                "createsApprovals": False,
+                "createsRunnerJobs": False,
+                "executesRunner": False,
+                "callsRealModel": False,
+                "readsRawSecrets": False,
+            },
+            "message": "Agent config real apply completed in one SQLite transaction.",
+        },
+    }
+
+
 with sqlite3.connect(db_file) as connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
@@ -502,6 +962,8 @@ with sqlite3.connect(db_file) as connection:
             result = create_agent_change_request(connection)
         elif command == "agentConfigApplicationAction":
             result = agent_config_application_action(connection)
+        elif command == "agentConfigApplicationRealApply":
+            result = agent_config_application_real_apply(connection)
         else:
             result = {"statusCode": 404, "body": {"error": "unknown_sqlite_write_command"}}
 

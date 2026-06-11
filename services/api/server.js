@@ -34,6 +34,7 @@ const runtimeStateFile = path.resolve(__dirname, "..", "..", "data", "mock", "ru
 const dashboardSource = process.env.AGENT_SWARM_DASHBOARD_SOURCE || "mock";
 const projectRoot = path.resolve(__dirname, "..", "..");
 const sqliteDbFile = process.env.AGENT_SWARM_SQLITE_DB || defaultDbFile;
+const agentConfigRealApplyEnabled = process.env.AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY === "true";
 
 function localTrialInfo() {
   return {
@@ -905,6 +906,49 @@ async function handleAgentChangeRequest(req, res, agentId) {
 async function handleAgentConfigApplicationApply(req, res, applicationId) {
   const body = await readBody(req);
   if (sqliteReadEnabled()) {
+    if (agentConfigRealApplyEnabled) {
+      const snapshot = projectSnapshotResponse(() => null);
+      const applications = snapshot?.agentConfigApplications || [];
+      const approvals = snapshot?.approvals || [];
+      const agents = snapshot?.agents || [];
+      const application = applications.find((item) => item.id === applicationId);
+      const approval = application
+        ? approvals.find((item) => item.id === application.approvalId)
+        : null;
+      const agent = application
+        ? agents.find((item) => item.id === application.agentId)
+        : null;
+
+      if (!application) {
+        sendJson(res, 404, { error: "agent_config_application_not_found" });
+        return;
+      }
+
+      const gate = buildAgentConfigRealApplyGate({
+        application,
+        approval,
+        agent,
+        dryRun: body.dryRun,
+        body,
+      });
+
+      if (!gate.preconditionsReady) {
+        sendJson(res, 409, {
+          error: "agent_config_real_apply_preconditions_failed",
+          message: "Agent config real apply requires dry-run proof, second confirmation, requestedBy, Git checkpoint acknowledgement, rollback acceptance, and a valid change plan.",
+          gate,
+        });
+        return;
+      }
+
+      sendSqliteWriteResult(res, runSqliteWrite("agentConfigApplicationRealApply", {
+        projectId: data.projectId,
+        applicationId,
+        body,
+      }));
+      return;
+    }
+
     sendSqliteWriteResult(res, runSqliteWrite("agentConfigApplicationAction", {
       projectId: data.projectId,
       applicationId,

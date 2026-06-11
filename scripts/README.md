@@ -29,6 +29,7 @@ verify-agent-config-apply-gate.ps1
 verify-agent-config-transaction-plan.ps1
 verify-agent-config-rollback-request.ps1
 verify-agent-config-version-history.ps1
+verify-agent-config-real-apply-sqlite.ps1
 verify-local-ui.ps1
 init-sqlite.ps1
 seed-sqlite.ps1
@@ -70,6 +71,8 @@ sqlite/
 `verify-agent-config-rollback-request.ps1` 验证直接 helper 级别的 Agent 配置回滚请求契约。它证明有效输入可以起草未来的审批/application/版本，但当前仍必须保持 `ok=false`、`canCreateApproval=false`、`blockedReasons=["feature_disabled"]` 和全 false sideEffects。Mock 和 SQLite flow 脚本会覆盖禁用态 HTTP 路由；在真实版本历史接入前，该路由保持 `requestReady=false`。
 
 `verify-agent-config-version-history.ps1` 验证只读的 Agent 配置版本历史来源 helper。它只规范化已经加载好的版本行，检查按目标 Agent 过滤、按版本排序、当前版本/恢复来源选择、snapshot 字段白名单和禁止字段/值。Mock/SQLite flow 脚本还会覆盖 `GET /api/agents/:agentId/config-version-history` 只读路由。它不会写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型或读取密钥。
+
+`verify-agent-config-real-apply-sqlite.ps1` 验证受 feature flag 控制的 SQLite Agent 配置真实 apply。默认关闭时，`POST /api/agent-config-applications/:applicationId/apply` 仍只做状态流转，不修改 `agents`，不写 `agent_config_versions`。当 API 进程显式设置 `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`，并且请求体携带 dry-run proof、二次确认、`requestedBy`、Git checkpoint acknowledgement 和 rollback acceptance 时，脚本验证一次 SQLite 事务会同时更新 `agents`、插入 `agent_config_versions`、标记 application applied、写 runtime event，并继续禁止创建 Runner job、执行 Runner、调用模型或读取 raw secret。脚本使用隔离端口 `8790`，不得占用人类本地试用端口 `8787`。
 
 `init-sqlite.ps1` 会创建本地 SQLite 数据库并应用 `data/migrations/001_initial_sqlite.sql`。
 
@@ -182,4 +185,13 @@ This script is acceptance verification, not a real connectivity test. It must no
 - `GET /api/agents/:agentId/config-version-history` 是只读路由；Mock 模式返回空历史，SQLite 模式只读 snapshot 中的 `agent_config_versions`。
 - helper 接收已经加载好的版本行，支持 camelCase 和 SQLite 风格 snake_case 字段，解析 JSON snapshot/change，按目标 Agent 过滤，按版本倒序排序，并默认选择最新旧版本作为 restore source。
 - snapshot 输出只允许 `permissions`、`model`、`status`、`maxSubAgents`、`canSpawnSubAgents`；secret/prompt/provider/local-path/Runner/tool/command/file/Git/network/workspace 等禁止字段和值必须被拒绝。
+
+## verify-agent-config-real-apply-sqlite.ps1
+
+`verify-agent-config-real-apply-sqlite.ps1` 是 feature-gated SQLite 真实 apply 的专用验收。
+
+- 开关关闭时，即使请求体包含 dry-run proof 和真实 apply 字段，也必须保持状态流转模式：Agent 配置不变，版本历史为空。
+- 开关打开时，真实 apply 只允许 SQLite 模式，并要求 dry-run proof、`secondConfirm=true`、确认文本、`requestedBy`、Git checkpoint acknowledgement 和 `rollbackPlanAccepted=true`。
+- 成功写入必须在一个 SQLite transaction 内完成：更新 `agents` 当前态、插入 `agent_config_versions`、标记 application applied、插入 `runtime_events`。
+- 该脚本继续断言不创建审批、不创建 Runner job、不执行 Runner、不调用真实模型、不读取 raw secret。
 - 这个 helper 检查不会启动本地服务、直接读 SQLite、暴露 HTTP 路由、写 Agent 配置、写版本、写 SQLite/runtime state、创建审批或 Runner job、执行 Runner、调用模型、读取 raw secret 或修改 Agent 配置。

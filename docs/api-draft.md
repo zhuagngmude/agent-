@@ -1503,3 +1503,14 @@ Model Gateway verification script checkpoint:
 - `GET /api/projects/:projectId/runner/status` 返回本地 Runner 连接状态、版本、工作区、权限边界和最后心跳。
 - `GET /api/projects/:projectId/dashboard` 同时返回 `runnerStatus`，供前端运行与调度页一次聚合渲染。
 - 当前只读展示 Runner 状态和权限，不执行本地命令、不写文件、不发起网络请求、不修改 Git。
+## Agent Config SQLite Real Apply Feature Flag
+
+`POST /api/agent-config-applications/:applicationId/apply` remains status-only by default. In SQLite mode, real Agent config writes are enabled only when the API process has `AGENT_SWARM_ENABLE_AGENT_CONFIG_REAL_APPLY=true`.
+
+The real apply request must include `secondConfirm=true`, confirm text, `requestedBy`, `gitCheckpoint.created=true`, a Git checkpoint commit string, `rollbackPlanAccepted=true`, and a `dryRun` proof object for the same application, approval, and Agent.
+
+The `dryRun` object must be the disabled dry-run proof with no validation errors, valid change-plan validation, `blockedReasons` containing `feature_disabled`, and all dry-run side effects false.
+
+When all checks pass, the SQLite write command performs one transaction that updates `agents`, inserts `agent_config_versions`, marks the application `applied`, and inserts one `runtime_events` row. It still must not create approvals, create Runner jobs, execute Runner, call real models, modify files/Git, or read raw secrets.
+
+Acceptance is covered by `scripts/verify-agent-config-real-apply-sqlite.ps1`. The script proves both default-off status-only behavior and explicit-flag transactional writes on isolated port `8790`.
