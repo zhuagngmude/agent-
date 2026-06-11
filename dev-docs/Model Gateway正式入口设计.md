@@ -45,6 +45,7 @@
 - 已有 provider config resolver helper，当前只返回 disabled / metadata，不返回 raw key、key suffix、masked fragment、base URL 原文或 endpoint URL。
 - 已有 redaction / response limiter helper 和安全 `model_calls` 记录草稿，当前不写表、不写 Mock / SQLite。
 - 已接入 `POST /api/projects/:projectId/project-plan-model-requests` 禁用态 route 草案。
+- 下一小步是 `model_calls` Mock / SQLite 写入草案：先定义固定请求信封、状态流转、runtime event 关联和事务边界，再进入实际迁移。
 - Model Gateway 仍是 disabled。
 - `AGENT_SWARM_ENABLE_REAL_MODEL_PROJECT_PLAN` 当前只能被报告，不能激活真实调用。
 - 本文只补正式入口设计和 provider 配置 / Key 存储方案；当前实现仍不发 provider 请求，不写 `model_calls`。
@@ -260,6 +261,17 @@ AGENT_SWARM_OPENAI_COMPAT_BASE_URL
 - request / response headers。
 - model reasoning text。
 - key 或 key fragment。
+
+## Mock / SQLite 写入草案
+
+- Mock 和 SQLite 必须共享同一份 `model_calls` 字段语义，只是落盘后端不同。
+- `blocked` 用于 feature flag / validation 拦截，不代表 provider 请求已发出。
+- `pending` 表示后端已接收固定请求信封，准备进入 provider adapter。
+- `running` 表示 provider 请求已经开始，后续只能通过同一条记录更新为终态。
+- `succeeded` / `failed` 必须保留脱敏后的 `structured_summary`、`token_usage`、`cost_estimate` 和粗粒度 `error_category`。
+- 任何写入都必须先经过 request hash 归一化，不得把 raw prompt、headers、key 或 provider body 作为持久化输入。
+- runtime event 若存在，必须和 `model_calls` 的状态变化一一对应，且只记录脱敏前后状态。
+- SQLite 写入与审计事件建议在同一事务内完成；Mock 写入则必须保持字段和状态语义一致。
 
 ## 返回契约草案
 

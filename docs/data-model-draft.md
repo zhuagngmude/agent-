@@ -165,12 +165,23 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 - `model_calls` 已进入阶段 2 结构草案，但 SQLite 建表、Mock / SQLite 写入、真实 provider 调用和 token usage 独立事件表仍暂缓。
 - `api_keys` 仍暂缓；阶段 2 第一版只允许 server env 读取 API key，不在 SQLite、Mock runtime state、前端 storage 或日志中保存 key。
 
+## `model_calls` 写入草案
+
+- Mock 和 SQLite 需要共享同一份 `model_calls` 字段语义，只是存储后端不同。
+- `blocked` 可作为 feature flag / 校验直接拦截时的审计状态；`pending`、`running`、`succeeded`、`failed` 用于真实调用路径。
+- 写入入口只能接受后端固定的请求信封，不接受前端自由 prompt、headers、key 或 provider body。
+- `request_hash` 必须基于脱敏后的固定请求信封生成，不能反推出原始输入。
+- `structured_summary` 只保存结构化、脱敏、限长后的摘要；第一条链路只允许 project plan 摘要。
+- 每次状态变化都应当可选地写入 `runtime_events`，并通过 `runtime_event_id` 关联。
+- 如果走 SQLite，创建和更新 `model_calls` 必须和对应审计事件保持同一事务语义。
+- 如果走 Mock，runtime state 里的 `model_calls` 也必须保留同样字段约束，不得补存 raw prompt 或 raw provider payload。
+
 ## 迁移顺序
 
 1. 先保留 Mock 结构兼容的 SQLite。
 2. 先落 `projects`, `agents`, `agent_relationships`, `tasks`, `approvals`, `workflows`。
 3. 再补 `agent_config_versions`, `agent_config_applications`, `runtime_events`, `runner_jobs`。
-4. 阶段 2 先只固定 `model_calls` 结构草案；建表和写入必须等 Model Gateway 正式入口、脱敏、成本、错误分类和验证脚本都补齐后再做。
+4. 阶段 2 先只固定 `model_calls` 结构草案和 Mock / SQLite 写入草案；建表和真正写入必须等 Model Gateway 正式入口、脱敏、成本、错误分类和验证脚本都补齐后再做。
 5. 最后再考虑云端数据库映射。
 
 ## 已定稿的几条规则
