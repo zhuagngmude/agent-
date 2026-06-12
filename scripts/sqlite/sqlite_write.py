@@ -25,7 +25,17 @@ def from_json(value, fallback):
 
 
 def pick(row, key, fallback=""):
-    return row[key] if row[key] is not None else fallback
+    try:
+        return row[key] if row[key] is not None else fallback
+    except (KeyError, IndexError):
+        return fallback
+
+
+def json_pick(row, key, fallback):
+    try:
+        return from_json(row[key], fallback)
+    except (KeyError, IndexError):
+        return fallback
 
 
 def bool_from_int(value):
@@ -439,6 +449,417 @@ def validate_real_apply_body(body, application_id, approval_id, agent_id):
 def fetch_one(connection, sql, params):
     row = connection.execute(sql, params).fetchone()
     return row
+
+
+def ensure_agent_run_schema(connection):
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS agent_runs (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          chain_id TEXT NOT NULL,
+          root_run_id TEXT NOT NULL,
+          parent_run_id TEXT,
+          sequence INTEGER NOT NULL,
+          role TEXT NOT NULL,
+          agent_id TEXT,
+          agent_name TEXT NOT NULL,
+          model TEXT NOT NULL,
+          status TEXT NOT NULL,
+          input_summary TEXT,
+          output_summary TEXT,
+          token_usage TEXT NOT NULL,
+          cost_estimate TEXT NOT NULL,
+          error_category TEXT,
+          error_message TEXT,
+          requested_by TEXT NOT NULL,
+          chain_label TEXT,
+          created_at TEXT NOT NULL,
+          started_at TEXT,
+          completed_at TEXT,
+          failed_at TEXT,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_project_id ON agent_runs(project_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_chain_id ON agent_runs(chain_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
+        CREATE INDEX IF NOT EXISTS idx_agent_runs_created_at ON agent_runs(created_at);
+        """
+    )
+
+
+def ensure_column(connection, table, column, definition):
+    columns = {
+        row[1]
+        for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def ensure_runner_status_schema(connection):
+    ensure_column(connection, "runner_status", "workspace_alias", "TEXT")
+    ensure_column(connection, "runner_status", "capabilities", "TEXT NOT NULL DEFAULT '{}'")
+    ensure_column(connection, "runner_status", "git_status", "TEXT NOT NULL DEFAULT '{}'")
+    ensure_column(connection, "runner_status", "validation_commands", "TEXT NOT NULL DEFAULT '[]'")
+
+
+def agent_run_row_to_api(row):
+    return {
+        "id": row["id"],
+        "projectId": row["project_id"],
+        "chainId": row["chain_id"],
+        "rootRunId": row["root_run_id"],
+        "parentRunId": pick(row, "parent_run_id"),
+        "sequence": row["sequence"],
+        "role": row["role"],
+        "agentId": pick(row, "agent_id"),
+        "agentName": row["agent_name"],
+        "model": row["model"],
+        "status": row["status"],
+        "inputSummary": pick(row, "input_summary"),
+        "outputSummary": pick(row, "output_summary"),
+        "tokenUsage": from_json(row["token_usage"], {}),
+        "costEstimate": from_json(row["cost_estimate"], {}),
+        "errorCategory": pick(row, "error_category"),
+        "errorMessage": pick(row, "error_message"),
+        "requestedBy": pick(row, "requested_by"),
+        "chainLabel": pick(row, "chain_label"),
+        "createdAt": pick(row, "created_at"),
+        "startedAt": pick(row, "started_at"),
+        "completedAt": pick(row, "completed_at"),
+        "failedAt": pick(row, "failed_at"),
+        "updatedAt": pick(row, "updated_at"),
+    }
+
+
+def runner_status_row_to_api(row):
+    if row is None:
+        return None
+
+    return {
+        "connected": bool_from_int(row["connected"]),
+        "runnerId": row["runner_id"],
+        "version": row["version"],
+        "workspacePath": pick(row, "workspace_path"),
+        "workspaceAlias": pick(row, "workspace_alias"),
+        "permissions": from_json(row["permissions"], {}),
+        "capabilities": json_pick(row, "capabilities", {}),
+        "gitStatus": json_pick(row, "git_status", {}),
+        "validationCommands": json_pick(row, "validation_commands", []),
+        "lastHeartbeatAt": pick(row, "last_heartbeat_at"),
+    }
+
+
+def runtime_event_row_to_api(row):
+    return {
+        "id": row["id"],
+        "projectId": row["project_id"],
+        "entityType": row["entity_type"],
+        "entityId": row["entity_id"],
+        "eventType": row["event_type"],
+        "beforeState": from_json(row["before_state"], None) if row["before_state"] else None,
+        "afterState": from_json(row["after_state"], None) if row["after_state"] else None,
+        "actor": pick(row, "actor"),
+        "reason": pick(row, "reason"),
+        "createdAt": pick(row, "created_at"),
+    }
+
+
+def upsert_runtime_event_payload(connection, event):
+    connection.execute(
+        """
+        INSERT INTO runtime_events (
+          id, project_id, entity_type, entity_id, event_type,
+          before_state, after_state, actor, reason, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          entity_type = excluded.entity_type,
+          entity_id = excluded.entity_id,
+          event_type = excluded.event_type,
+          before_state = excluded.before_state,
+          after_state = excluded.after_state,
+          actor = excluded.actor,
+          reason = excluded.reason,
+          created_at = excluded.created_at
+        """,
+        (
+            event["id"],
+            project_id,
+            event["entityType"],
+            event["entityId"],
+            event["eventType"],
+            as_json(event.get("beforeState")) if event.get("beforeState") is not None else None,
+            as_json(event.get("afterState")) if event.get("afterState") is not None else None,
+            event.get("actor", "api"),
+            event.get("reason", ""),
+            event.get("createdAt", now()),
+        ),
+    )
+
+
+def create_agent_run_request(connection):
+    ensure_agent_run_schema(connection)
+
+    agent_runs = args.get("agentRuns")
+    runtime_events = args.get("runtimeEvents")
+    chain = args.get("chain") or {}
+    if not isinstance(agent_runs, list) or len(agent_runs) == 0:
+        return {"statusCode": 422, "body": {"error": "agent_run_request_invalid", "message": "agentRuns are required."}}
+    if not isinstance(runtime_events, list):
+        return {"statusCode": 422, "body": {"error": "agent_run_request_invalid", "message": "runtimeEvents must be an array."}}
+
+    for agent_run in agent_runs:
+        connection.execute(
+            """
+            INSERT INTO agent_runs (
+              id, project_id, chain_id, root_run_id, parent_run_id, sequence,
+              role, agent_id, agent_name, model, status, input_summary,
+              output_summary, token_usage, cost_estimate, error_category,
+              error_message, requested_by, chain_label, created_at, started_at,
+              completed_at, failed_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              chain_id = excluded.chain_id,
+              root_run_id = excluded.root_run_id,
+              parent_run_id = excluded.parent_run_id,
+              sequence = excluded.sequence,
+              role = excluded.role,
+              agent_id = excluded.agent_id,
+              agent_name = excluded.agent_name,
+              model = excluded.model,
+              status = excluded.status,
+              input_summary = excluded.input_summary,
+              output_summary = excluded.output_summary,
+              token_usage = excluded.token_usage,
+              cost_estimate = excluded.cost_estimate,
+              error_category = excluded.error_category,
+              error_message = excluded.error_message,
+              requested_by = excluded.requested_by,
+              chain_label = excluded.chain_label,
+              created_at = excluded.created_at,
+              started_at = excluded.started_at,
+              completed_at = excluded.completed_at,
+              failed_at = excluded.failed_at,
+              updated_at = excluded.updated_at
+            """,
+            (
+                agent_run["id"],
+                project_id,
+                agent_run["chainId"],
+                agent_run["rootRunId"],
+                agent_run.get("parentRunId") or None,
+                int(agent_run.get("sequence", 0)),
+                agent_run.get("role", ""),
+                agent_run.get("agentId") or None,
+                agent_run.get("agentName", ""),
+                agent_run.get("model", ""),
+                agent_run.get("status", ""),
+                agent_run.get("inputSummary", ""),
+                agent_run.get("outputSummary", ""),
+                as_json(agent_run.get("tokenUsage", {})),
+                as_json(agent_run.get("costEstimate", {})),
+                agent_run.get("errorCategory", ""),
+                agent_run.get("errorMessage", ""),
+                agent_run.get("requestedBy", "local_user"),
+                agent_run.get("chainLabel", ""),
+                agent_run.get("createdAt", now()),
+                agent_run.get("startedAt") or None,
+                agent_run.get("completedAt") or None,
+                agent_run.get("failedAt") or None,
+                agent_run.get("updatedAt", now()),
+            ),
+        )
+
+    for event in runtime_events:
+        upsert_runtime_event_payload(connection, event)
+
+    return {
+        "statusCode": 201,
+        "body": {
+            "chain": chain,
+            "agentRuns": [agent_run_row_to_api(fetch_one(connection, "SELECT * FROM agent_runs WHERE id = ? AND project_id = ?", (agent_run["id"], project_id))) for agent_run in agent_runs],
+            "runtimeEvents": [runtime_event_row_to_api(fetch_one(connection, "SELECT * FROM runtime_events WHERE id = ?", (event["id"],))) for event in runtime_events],
+            "sideEffects": {
+                "writesAgents": False,
+                "writesAgentConfigVersions": False,
+                "writesAgentConfigApplications": False,
+                "writesRuntimeEvents": True,
+                "writesSqlite": True,
+                "writesRuntimeState": False,
+                "writesProjectFiles": False,
+                "modifiesGit": False,
+                "createsApprovals": False,
+                "createsTasks": False,
+                "createsRunnerJobs": False,
+                "triggersAgents": False,
+                "executesRunner": False,
+                "callsRealModel": False,
+                "readsRawSecrets": False,
+            },
+            "message": "Agent Run chain recorded in SQLite. No real Runner or model call was executed.",
+        },
+    }
+
+
+def runner_status_action(connection):
+    ensure_agent_run_schema(connection)
+    ensure_runner_status_schema(connection)
+
+    action = args["action"]
+    body = args.get("body", {})
+    current = body.get("currentRunnerStatus")
+    row = fetch_one(connection, "SELECT * FROM runner_status WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1", (project_id,))
+    current_status = runner_status_row_to_api(row) or current or {
+        "connected": False,
+        "runnerId": "",
+        "version": "",
+        "workspacePath": "",
+        "permissions": {},
+        "lastHeartbeatAt": "",
+    }
+    before = dict(current_status)
+    before["permissions"] = dict(current_status.get("permissions") or {})
+    timestamp = now()
+    requested_by = body.get("requestedBy") or body.get("updatedBy") or "local_user"
+    runner_id = str(body.get("runnerId") or "").strip()
+    version = str(body.get("version") or "").strip()
+    workspace_path = str(body.get("workspacePath") or "").strip()
+    workspace_alias = str(body.get("workspaceAlias") or "").strip()
+    has_permissions_update = isinstance(body.get("permissions"), dict)
+    has_capabilities_update = isinstance(body.get("capabilities"), dict)
+    has_git_status_update = isinstance(body.get("gitStatus"), dict)
+    has_validation_commands_update = isinstance(body.get("validationCommands"), list)
+    reason = str(body.get("reason") or body.get("note") or "").strip()
+
+    if action == "heartbeat" and current_status.get("connected") is not True:
+        return {"statusCode": 409, "body": {"error": "runner_status_not_connected", "message": "Runner heartbeat requires a connected Runner."}}
+    if action == "disconnect" and current_status.get("connected") is not True:
+        return {"statusCode": 409, "body": {"error": "runner_status_already_disconnected", "message": "Runner is already disconnected."}}
+
+    after = dict(current_status)
+    after["permissions"] = dict(current_status.get("permissions") or {})
+    after["capabilities"] = dict(current_status.get("capabilities") or {})
+    after["gitStatus"] = dict(current_status.get("gitStatus") or {})
+    after["validationCommands"] = list(current_status.get("validationCommands") or [])
+    if action == "connect":
+        after["connected"] = True
+        if runner_id:
+            after["runnerId"] = runner_id
+        if version:
+            after["version"] = version
+        if workspace_path:
+            after["workspacePath"] = workspace_path
+        if workspace_alias:
+            after["workspaceAlias"] = workspace_alias
+        if has_permissions_update:
+            after["permissions"].update(body.get("permissions") or {})
+        if has_capabilities_update:
+            after["capabilities"].update(body.get("capabilities") or {})
+        if has_git_status_update:
+            after["gitStatus"].update(body.get("gitStatus") or {})
+        if has_validation_commands_update:
+            after["validationCommands"] = body.get("validationCommands") or []
+        after["lastHeartbeatAt"] = timestamp
+    elif action == "heartbeat":
+        if runner_id:
+            after["runnerId"] = runner_id
+        if version:
+            after["version"] = version
+        if workspace_path:
+            after["workspacePath"] = workspace_path
+        if workspace_alias:
+            after["workspaceAlias"] = workspace_alias
+        if has_permissions_update:
+            after["permissions"].update(body.get("permissions") or {})
+        if has_capabilities_update:
+            after["capabilities"].update(body.get("capabilities") or {})
+        if has_git_status_update:
+            after["gitStatus"].update(body.get("gitStatus") or {})
+        if has_validation_commands_update:
+            after["validationCommands"] = body.get("validationCommands") or []
+        after["lastHeartbeatAt"] = timestamp
+    elif action == "disconnect":
+        after["connected"] = False
+    else:
+        return {"statusCode": 404, "body": {"error": "unknown_runner_status_action", "message": "Unknown runner status action."}}
+
+    connection.execute(
+        """
+        INSERT INTO runner_status (
+          id, project_id, connected, runner_id, version, workspace_path,
+          workspace_alias, permissions, capabilities, git_status,
+          validation_commands, last_heartbeat_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          connected = excluded.connected,
+          runner_id = excluded.runner_id,
+          version = excluded.version,
+          workspace_path = excluded.workspace_path,
+          workspace_alias = excluded.workspace_alias,
+          permissions = excluded.permissions,
+          capabilities = excluded.capabilities,
+          git_status = excluded.git_status,
+          validation_commands = excluded.validation_commands,
+          last_heartbeat_at = excluded.last_heartbeat_at,
+          updated_at = excluded.updated_at
+        """,
+        (
+            f"runner_status_{project_id}",
+            project_id,
+            as_bool(after.get("connected")),
+            after.get("runnerId", ""),
+            after.get("version", ""),
+            after.get("workspacePath", ""),
+            after.get("workspaceAlias", ""),
+            as_json(after.get("permissions", {})),
+            as_json(after.get("capabilities", {})),
+            as_json(after.get("gitStatus", {})),
+            as_json(after.get("validationCommands", [])),
+            after.get("lastHeartbeatAt", timestamp),
+            row["created_at"] if row else timestamp,
+            timestamp,
+        ),
+    )
+
+    after_row = fetch_one(connection, "SELECT * FROM runner_status WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1", (project_id,))
+    after_api = runner_status_row_to_api(after_row)
+    runtime_event(
+        connection,
+        "runner_status",
+        f"runner_status_{project_id}",
+        "connected" if action == "connect" else "heartbeat" if action == "heartbeat" else "disconnected",
+        before,
+        after_api,
+        actor=requested_by,
+        reason=reason or f"runner_status_{action}",
+    )
+    return {
+        "statusCode": 200,
+        "body": {
+            "runnerStatus": after_api,
+            "runtimeEvent": runtime_event_row_to_api(fetch_one(connection, "SELECT * FROM runtime_events WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", ("runner_status", f"runner_status_{project_id}"))),
+            "sideEffects": {
+                "writesAgents": False,
+                "writesAgentConfigVersions": False,
+                "writesAgentConfigApplications": False,
+                "writesRuntimeEvents": True,
+                "writesSqlite": True,
+                "writesRuntimeState": False,
+                "writesProjectFiles": False,
+                "modifiesGit": False,
+                "createsApprovals": False,
+                "createsTasks": False,
+                "createsRunnerJobs": False,
+                "triggersAgents": False,
+                "executesRunner": False,
+                "callsRealModel": False,
+                "readsRawSecrets": False,
+            },
+            "message": "Runner status updated in SQLite local trial mode.",
+        },
+    }
 
 
 def transition_task(connection):
@@ -1445,12 +1866,16 @@ with sqlite3.connect(db_file) as connection:
             result = approval_action(connection)
         elif command == "createAgentChangeRequest":
             result = create_agent_change_request(connection)
+        elif command == "createAgentRunRequest":
+            result = create_agent_run_request(connection)
         elif command == "createProjectPlanRequest":
             result = create_project_plan_request(connection)
         elif command == "agentConfigApplicationAction":
             result = agent_config_application_action(connection)
         elif command == "agentConfigApplicationRealApply":
             result = agent_config_application_real_apply(connection)
+        elif command == "runnerStatusAction":
+            result = runner_status_action(connection)
         elif command == "runnerJobAction":
             result = runner_job_action(connection)
         else:

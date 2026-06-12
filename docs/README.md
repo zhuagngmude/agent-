@@ -1,16 +1,17 @@
 # docs
 
-Formal technical docs for `agent-swarm`.
+这里存放 `agent蜂群` 的正式技术文档、治理文档和验收文档。
 
-## Start Here
+## 先读这里
 
-- [api-draft.md](./api-draft.md): current API contract and stage boundaries.
-- [data-model-draft.md](./data-model-draft.md): current entity and table draft.
-- [demo-checklist.md](./demo-checklist.md): local demo and verification checklist.
-- [runner-safety-acceptance.md](./runner-safety-acceptance.md): Runner safety contract.
-- [module-stability-map.md](./module-stability-map.md): protected, contract, and refactorable areas.
+- [Agent宪法.md](./Agent宪法.md)：AI、Agent、Model Gateway、Runner 和审批链的中文治理边界。
+- [api-draft.md](./api-draft.md)：当前 API 契约和阶段边界。
+- [data-model-draft.md](./data-model-draft.md)：当前实体和数据表草案。
+- [demo-checklist.md](./demo-checklist.md)：本地演示和验证清单。
+- [runner-safety-acceptance.md](./runner-safety-acceptance.md)：Runner 安全契约。
+- [module-stability-map.md](./module-stability-map.md)：保护区、契约区和可重构区说明。
 
-## Current Feature Specs
+## 当前功能规格
 
 - [agent-config-apply-dry-run-spec.md](./agent-config-apply-dry-run-spec.md)
 - [mvp-0.3-project-plan-flow-spec.md](./mvp-0.3-project-plan-flow-spec.md)
@@ -18,19 +19,19 @@ Formal technical docs for `agent-swarm`.
 - [mvp-0.4-execution-layer-draft.md](./mvp-0.4-execution-layer-draft.md)
 - [agent-permission-contract.md](./agent-permission-contract.md)
 
-## Model Gateway Notes
+## Model Gateway 相关说明
 
 - [relay-provider-info-checklist.md](./relay-provider-info-checklist.md)
 - [cheng-relay-manual-ping-spec.md](./cheng-relay-manual-ping-spec.md)
 - [deepseek-provider-info-checklist.md](./deepseek-provider-info-checklist.md)
 
-## Platform Notes
+## 平台说明
 
 - [sqlite-seed-plan.md](./sqlite-seed-plan.md)
 - [tech-stack-notes.md](./tech-stack-notes.md)
 
-## Verification
+## 验证
 
-Verification scripts are documented in [../scripts/README.md](../scripts/README.md).
+验证脚本说明见 [../scripts/README.md](../scripts/README.md)。
 
-Current stage: MVP-0.4 accepted; Stage 2 real-model admission design is now closed as a disabled-only scaffold with `model_calls` as a draft plus helper / route prep, and the helper-only `model_calls` write / migration draft scaffold is in place. No real Runner, no real model calls, no cloud sync.
+当前阶段：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已收口，只保留 helper-only scaffold；阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程。当前不开放真实 Runner、真实模型调用或云同步。

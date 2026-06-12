@@ -37,6 +37,13 @@ const {
   isProjectPlanApproval,
   noProjectPlanRequestSideEffects,
 } = require("./project-plan");
+const {
+  buildAgentRunChainViews,
+  compactText,
+  createAgentRunChain,
+  noAgentRunSideEffects,
+  summarizeAgentRunChain,
+} = require("./agent-runs");
 
 const port = Number(process.env.AGENT_SWARM_API_PORT || 8787);
 const runtimeStateFile = process.env.AGENT_SWARM_RUNTIME_STATE_FILE
@@ -180,6 +187,178 @@ function findRunnerJob(id) {
   return data.runnerJobs.find((item) => item.id === id);
 }
 
+function findAgentRun(id) {
+  return data.agentRuns.find((item) => item.id === id);
+}
+
+function runnerStatusEntityId() {
+  return `runner_status_${data.projectId}`;
+}
+
+function cloneRunnerStatusValue(source = data.runnerStatus) {
+  return {
+    ...source,
+    permissions: {
+      ...(source.permissions || {}),
+    },
+    capabilities: {
+      ...(source.capabilities || {}),
+    },
+    gitStatus: {
+      ...(source.gitStatus || {}),
+    },
+    validationCommands: Array.isArray(source.validationCommands)
+      ? source.validationCommands.map((command) => ({ ...command }))
+      : [],
+  };
+}
+
+function applyRunnerStatusAction(action, body = {}) {
+  const sourceRunnerStatus = body.currentRunnerStatus && typeof body.currentRunnerStatus === "object"
+    ? body.currentRunnerStatus
+    : data.runnerStatus;
+  const current = cloneRunnerStatusValue(sourceRunnerStatus);
+  const before = cloneRunnerStatusValue(current);
+  const now = new Date().toISOString();
+  const requestedBy = compactText(body.requestedBy || body.updatedBy || "local_user") || "local_user";
+  const runnerId = compactText(body.runnerId || "");
+  const version = compactText(body.version || "");
+  const workspacePath = compactText(body.workspacePath || "");
+  const workspaceAlias = compactText(body.workspaceAlias || "");
+  const hasPermissionsUpdate = body.permissions && typeof body.permissions === "object" && !Array.isArray(body.permissions);
+  const hasCapabilitiesUpdate = body.capabilities && typeof body.capabilities === "object" && !Array.isArray(body.capabilities);
+  const hasGitStatusUpdate = body.gitStatus && typeof body.gitStatus === "object" && !Array.isArray(body.gitStatus);
+  const hasValidationCommandsUpdate = Array.isArray(body.validationCommands);
+  const reason = compactText(body.reason || body.note || "");
+
+  if (action === "heartbeat" && current.connected !== true) {
+    return {
+      error: "runner_status_not_connected",
+      message: "Runner heartbeat requires a connected Runner.",
+    };
+  }
+
+  if (action === "disconnect" && current.connected !== true) {
+    return {
+      error: "runner_status_already_disconnected",
+      message: "Runner is already disconnected.",
+    };
+  }
+
+  if (action === "connect") {
+    current.connected = true;
+    if (runnerId) current.runnerId = runnerId;
+    if (version) current.version = version;
+    if (workspacePath) current.workspacePath = workspacePath;
+    if (workspaceAlias) current.workspaceAlias = workspaceAlias;
+    if (hasPermissionsUpdate) {
+      current.permissions = {
+        ...(current.permissions || {}),
+        ...body.permissions,
+      };
+    }
+    if (hasCapabilitiesUpdate) {
+      current.capabilities = {
+        ...(current.capabilities || {}),
+        ...body.capabilities,
+      };
+    }
+    if (hasGitStatusUpdate) {
+      current.gitStatus = {
+        ...(current.gitStatus || {}),
+        ...body.gitStatus,
+      };
+    }
+    if (hasValidationCommandsUpdate) {
+      current.validationCommands = body.validationCommands.map((command) => ({ ...command }));
+    }
+    current.lastHeartbeatAt = now;
+  } else if (action === "heartbeat") {
+    if (runnerId) current.runnerId = runnerId;
+    if (version) current.version = version;
+    if (workspacePath) current.workspacePath = workspacePath;
+    if (workspaceAlias) current.workspaceAlias = workspaceAlias;
+    if (hasPermissionsUpdate) {
+      current.permissions = {
+        ...(current.permissions || {}),
+        ...body.permissions,
+      };
+    }
+    if (hasCapabilitiesUpdate) {
+      current.capabilities = {
+        ...(current.capabilities || {}),
+        ...body.capabilities,
+      };
+    }
+    if (hasGitStatusUpdate) {
+      current.gitStatus = {
+        ...(current.gitStatus || {}),
+        ...body.gitStatus,
+      };
+    }
+    if (hasValidationCommandsUpdate) {
+      current.validationCommands = body.validationCommands.map((command) => ({ ...command }));
+    }
+    current.lastHeartbeatAt = now;
+  } else if (action === "disconnect") {
+    current.connected = false;
+  } else {
+    return {
+      error: "unknown_runner_status_action",
+      message: "Unknown runner status action.",
+    };
+  }
+
+  const after = cloneRunnerStatusValue(current);
+  const event = body.recordEvent === false
+    ? null
+    : recordRuntimeEvent(
+        "runner_status",
+        runnerStatusEntityId(),
+        action === "connect" ? "connected" : action === "heartbeat" ? "heartbeat" : "disconnected",
+        before,
+        after,
+        requestedBy,
+        reason || `runner_status_${action}`
+      );
+
+  return {
+    runnerStatus: after,
+    runtimeEvent: event,
+    statusCode: 200,
+    message: action === "connect"
+      ? "Runner connected in local trial mode."
+      : action === "heartbeat"
+        ? "Runner heartbeat recorded in local trial mode."
+        : "Runner disconnected in local trial mode.",
+  };
+}
+
+function getAgentRunsSnapshotResponse(snapshot, chainId = "") {
+  const sourceRuns = snapshot?.agentRuns || data.agentRuns;
+  const runtimeEvents = snapshot?.runtimeEvents || data.runtimeEvents;
+  const chainViews = buildAgentRunChainViews(sourceRuns);
+  const selectedChain = chainId
+    ? chainViews.find((item) => item.chain.chainId === chainId) || null
+    : chainViews[0] || null;
+  const selectedChainRuns = selectedChain ? selectedChain.agentRuns : sourceRuns;
+  const selectedChainEvents = selectedChain
+    ? runtimeEvents.filter((event) => event.entityType === "agent_run" && selectedChainRuns.some((run) => run.id === event.entityId))
+    : runtimeEvents.filter((event) => event.entityType === "agent_run");
+
+  return {
+    agentRuns: selectedChainRuns.map((run) => ({ ...run })),
+    agentRunChains: chainViews.map((item) => ({ ...item.chain })),
+    selectedChain: selectedChain
+      ? {
+          ...selectedChain.chain,
+          agentRuns: selectedChainRuns.map((run) => ({ ...run })),
+        }
+      : null,
+    runtimeEvents: selectedChainEvents.map((event) => ({ ...event })),
+  };
+}
+
 function findAgentConfigApplication(id) {
   return data.agentConfigApplications.find((item) => item.id === id);
 }
@@ -232,6 +411,8 @@ function serializeRuntimeState() {
       updatedAt: task.updatedAt || "",
     })),
     runnerJobs: data.runnerJobs.map((job) => ({ ...job })),
+    runnerStatus: cloneRunnerStatusValue(data.runnerStatus),
+    agentRuns: data.agentRuns.map((run) => ({ ...run })),
     runtimeEvents: data.runtimeEvents.map((event) => ({ ...event })),
     agentConfigApplications: data.agentConfigApplications.map((item) => ({ ...item })),
   };
@@ -328,6 +509,17 @@ function applyRuntimeState(state) {
     data.runnerJobs.splice(0, data.runnerJobs.length, ...state.runnerJobs.map((job) => ({ ...job })));
   }
 
+  if (state.runnerStatus && typeof state.runnerStatus === "object" && !Array.isArray(state.runnerStatus)) {
+    Object.keys(data.runnerStatus).forEach((key) => {
+      delete data.runnerStatus[key];
+    });
+    Object.assign(data.runnerStatus, cloneRunnerStatusValue(state.runnerStatus));
+  }
+
+  if (Array.isArray(state.agentRuns)) {
+    data.agentRuns.splice(0, data.agentRuns.length, ...state.agentRuns.map((run) => ({ ...run })));
+  }
+
   if (Array.isArray(state.runtimeEvents)) {
     data.runtimeEvents.splice(
       0,
@@ -389,6 +581,46 @@ function clearRuntimeState() {
   if (fs.existsSync(runtimeStateFile)) {
     fs.rmSync(runtimeStateFile, { force: true });
   }
+}
+
+function ensureAgentRunRequest(body = {}) {
+  return {
+    ...body,
+    requestedBy: body.requestedBy || "local_user",
+  };
+}
+
+function applyAgentRunChainResult(result) {
+  result.agentRuns.forEach((run) => {
+    const existing = findAgentRun(run.id);
+    if (existing) {
+      Object.assign(existing, run);
+    } else {
+      data.agentRuns.push({ ...run });
+    }
+  });
+
+  result.runtimeEvents.forEach((event) => {
+    data.runtimeEvents.push({ ...event });
+  });
+}
+
+function upsertAgentRunChain(requestBody = {}, options = {}) {
+  const result = createAgentRunChain({
+    projectId: data.projectId,
+    agents: options.agents || data.agents,
+    body: ensureAgentRunRequest(requestBody),
+    chainId: options.chainId || "",
+    createdAt: options.createdAt || "",
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  applyAgentRunChainResult(result);
+
+  return result;
 }
 
 function upsertRunnerJobFromApproval(approval) {
@@ -1261,6 +1493,59 @@ async function handleProjectPlanRequest(req, res, projectId) {
   });
 }
 
+async function handleAgentRunRequest(req, res, projectId) {
+  if (projectId !== data.projectId) {
+    sendJson(res, 404, { error: "project_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  const snapshot = sqliteReadEnabled() ? projectSnapshotResponse(() => null) : null;
+  const result = createAgentRunChain({
+    projectId,
+    agents: snapshot?.agents || data.agents,
+    body: ensureAgentRunRequest(body),
+    chainId: compactText(body.chainId || ""),
+    createdAt: compactText(body.createdAt || ""),
+  });
+
+  if (!result.ok) {
+    sendJson(res, 422, {
+      ...result,
+      sideEffects: {
+        ...noAgentRunSideEffects(),
+        writesRuntimeState: false,
+        writesSqlite: false,
+        writesRuntimeEvents: false,
+      },
+    });
+    return;
+  }
+
+  if (sqliteReadEnabled()) {
+    sendSqliteWriteResult(res, runSqliteWrite("createAgentRunRequest", {
+      projectId,
+      agentRuns: result.agentRuns,
+      runtimeEvents: result.runtimeEvents,
+      chain: result.chain,
+    }));
+    return;
+  }
+
+  applyAgentRunChainResult(result);
+  saveRuntimeState();
+  sendJson(res, 201, {
+    ...result,
+    sideEffects: {
+      ...noAgentRunSideEffects(),
+      writesRuntimeState: true,
+      writesSqlite: false,
+      writesRuntimeEvents: true,
+    },
+    message: "Agent Run chain created in local trial mode. No real Runner or model call was executed.",
+  });
+}
+
 async function handleProjectPlanModelRequest(req, res, projectId) {
   const body = await readBody(req);
   if (projectId !== data.projectId) {
@@ -1285,6 +1570,59 @@ async function handleProjectPlanModelRequest(req, res, projectId) {
     routeMode: "feature_disabled",
     projectIdSource: "url_path",
     bodyProjectIdIgnored: body.projectId !== undefined,
+  });
+}
+
+async function handleRunnerStatusAction(req, res, action, projectId) {
+  if (projectId !== data.projectId) {
+    sendJson(res, 404, { error: "project_not_found" });
+    return;
+  }
+
+  const body = await readBody(req);
+  if (sqliteReadEnabled()) {
+    const snapshot = projectSnapshotResponse(() => null);
+    const currentRunnerStatus = snapshot?.runnerStatus || data.runnerStatus;
+    const validation = applyRunnerStatusAction(action, {
+      ...body,
+      recordEvent: false,
+    });
+
+    if (validation.error) {
+      sendJson(res, 409, validation);
+      return;
+    }
+
+    sendSqliteWriteResult(res, runSqliteWrite("runnerStatusAction", {
+      projectId,
+      action,
+      body,
+      currentRunnerStatus,
+    }));
+    return;
+  }
+
+  const result = applyRunnerStatusAction(action, body);
+  if (result.error) {
+    sendJson(res, 409, result);
+    return;
+  }
+
+  Object.keys(data.runnerStatus).forEach((key) => {
+    delete data.runnerStatus[key];
+  });
+  Object.assign(data.runnerStatus, cloneRunnerStatusValue(result.runnerStatus));
+  saveRuntimeState();
+  sendJson(res, result.statusCode || 200, {
+    runnerStatus: cloneRunnerStatusValue(data.runnerStatus),
+    runtimeEvent: result.runtimeEvent,
+    sideEffects: {
+      ...noAgentRunSideEffects(),
+      writesRuntimeState: true,
+      writesSqlite: false,
+      writesRuntimeEvents: true,
+    },
+    message: result.message,
   });
 }
 
@@ -1753,6 +2091,8 @@ async function handleRequest(req, res) {
           approvals: snapshot?.approvals || [],
           tasks: snapshot?.tasks || [],
           runnerJobs: snapshot?.runnerJobs || [],
+          runnerStatus: snapshot?.runnerStatus || {},
+          agentRuns: snapshot?.agentRuns || [],
           runtimeEvents: snapshot?.runtimeEvents || [],
           agentConfigApplications: snapshot?.agentConfigApplications || [],
         },
@@ -1801,6 +2141,8 @@ async function handleRequest(req, res) {
           approvals: snapshot?.approvals || [],
           tasks: snapshot?.tasks || [],
           runnerJobs: snapshot?.runnerJobs || [],
+          runnerStatus: snapshot?.runnerStatus || {},
+          agentRuns: snapshot?.agentRuns || [],
           runtimeEvents: snapshot?.runtimeEvents || [],
           agentConfigApplications: snapshot?.agentConfigApplications || [],
         },
@@ -1855,9 +2197,22 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "GET" && withProject(pathname, "/agent-runs")) {
+    const snapshot = projectSnapshotResponse(() => null);
+    const chainId = compactText(url.searchParams.get("chainId") || "");
+    sendJson(res, 200, getAgentRunsSnapshotResponse(snapshot, chainId));
+    return;
+  }
+
   const projectPlanRequest = pathname.match(/^\/api\/projects\/([^/]+)\/project-plan-requests$/);
   if (req.method === "POST" && projectPlanRequest) {
     await handleProjectPlanRequest(req, res, projectPlanRequest[1]);
+    return;
+  }
+
+  const agentRunRequest = pathname.match(/^\/api\/projects\/([^/]+)\/agent-run-requests$/);
+  if (req.method === "POST" && agentRunRequest) {
+    await handleAgentRunRequest(req, res, agentRunRequest[1]);
     return;
   }
 
@@ -1963,10 +2318,13 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && withProject(pathname, "/runner/status")) {
     const snapshot = projectSnapshotResponse(() => null);
-    sendJson(res, 200, snapshot?.runnerStatus || {
-      ...data.runnerStatus,
-      lastHeartbeatAt: new Date().toISOString(),
-    });
+    sendJson(res, 200, snapshot?.runnerStatus || cloneRunnerStatusValue(data.runnerStatus));
+    return;
+  }
+
+  const runnerStatusAction = pathname.match(/^\/api\/projects\/([^/]+)\/runner\/status\/(connect|heartbeat|disconnect)$/);
+  if (req.method === "POST" && runnerStatusAction) {
+    await handleRunnerStatusAction(req, res, runnerStatusAction[2], runnerStatusAction[1]);
     return;
   }
 

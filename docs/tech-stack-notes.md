@@ -1,65 +1,143 @@
-# Technology Stack Notes
+# 技术栈说明
 
-Date: 2026-06-09
+日期：2026-06-12
 
-This note records the current technology-stack decision for `agent-swarm`. It separates what is already in the repository from what should be considered later.
+本文记录 `agent蜂群` 的当前实际技术栈、老师反馈后的调整方向，以及重新立项讨论阶段的候选技术栈。当前只讨论方案，不写业务代码。
 
-## Current Actual Stack
+## 当前实际技术栈
 
-The current stack is appropriate for MVP-0.2 validation because it keeps moving parts small and easy to inspect.
+当前仓库已经落地的是 MVP 验证原型：
 
-- Frontend: native HTML, CSS, and JavaScript in `apps/web/`.
-- Mock backend: Node.js native HTTP server in `services/api/server.js`.
-- Mock data and state: JavaScript mock data plus local runtime state under `data/mock/`.
-- Scripts: PowerShell scripts under `scripts/`.
-- Documentation: Markdown under `README.md`, `AGENTS.md`, `dev-docs/`, and `docs/`.
-- Local database experiment: SQLite stored at `data/local/agent-swarm.sqlite`, initialized and seeded through PowerShell scripts that use Python standard-library `sqlite3`.
+- 前端：`apps/web/` 中的原生 HTML、CSS、JavaScript。
+- 后端：`services/api/server.js` 中的 Node.js 原生 HTTP server。
+- Mock 数据和状态：JavaScript mock 数据加 `data/mock/runtime-state.json`。
+- 本地数据库验证：SQLite，文件位于 `data/local/agent-swarm.sqlite`，通过 PowerShell 和 Python 标准库 `sqlite3` 初始化、seed 和验证。
+- 脚本：PowerShell。
+- 文档：Markdown。
 
-This stack is not meant to be the final commercial stack. Its job is to validate product flow, API shape, database shape, approval rules, and Runner safety boundaries before introducing heavier frameworks.
+这套技术栈的价值是快速验证产品流程、API 形态、状态流转、审批边界和 Runner 安全规则。它不是正式工程架构，也不适合继续作为长期交付方案扩展。
 
-## SQLite Local Persistence Path
+## 重新立项判断
 
-SQLite is currently a local development and validation path, not the final cloud database decision.
+老师反馈后，当前进入重新立项讨论阶段。结论是：
 
-- SQLite mode is enabled by setting `AGENT_SWARM_DASHBOARD_SOURCE=sqlite`.
-- Migration lives in `data/migrations/001_initial_sqlite.sql`.
-- Seed data lives in `data/seed/project_agent_swarm.seed.json`.
-- Read mapping lives in `services/api/db/sqlite-read.js`.
-- Write-state transitions live in `services/api/db/sqlite-write.js`.
-- Local database files under `data/local/` must stay untracked.
+- 不继续手搓前端。
+- 不继续把原生 Node.js HTTP server 扩展为正式后端。
+- 不直接在旧目录上叠功能。
+- 不直接初始化新工程，直到技术栈、目录结构和迁移方案确认。
+- 旧 MVP 作为原型和验证资产保留，后续按新架构选择性迁移。
 
-SQLite is useful now because it proves the table design and state transitions without requiring cloud accounts, auth, networking, migrations infrastructure, or production deployment.
+## 候选正式技术栈
 
-## Likely Future Production Stack
+当前建议方案：
 
-After the MVP control flow, database model, and Runner safety rules are stable, the likely production stack can be upgraded.
+```text
+前端 UI：
+React + TypeScript + Vite + Ant Design
 
-- Frontend: React with TypeScript, likely Vite or Next.js depending on deployment and routing needs.
-- Styling/UI: Tailwind CSS plus a mature component system such as Radix/shadcn-style primitives, while preserving the project-specific visual direction.
-- Backend: TypeScript backend or Python FastAPI. The decision should be made after the Agent orchestration and Runner boundary are clearer.
-- Database: PostgreSQL, possibly Supabase PostgreSQL for early production because it also offers Auth and RLS.
-- Auth/permissions: Supabase Auth/RLS or a dedicated auth layer with RBAC plus ABAC.
-- Runner: Python Runner remains a good fit for local file operations, Git checkpoints, test execution, and cross-platform scripting.
-- AI model calls: provider SDKs should be isolated behind service boundaries instead of being called directly from UI code.
+桌面端：
+Tauri + Rust
 
-## Do Not Migrate Yet
+后端：
+Fastify 或 NestJS
 
-Do not migrate to a heavier framework only because it looks more formal. Migrate when the current simple stack becomes the bottleneck.
+本地数据库：
+SQLite + Prisma 或 Drizzle
 
-- Do not move the frontend to React/Next.js until the core screens, state shapes, and approval flows are stable.
-- Do not replace SQLite with PostgreSQL until the local schema and state transitions have passed regression checks.
-- Do not connect real model APIs until approval, logging, cost tracking, and key-safety rules are ready.
-- Do not implement real Runner execution until `docs/runner-safety-acceptance.md` is satisfied.
-- Do not add cloud sync or full permissions before the local single-project flow is reliable.
+后续云端数据库：
+PostgreSQL / Supabase
 
-## Current Decision
+共享 UI：
+packages/ui 作为唯一 UI 源码
+apps/web 和 apps/desktop 作为运行入口
+```
 
-The current languages and tools are suitable for this stage:
+## 前端方案
 
-- JavaScript is suitable for the current frontend and mock API because it keeps the prototype fast and inspectable.
-- PowerShell is suitable for local Windows development scripts in this project.
-- Python is suitable as a SQLite bridge now and remains suitable for the future local Runner.
-- Markdown is suitable for product, architecture, and AI handoff records.
-- SQLite is suitable as the first real persistence layer for local validation.
+旧前端位于 `apps/web/`，是原生 HTML / CSS / JavaScript。
 
-The final product will probably need a stronger typed frontend/backend and PostgreSQL, but switching too early would add framework work before the product and safety model are stable.
+后续不再继续手搓 UI。建议使用：
+
+- React：组件化 UI。
+- TypeScript：约束数据结构和组件 props。
+- Vite：本地开发和构建。
+- Ant Design：表格、表单、弹窗、标签、菜单、布局、提示等成熟组件。
+
+目标是把 Web 和桌面端共用 UI 源码放到：
+
+```text
+packages/ui
+```
+
+`apps/web` 和 `apps/desktop` 不再各自维护一套 UI，它们只作为运行入口消费 `packages/ui`。
+
+## 桌面端方案
+
+桌面端建议使用：
+
+```text
+Tauri + Rust
+```
+
+Rust 的职责：
+
+- 本地文件能力。
+- Git 状态和 checkpoint。
+- Runner 连接。
+- 权限边界。
+- 本地安全能力。
+
+Rust 不负责重新绘制一套 UI。桌面端应加载和复用 `packages/ui` 中的 React UI，避免 Web 和桌面两套界面分裂。
+
+## 后端方案
+
+旧后端是 Node.js 原生 HTTP server，适合 MVP 验证，但不适合作为正式工程继续扩展。
+
+候选方案：
+
+- Fastify：轻量、性能好、迁移成本较低。
+- NestJS：结构更完整，适合大型模块化后端，但初期成本更高。
+
+重新立项时需要决定：
+
+- 是否继续使用 Node.js / TypeScript 后端。
+- API 契约如何和前端共享。
+- Model Gateway、Approval Service、Agent Run、Runner Bridge 分别放在哪些模块。
+
+## 数据库方案
+
+当前 SQLite 是本地验证层，不是云端生产数据库。
+
+本地版建议继续保留 SQLite，因为它适合单机桌面应用：
+
+- 无需云服务。
+- 易于打包。
+- 适合本地项目状态和审计记录。
+
+但后续不建议继续手写大量 SQL 映射。可以讨论：
+
+- Prisma：生态成熟、类型生成友好。
+- Drizzle：更轻量、更贴近 SQL。
+
+后续团队和云端版再讨论 PostgreSQL / Supabase。
+
+## 暂不做
+
+- 不直接开始 React 重写。
+- 不直接接 Tauri。
+- 不直接删除旧前端目录。
+- 不继续扩展原生 HTML / CSS / JavaScript UI。
+- 不继续扩展 Node.js 原生 HTTP server 作为正式后端。
+- 不接真实模型。
+- 不启用真实 Runner。
+- 不做云同步或完整权限系统。
+
+## 下一步决策清单
+
+1. 确认前端是否采用 React + TypeScript + Vite + Ant Design。
+2. 确认桌面端是否采用 Tauri + Rust。
+3. 确认后端采用 Fastify 还是 NestJS。
+4. 确认本地数据库继续 SQLite，并选择 Prisma 或 Drizzle。
+5. 确认 `packages/ui` 是唯一 UI 源码。
+6. 确认 `apps/web` 和 `apps/desktop` 只作为运行入口。
+7. 确认旧原型归档和迁移方案。

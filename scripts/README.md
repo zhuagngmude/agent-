@@ -14,7 +14,7 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-project-plan-flow.ps1`: helper-only project-plan approval flow.
 - `verify-mock-flows.ps1`: isolated Mock flow checks on `8789`.
 - `verify-sqlite-flows.ps1`: isolated SQLite flow checks on `8788`.
-- `verify-local-ui.ps1`: browser smoke for the running local trial on `8787/5175`.
+- `verify-local-ui.ps1`: browser smoke for the running local trial on `8787/5175`, including the Agent Run record page.
 - `verify-model-gateway.ps1`: disabled Model Gateway and relay boundary checks.
 - `verify-real-model-admission.ps1`: disabled project-plan model request admission checks, provider config resolver checks, redaction / safe-record checks, model_calls write-draft helper checks, and isolated disabled route checks; no provider calls.
 - `verify-agent-permissions.ps1`
@@ -27,7 +27,7 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-agent-config-real-apply-sqlite.ps1`
 - `verify-agent-config-safety-loop.ps1`
 
-The mock / SQLite flow scripts now also cover execution request lifecycle transitions, read-only execution request views, and runtime event auditing.
+The mock / SQLite flow scripts now also cover Agent Run chain recording, execution request lifecycle transitions, read-only execution request views, and runtime event auditing.
 
 ## Ports
 

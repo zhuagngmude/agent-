@@ -1,23 +1,23 @@
 # dev-docs
 
-Development notes, handoffs, and current working guidance.
+这里存放 `agent蜂群` 的开发笔记、阶段交接、内部路线和 AI 维护说明。正式 API、数据模型和验收规格优先放在 `docs/`。
 
-## Index
+## 索引
 
-- [人类说明书.md](./人类说明书.md): user-facing project guide.
-- [AI开发维护手册.md](./AI开发维护手册.md): AI operating guide.
-- [新窗口交接说明.md](./新窗口交接说明.md): continuation / handoff snapshot.
-- [下一步开发路线.md](./下一步开发路线.md): current roadmap snapshot.
-- [MVP-0.4验收记录.md](./MVP-0.4验收记录.md): acceptance snapshot for the completed MVP-0.4 local loop.
-- [应用真正可用落地计划.md](./应用真正可用落地计划.md): staged path from the completed MVP-0.4 local loop to a truly usable application.
-- [真实模型接入准入规格.md](./真实模型接入准入规格.md): internal gate for entering the first real model-call design without enabling providers.
-- [Model Gateway正式入口设计.md](./Model%20Gateway正式入口设计.md): Stage 2 draft for the future model-call entrypoint, provider config, and key-storage boundary.
-- [UI第一版验收建议.md](./UI第一版验收建议.md): UI acceptance notes.
-- [前端交互反推架构调整.md](./前端交互反推架构调整.md): frontend-driven architecture notes.
+- [AI开发维护手册.md](./AI开发维护手册.md)：后续 AI 进入项目时的操作边界和维护规则。
+- [新窗口交接说明.md](./新窗口交接说明.md)：当前工作状态和交接快照。
+- [下一步开发路线.md](./下一步开发路线.md)：当前阶段、下一步和禁止事项。
+- [人类说明书.md](./人类说明书.md)：面向人类用户的项目说明。
+- [应用真正可用落地计划.md](./应用真正可用落地计划.md)：从本地 MVP 走向真正可用应用的阶段路线。
+- [真实模型接入准入规格.md](./真实模型接入准入规格.md)：真实模型调用进入实现前必须满足的准入规格。
+- [Model Gateway正式入口设计.md](./Model%20Gateway正式入口设计.md)：阶段 2 的未来模型调用入口、provider 配置和 Key 存储边界。
+- [MVP-0.4验收记录.md](./MVP-0.4验收记录.md)：已完成 MVP-0.4 本地闭环的验收快照。
+- [UI第一版验收建议.md](./UI第一版验收建议.md)：UI 第一版验收建议。
+- [前端交互反推架构调整.md](./前端交互反推架构调整.md)：从前端交互倒推架构的设计笔记。
 
-## Boundary
+## 边界
 
-- `docs/` is for formal technical specs and acceptance docs.
-- `dev-docs/` is for working notes, handoffs, and guidance.
-- `_internal/` is ignored local material and should not be committed.
-- Keep secrets and customer data out of this directory.
+- `docs/` 存放正式技术规格、治理文档和验收文档。
+- `dev-docs/` 存放开发中的路线、交接和内部维护说明。
+- `_internal/` 是本地忽略材料，不要提交。
+- 不要把密钥、客户数据、私密日志或完整本地路径写进公开文档。

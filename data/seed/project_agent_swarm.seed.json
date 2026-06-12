@@ -270,12 +270,47 @@
     "runnerId": "local_runner_001",
     "version": "0.1.0",
     "workspacePath": "F:/projects/agent-swarm",
+    "workspaceAlias": "agent-swarm",
     "permissions": {
       "readFiles": true,
       "writeFiles": "approval_required",
       "executeCommands": "approval_required",
       "networkRequests": "approval_required"
-    }
+    },
+    "capabilities": {
+      "reportsStatus": true,
+      "reportsGitStatus": true,
+      "reportsDirtyWorkspace": true,
+      "supportsValidationCommands": true,
+      "executesCommands": false,
+      "writesFiles": false,
+      "modifiesGit": false,
+      "networkRequests": false
+    },
+    "gitStatus": {
+      "branch": "local-trial",
+      "dirty": false,
+      "ahead": 0,
+      "behind": 0,
+      "checkpointRequired": true,
+      "statusSource": "runner_reported_seed"
+    },
+    "validationCommands": [
+      {
+        "id": "verify_mock_flows",
+        "label": "Mock flow verification",
+        "command": "powershell -ExecutionPolicy Bypass -File scripts\\verify-mock-flows.ps1",
+        "allowed": false,
+        "mode": "preview_only"
+      },
+      {
+        "id": "verify_sqlite_flows",
+        "label": "SQLite flow verification",
+        "command": "powershell -ExecutionPolicy Bypass -File scripts\\verify-sqlite-flows.ps1",
+        "allowed": false,
+        "mode": "preview_only"
+      }
+    ]
   },
   "gitCheckpoints": [
     {

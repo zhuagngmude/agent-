@@ -6,6 +6,7 @@ const projectId = "project_agent_swarm";
 let selectedApprovalIndex = 0;
 let selectedTaskIndex = 0;
 let selectedRunnerJobIndex = 0;
+let selectedAgentRunChainId = "";
 let selectedAgentIndex = 0;
 let selectedAgentChangeType = "model";
 let selectedAgentConfigApplicationId = "";
@@ -13,6 +14,8 @@ let approvalActionRunning = false;
 let runtimeStateRunning = false;
 let taskActionRunning = false;
 let runnerJobActionRunning = false;
+let agentRunRequestRunning = false;
+let runnerStatusActionRunning = false;
 let agentChangeRequestRunning = false;
 let agentConfigApplyRunning = false;
 let agentConfigCancelRunning = false;
@@ -44,6 +47,107 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function shortText(value, limit = 120) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function sortAgentRunsBySequence(agentRuns = []) {
+  return [...agentRuns].sort((left, right) => {
+    const sequenceDelta = (left.sequence || 0) - (right.sequence || 0);
+    if (sequenceDelta !== 0) return sequenceDelta;
+    const createdDelta = String(left.createdAt || "").localeCompare(String(right.createdAt || ""));
+    if (createdDelta !== 0) return createdDelta;
+    return String(left.id || "").localeCompare(String(right.id || ""));
+  });
+}
+
+function summarizeAgentRunChain(agentRuns = []) {
+  const runs = Array.isArray(agentRuns) ? agentRuns : [];
+  const chainId = runs[0]?.chainId || "";
+  const rootRun = runs[0] || null;
+  const failedRun = runs.find((run) => run.status === "failed") || null;
+  const blockedRuns = runs.filter((run) => run.status === "blocked");
+  const succeededRuns = runs.filter((run) => run.status === "succeeded");
+  const lastRun = runs[runs.length - 1] || null;
+  const status = failedRun
+    ? "failed"
+    : blockedRuns.length > 0
+      ? "blocked"
+      : runs.length > 0 && succeededRuns.length === runs.length
+        ? "succeeded"
+        : lastRun?.status || "queued";
+
+  return {
+    chainId,
+    rootRunId: rootRun?.rootRunId || "",
+    requestedBy: rootRun?.requestedBy || "",
+    chainLabel: rootRun?.chainLabel || "",
+    status,
+    totalRuns: runs.length,
+    succeededRuns: succeededRuns.length,
+    blockedRuns: blockedRuns.length,
+    failedRunId: failedRun?.id || "",
+    failedRole: failedRun?.role || "",
+    createdAt: rootRun?.createdAt || "",
+    updatedAt: lastRun?.updatedAt || rootRun?.updatedAt || "",
+    inputSummary: rootRun?.inputSummary || "",
+    outputSummary: lastRun?.outputSummary || rootRun?.outputSummary || "",
+    summary: runs.length > 0
+      ? runs.map((run) => roleLabel(run.role)).join(" → ")
+      : "暂无 Agent Run 记录",
+  };
+}
+
+function buildAgentRunChainViews(agentRuns = []) {
+  const runsByChain = new Map();
+  sortAgentRunsBySequence(agentRuns).forEach((run) => {
+    if (!runsByChain.has(run.chainId)) {
+      runsByChain.set(run.chainId, []);
+    }
+    runsByChain.get(run.chainId).push(run);
+  });
+
+  return [...runsByChain.values()]
+    .map((runs) => ({
+      chain: summarizeAgentRunChain(runs),
+      agentRuns: runs,
+    }))
+    .sort((left, right) => {
+      const updatedDelta = String(right.chain.updatedAt || "").localeCompare(String(left.chain.updatedAt || ""));
+      if (updatedDelta !== 0) return updatedDelta;
+      return String(right.chain.createdAt || "").localeCompare(String(left.chain.createdAt || ""));
+    });
+}
+
+function agentRunBadgeClass(status) {
+  if (status === "failed") return "red";
+  if (status === "blocked") return "orange";
+  if (status === "succeeded") return "green";
+  if (status === "running") return "blue";
+  return "gray";
+}
+
+function formatAgentRunTokenUsage(tokenUsage = {}) {
+  const promptTokens = Number(tokenUsage.promptTokens || tokenUsage.prompt_tokens || 0);
+  const completionTokens = Number(tokenUsage.completionTokens || tokenUsage.completion_tokens || 0);
+  const totalTokens = Number(tokenUsage.totalTokens || tokenUsage.total_tokens || promptTokens + completionTokens || 0);
+  if (!totalTokens) return "—";
+  return `${promptTokens}/${completionTokens} · ${totalTokens}`;
+}
+
+function formatAgentRunCostEstimate(costEstimate = {}) {
+  const amount = costEstimate.amount;
+  if (amount === undefined || amount === null || amount === "") {
+    return "—";
+  }
+  return `${amount} ${costEstimate.currency || ""}`.trim();
 }
 
 function renderDashboard() {
@@ -319,6 +423,7 @@ function normalizeDashboard(apiData) {
   const agentStatus = apiData.agentStatus || [];
   const workflows = apiData.workflows || [];
   const runnerJobs = apiData.runnerJobs || [];
+  const agentRuns = apiData.agentRuns || [];
   const runtimeEvents = apiData.runtimeEvents || [];
   const agentConfigApplications = apiData.agentConfigApplications || [];
   const agentById = new Map(agentStatus.map((agent) => [agent.id, agent]));
@@ -385,7 +490,11 @@ function normalizeDashboard(apiData) {
       runnerId: apiData.runnerStatus?.runnerId || "",
       version: apiData.runnerStatus?.version || "",
       workspacePath: apiData.runnerStatus?.workspacePath || "",
+      workspaceAlias: apiData.runnerStatus?.workspaceAlias || "",
       permissions: apiData.runnerStatus?.permissions || {},
+      capabilities: apiData.runnerStatus?.capabilities || {},
+      gitStatus: apiData.runnerStatus?.gitStatus || {},
+      validationCommands: apiData.runnerStatus?.validationCommands || [],
       lastHeartbeatAt: apiData.runnerStatus?.lastHeartbeatAt || "",
     },
     runtimeEvents: runtimeEvents.map((event) => ({
@@ -400,6 +509,58 @@ function normalizeDashboard(apiData) {
       beforeState: event.beforeState ?? null,
       afterState: event.afterState ?? null,
     })),
+    agentRuns: agentRuns.map((run) => ({
+      id: run.id,
+      projectId: run.projectId || "",
+      chainId: run.chainId || "",
+      rootRunId: run.rootRunId || "",
+      parentRunId: run.parentRunId || "",
+      sequence: Number(run.sequence || 0),
+      role: run.role || "",
+      agentId: run.agentId || "",
+      agentName: run.agentName || "",
+      model: run.model || "",
+      status: run.status || "queued",
+      inputSummary: run.inputSummary || "",
+      outputSummary: run.outputSummary || "",
+      tokenUsage: run.tokenUsage || {},
+      costEstimate: run.costEstimate || {},
+      errorCategory: run.errorCategory || "",
+      errorMessage: run.errorMessage || "",
+      requestedBy: run.requestedBy || "",
+      chainLabel: run.chainLabel || "",
+      createdAt: run.createdAt || "",
+      startedAt: run.startedAt || "",
+      completedAt: run.completedAt || "",
+      failedAt: run.failedAt || "",
+      updatedAt: run.updatedAt || "",
+    })),
+    agentRunChainViews: buildAgentRunChainViews(agentRuns.map((run) => ({
+      id: run.id,
+      projectId: run.projectId || "",
+      chainId: run.chainId || "",
+      rootRunId: run.rootRunId || "",
+      parentRunId: run.parentRunId || "",
+      sequence: Number(run.sequence || 0),
+      role: run.role || "",
+      agentId: run.agentId || "",
+      agentName: run.agentName || "",
+      model: run.model || "",
+      status: run.status || "queued",
+      inputSummary: run.inputSummary || "",
+      outputSummary: run.outputSummary || "",
+      tokenUsage: run.tokenUsage || {},
+      costEstimate: run.costEstimate || {},
+      errorCategory: run.errorCategory || "",
+      errorMessage: run.errorMessage || "",
+      requestedBy: run.requestedBy || "",
+      chainLabel: run.chainLabel || "",
+      createdAt: run.createdAt || "",
+      startedAt: run.startedAt || "",
+      completedAt: run.completedAt || "",
+      failedAt: run.failedAt || "",
+      updatedAt: run.updatedAt || "",
+    }))),
     approvalRequests: pendingApprovals.map((item) => ({
       file: item.affectedFiles?.[0] || item.id,
       type: (item.operationTypes || []).join(" / ") || "unknown",
@@ -620,8 +781,36 @@ async function postProjectPlanRequest(body = {}) {
   return result;
 }
 
+async function postAgentRunRequest(body = {}) {
+  const response = await fetch(`${apiBase}/api/projects/${projectId}/agent-run-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
 async function postRunnerJobAction(jobId, action, body = {}) {
   const response = await fetch(`${apiBase}/api/runner/jobs/${jobId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || result.error || `API returned ${response.status}`);
+  }
+  return result;
+}
+
+async function postRunnerStatusAction(action, body = {}) {
+  const response = await fetch(`${apiBase}/api/projects/${projectId}/runner/status/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -1459,6 +1648,13 @@ function setProjectPlanFeedback(text, mode = "") {
   feedback.textContent = text;
 }
 
+function setAgentRunFeedback(text, mode = "") {
+  const feedback = document.querySelector("#agentRunFeedback");
+  if (!feedback) return;
+  feedback.className = `approval-feedback ${mode}`.trim();
+  feedback.textContent = text;
+}
+
 function setRuntimeStateButtons(disabled) {
   document.querySelectorAll("#exportRuntimeState, #resetRuntimeState, #clearRuntimeState")
     .forEach((button) => { button.disabled = disabled; });
@@ -1655,6 +1851,147 @@ function renderWorkflowPage() {
   }
 }
 
+function renderAgentRunsPage(selectedChainId = selectedAgentRunChainId) {
+  const chainViews = appData.agentRunChainViews || [];
+  const agentRuns = appData.agentRuns || [];
+  const chainCount = document.querySelector("#agentRunChainCount");
+  const runCount = document.querySelector("#agentRunCount");
+  const chainBadge = document.querySelector("#agentRunChainBadge");
+  const chainTableBody = document.querySelector("#agentRunChainTable tbody");
+  const detail = document.querySelector("#agentRunDetail");
+  const detailStatus = document.querySelector("#agentRunDetailStatus");
+  const requestControls = document.querySelectorAll("#agentRuns .agent-run-request input, #agentRuns .agent-run-request textarea, #agentRuns .agent-run-request select, #agentRuns .agent-run-request button");
+  const submitButton = document.querySelector("#submitAgentRunRequest");
+
+  requestControls.forEach((control) => {
+    control.disabled = agentRunRequestRunning;
+  });
+  if (submitButton) {
+    submitButton.textContent = agentRunRequestRunning ? "生成中..." : "生成 Agent Run 链";
+    submitButton.onclick = () => runAgentRunRequest();
+  }
+
+  if (chainCount) chainCount.textContent = chainViews.length;
+  if (runCount) runCount.textContent = agentRuns.length;
+  if (chainBadge) chainBadge.textContent = chainViews.length > 0 ? "本地记录" : "空状态";
+  if (!chainTableBody || !detail) return;
+
+  if (chainViews.length === 0) {
+    selectedAgentRunChainId = "";
+    chainTableBody.innerHTML = `<tr><td colspan="5">暂无 Agent Run 记录</td></tr>`;
+    detail.innerHTML = `
+      <div class="approval-meta">
+        <div><span>当前状态</span><strong>暂无 Agent Run 记录</strong></div>
+        <div><span>安全说明</span><strong>当前仅保留只读链路展示，不会写文件、启用 Runner 或调用真实模型。</strong></div>
+      </div>
+    `;
+    if (detailStatus) {
+      detailStatus.textContent = "空状态";
+      detailStatus.className = "badge gray";
+    }
+    return;
+  }
+
+  const selectedView = chainViews.find((view) => view.chain.chainId === selectedChainId) || chainViews[0];
+  selectedAgentRunChainId = selectedView?.chain?.chainId || "";
+  const chain = selectedView.chain;
+  const selectedRuns = selectedView.agentRuns || [];
+  const recentEvents = (appData.runtimeEvents || [])
+    .filter((event) => event.entityType === "agent_run" && selectedRuns.some((run) => run.id === event.entityId))
+    .slice(-8)
+    .reverse();
+
+  chainTableBody.innerHTML = chainViews.map((view, index) => `
+    <tr class="${view.chain.chainId === selectedAgentRunChainId ? "active" : ""}" data-agent-run-chain-index="${index}">
+      <td>
+        <strong>${escapeHtml(view.chain.chainLabel || "Agent Run 链")}</strong>
+        <p>${escapeHtml(view.chain.summary || "暂无摘要")}</p>
+      </td>
+      <td>${escapeHtml(view.chain.requestedBy || "local_user")}</td>
+      <td><span class="badge ${agentRunBadgeClass(view.chain.status)}">${escapeHtml(statusLabel("agentRun", view.chain.status))}</span></td>
+      <td>${escapeHtml(String(view.chain.totalRuns || 0))}</td>
+      <td>${escapeHtml(view.chain.updatedAt || "未记录")}</td>
+    </tr>
+  `).join("");
+
+  if (detailStatus) {
+    detailStatus.textContent = statusLabel("agentRun", chain.status);
+    detailStatus.className = `badge ${agentRunBadgeClass(chain.status)}`;
+  }
+
+  detail.innerHTML = `
+    <div class="approval-meta">
+      <div><span>链路 ID</span><strong>${escapeHtml(chain.chainId || "未命名链")}</strong></div>
+      <div><span>链路名称</span><strong>${escapeHtml(chain.chainLabel || "本地 Agent Run 链")}</strong></div>
+      <div><span>请求人</span><strong>${escapeHtml(chain.requestedBy || "local_user")}</strong></div>
+      <div><span>当前状态</span><strong>${escapeHtml(statusLabel("agentRun", chain.status))}</strong></div>
+    </div>
+    <div class="approval-meta">
+      <div><span>总 Runs</span><strong>${escapeHtml(String(chain.totalRuns || 0))}</strong></div>
+      <div><span>已成功</span><strong>${escapeHtml(String(chain.succeededRuns || 0))}</strong></div>
+      <div><span>已阻塞</span><strong>${escapeHtml(String(chain.blockedRuns || 0))}</strong></div>
+      <div><span>最后更新</span><strong>${escapeHtml(chain.updatedAt || "未记录")}</strong></div>
+    </div>
+    <div class="task-files">
+      <h3>链路摘要</h3>
+      <ul>
+        <li><b>步骤顺序</b><span>${escapeHtml(chain.summary || "暂无摘要")}</span></li>
+        <li><b>输入摘要</b><span>${escapeHtml(shortText(chain.inputSummary || "暂无", 140) || "暂无")}</span></li>
+        <li><b>输出摘要</b><span>${escapeHtml(shortText(chain.outputSummary || "暂无", 140) || "暂无")}</span></li>
+      </ul>
+    </div>
+    <div class="task-table-wrap">
+      <table class="data-table">
+        <thead><tr><th>角色</th><th>Agent / 模型</th><th>状态</th><th>Token / 成本</th><th>结果 / 错误</th></tr></thead>
+        <tbody>
+          ${selectedRuns.map((run) => `
+            <tr>
+              <td>
+                <strong>${escapeHtml(roleLabel(run.role))}</strong>
+                <p>${escapeHtml(run.role || "")}</p>
+              </td>
+              <td>
+                <strong>${escapeHtml(run.agentName || "未命名 Agent")}</strong>
+                <p>${escapeHtml(run.model || "未指定模型")}</p>
+              </td>
+              <td><span class="badge ${agentRunBadgeClass(run.status)}">${escapeHtml(statusLabel("agentRun", run.status))}</span></td>
+              <td>
+                <strong>${escapeHtml(formatAgentRunTokenUsage(run.tokenUsage))}</strong>
+                <p>${escapeHtml(formatAgentRunCostEstimate(run.costEstimate))}</p>
+              </td>
+              <td>${escapeHtml(shortText(run.outputSummary || run.errorMessage || run.inputSummary || "", 120) || "暂无")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="task-files">
+      <h3>最近事件</h3>
+      <ul>
+        ${recentEvents.length === 0
+          ? "<li>暂无审计事件</li>"
+          : recentEvents.map((event) => `
+            <li>
+              <b>${escapeHtml(event.eventType || "event")}</b>
+              <span>${escapeHtml(event.entityId || "")}</span>
+              <em>${escapeHtml(event.actor || "api")}</em>
+              <strong>${escapeHtml(event.createdAt || "")}</strong>
+            </li>
+          `).join("")}
+      </ul>
+    </div>
+    <p class="runner-safety-note">当前只展示本地 Agent Run 记录，不会触发真实 Runner、写项目文件、修改 Git 或调用 provider。</p>
+  `;
+
+  chainTableBody.querySelectorAll("[data-agent-run-chain-index]").forEach((row) => {
+    row.addEventListener("click", () => {
+      selectedAgentRunChainId = chainViews[Number(row.dataset.agentRunChainIndex)]?.chain?.chainId || selectedAgentRunChainId;
+      renderAgentRunsPage(selectedAgentRunChainId);
+    });
+  });
+
+}
+
 function runnerJobStatusLabel(status) {
   const labels = {
     queued: "只读排队",
@@ -1714,11 +2051,80 @@ function runnerPermissionLabel(value) {
   return value || "未配置";
 }
 
+function runnerCapabilityLabel(value) {
+  if (value === true) return "可上报";
+  if (value === false) return "关闭";
+  return value || "未配置";
+}
+
+function compactWorkspacePath(pathValue) {
+  const path = String(pathValue || "").replaceAll("\\", "/");
+  if (!path) return "";
+  const parts = path.split("/").filter(Boolean);
+  return parts.slice(-2).join("/") || path;
+}
+
+function defaultRunnerStatusPayload() {
+  return {
+    runnerId: appData.runnerStatus?.runnerId || "local_runner_manual",
+    version: appData.runnerStatus?.version || "0.1.0",
+    workspaceAlias: appData.runnerStatus?.workspaceAlias || "agent-swarm",
+    workspacePath: appData.runnerStatus?.workspacePath || "F:/projects/agent-swarm",
+    permissions: {
+      readFiles: true,
+      writeFiles: "approval_required",
+      executeCommands: "approval_required",
+      networkRequests: "approval_required",
+    },
+    capabilities: {
+      reportsStatus: true,
+      reportsGitStatus: true,
+      reportsDirtyWorkspace: true,
+      supportsValidationCommands: true,
+      executesCommands: false,
+      writesFiles: false,
+      modifiesGit: false,
+      networkRequests: false,
+    },
+    gitStatus: {
+      branch: appData.runnerStatus?.gitStatus?.branch || "local-trial",
+      dirty: appData.runnerStatus?.gitStatus?.dirty === true,
+      ahead: Number(appData.runnerStatus?.gitStatus?.ahead || 0),
+      behind: Number(appData.runnerStatus?.gitStatus?.behind || 0),
+      checkpointRequired: true,
+      statusSource: "ui_status_report",
+    },
+    validationCommands: [
+      {
+        id: "verify_mock_flows",
+        label: "Mock flow verification",
+        command: "powershell -ExecutionPolicy Bypass -File scripts\\verify-mock-flows.ps1",
+        allowed: false,
+        mode: "preview_only",
+      },
+      {
+        id: "verify_sqlite_flows",
+        label: "SQLite flow verification",
+        command: "powershell -ExecutionPolicy Bypass -File scripts\\verify-sqlite-flows.ps1",
+        allowed: false,
+        mode: "preview_only",
+      },
+    ],
+    requestedBy: "local_user",
+    reason: "runner_status_ui_update",
+  };
+}
+
 function renderRunnerStatus() {
   const runnerStatus = appData.runnerStatus || {};
   const statusBadge = document.querySelector("#runnerConnectionStatus");
   const detail = document.querySelector("#runnerStatusDetail");
   const permissions = runnerStatus.permissions || {};
+  const capabilities = runnerStatus.capabilities || {};
+  const gitStatus = runnerStatus.gitStatus || {};
+  const validationCommands = runnerStatus.validationCommands || [];
+  const workspaceAlias = runnerStatus.workspaceAlias || compactWorkspacePath(runnerStatus.workspacePath) || "未配置";
+  const compactPath = compactWorkspacePath(runnerStatus.workspacePath);
 
   if (statusBadge) {
     statusBadge.textContent = runnerStatus.connected ? "已连接" : "未连接";
@@ -1731,8 +2137,14 @@ function renderRunnerStatus() {
     <div class="approval-meta runner-status-meta">
       <div><span>Runner ID</span><strong>${escapeHtml(runnerStatus.runnerId || "未连接")}</strong></div>
       <div><span>版本</span><strong>${escapeHtml(runnerStatus.version || "未记录")}</strong></div>
-      <div><span>工作区</span><strong>${escapeHtml(runnerStatus.workspacePath || "未配置")}</strong></div>
+      <div><span>工作区别名</span><strong>${escapeHtml(workspaceAlias)}</strong></div>
       <div><span>最后心跳</span><strong>${escapeHtml(runnerStatus.lastHeartbeatAt || "未记录")}</strong></div>
+    </div>
+    <div class="approval-meta runner-status-meta">
+      <div><span>路径显示</span><strong>${escapeHtml(compactPath || "未配置")}</strong></div>
+      <div><span>Git 分支</span><strong>${escapeHtml(gitStatus.branch || "未上报")}</strong></div>
+      <div><span>工作区状态</span><strong>${gitStatus.dirty ? "dirty，需要阻止后续执行计划" : "clean"}</strong></div>
+      <div><span>同步状态</span><strong>${escapeHtml(`ahead ${gitStatus.ahead ?? 0} / behind ${gitStatus.behind ?? 0}`)}</strong></div>
     </div>
     <div class="runner-permissions">
       <span>读文件：${escapeHtml(runnerPermissionLabel(permissions.readFiles))}</span>
@@ -1740,8 +2152,30 @@ function renderRunnerStatus() {
       <span>执行命令：${escapeHtml(runnerPermissionLabel(permissions.executeCommands))}</span>
       <span>网络请求：${escapeHtml(runnerPermissionLabel(permissions.networkRequests))}</span>
     </div>
-    <p class="runner-safety-note">当前为 Mock 只读状态页：Runner job 只是审批后的排队记录，不会执行本地命令、不会写文件、不会发起网络请求，也不会修改 Git。</p>
+    <div class="runner-permissions">
+      <span>状态上报：${escapeHtml(runnerCapabilityLabel(capabilities.reportsStatus))}</span>
+      <span>Git 状态：${escapeHtml(runnerCapabilityLabel(capabilities.reportsGitStatus))}</span>
+      <span>脏工作区：${escapeHtml(runnerCapabilityLabel(capabilities.reportsDirtyWorkspace))}</span>
+      <span>验证命令预览：${escapeHtml(runnerCapabilityLabel(capabilities.supportsValidationCommands))}</span>
+    </div>
+    <div class="task-files">
+      <h3>验证命令预览</h3>
+      <ul>${validationCommands.length === 0
+        ? "<li>暂无验证命令上报</li>"
+        : validationCommands.map((command) => `<li><b>${escapeHtml(command.label || command.id || "命令")}</b><span>${escapeHtml(command.command || "")}</span><em>${escapeHtml(command.mode || "preview_only")}</em></li>`).join("")}
+      </ul>
+    </div>
+    <div class="task-actions runner-status-actions">
+      <button class="safe-action" type="button" data-runner-status-action="connect" ${runnerStatusActionRunning ? "disabled" : ""}>连接状态</button>
+      <button class="neutral-action" type="button" data-runner-status-action="heartbeat" ${runnerStatusActionRunning || !runnerStatus.connected ? "disabled" : ""}>记录心跳</button>
+      <button class="danger-action" type="button" data-runner-status-action="disconnect" ${runnerStatusActionRunning || !runnerStatus.connected ? "disabled" : ""}>断开连接</button>
+    </div>
+    <p class="runner-safety-note">阶段 4 只接受 Runner 状态、能力声明、Git 状态和验证命令预览；不会启动 Runner、执行本地命令、写文件、发起网络请求或修改 Git。</p>
   `;
+
+  detail.querySelectorAll("[data-runner-status-action]").forEach((button) => {
+    button.addEventListener("click", () => runRunnerStatusAction(button.dataset.runnerStatusAction));
+  });
 }
 
 function renderRuntimePage(selectedIndex = selectedRunnerJobIndex) {
@@ -2218,6 +2652,53 @@ async function runProjectPlanRequest() {
   }
 }
 
+async function runAgentRunRequest() {
+  if (agentRunRequestRunning) return;
+
+  const idea = document.querySelector("#agentRunIdea")?.value?.trim() || "";
+  const constraints = document.querySelector("#agentRunConstraints")?.value?.trim() || "";
+  const simulateFailureRole = document.querySelector("#agentRunFailureRole")?.value || "";
+
+  if (!idea) {
+    setAgentRunFeedback("请输入 Agent Run 需求。", "error");
+    return;
+  }
+
+  agentRunRequestRunning = true;
+  setAgentRunFeedback("正在生成 Agent Run 链...");
+  renderAgentRunsPage(selectedAgentRunChainId);
+
+  let feedbackText = "";
+  let feedbackMode = "";
+  try {
+    const result = await postAgentRunRequest({
+      idea,
+      constraints,
+      requestedBy: "local_user",
+      chainLabel: shortText(idea, 48) || "本地 Agent Run 链",
+      simulateFailureRole,
+    });
+    selectedAgentRunChainId = result.chain?.chainId || selectedAgentRunChainId;
+    appData = await loadDashboardFromApi();
+    renderDashboard();
+    renderAgentsPage();
+    renderWorkflowPage();
+    renderAgentRunsPage(selectedAgentRunChainId);
+    renderRuntimePage();
+    feedbackText = `已生成 Agent Run 链：${result.chain?.chainId || "未知 ID"}`;
+    feedbackMode = "success";
+  } catch (error) {
+    feedbackText = `生成失败：${error.message}`;
+    feedbackMode = "error";
+  } finally {
+    agentRunRequestRunning = false;
+    renderAgentRunsPage(selectedAgentRunChainId);
+    if (feedbackText) {
+      setAgentRunFeedback(feedbackText, feedbackMode);
+    }
+  }
+}
+
 async function runApprovalAction(action) {
   const item = pendingApprovalRequests()[selectedApprovalIndex];
   if (!item?.id || approvalActionRunning) return;
@@ -2297,6 +2778,37 @@ async function runTaskAction(action) {
   } finally {
     taskActionRunning = false;
     renderTaskPage(selectedTaskIndex);
+  }
+}
+
+async function runRunnerStatusAction(action) {
+  if (runnerStatusActionRunning) return;
+
+  const actionLabels = {
+    connect: "连接状态",
+    heartbeat: "记录心跳",
+    disconnect: "断开连接",
+  };
+
+  runnerStatusActionRunning = true;
+  renderRuntimePage(selectedRunnerJobIndex);
+
+  try {
+    const body = action === "disconnect"
+      ? { requestedBy: "local_user", reason: "runner_status_ui_disconnect" }
+      : defaultRunnerStatusPayload();
+    await postRunnerStatusAction(action, body);
+    appData = await loadDashboardFromApi();
+    renderDashboard();
+    renderRuntimePage(selectedRunnerJobIndex);
+  } catch (error) {
+    const detail = document.querySelector("#runnerStatusDetail");
+    if (detail) {
+      detail.insertAdjacentHTML("beforeend", `<p class="approval-feedback error">${escapeHtml(actionLabels[action] || action)}失败：${escapeHtml(error.message)}</p>`);
+    }
+  } finally {
+    runnerStatusActionRunning = false;
+    renderRuntimePage(selectedRunnerJobIndex);
   }
 }
 
@@ -2414,6 +2926,7 @@ async function runRuntimeStateAction(action) {
       renderDashboard();
       renderAgentsPage();
       renderWorkflowPage();
+      renderAgentRunsPage();
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
@@ -2425,6 +2938,7 @@ async function runRuntimeStateAction(action) {
       renderDashboard();
       renderAgentsPage();
       renderWorkflowPage();
+      renderAgentRunsPage();
       renderRuntimePage();
       renderApprovalPage(selectedApprovalIndex);
       renderTaskPage(selectedTaskIndex);
@@ -2492,6 +3006,7 @@ async function boot() {
   renderDashboard();
   renderAgentsPage();
   renderWorkflowPage();
+  renderAgentRunsPage();
   renderRuntimePage();
   renderApprovalPage();
   renderTaskPage();

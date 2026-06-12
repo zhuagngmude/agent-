@@ -198,6 +198,39 @@ CREATE TABLE IF NOT EXISTS workflows (
 CREATE INDEX IF NOT EXISTS idx_workflows_project_id ON workflows(project_id);
 CREATE INDEX IF NOT EXISTS idx_workflows_status ON workflows(status);
 
+CREATE TABLE IF NOT EXISTS agent_runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  chain_id TEXT NOT NULL,
+  root_run_id TEXT NOT NULL,
+  parent_run_id TEXT,
+  sequence INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  agent_id TEXT,
+  agent_name TEXT NOT NULL,
+  model TEXT NOT NULL,
+  status TEXT NOT NULL,
+  input_summary TEXT,
+  output_summary TEXT,
+  token_usage TEXT NOT NULL,
+  cost_estimate TEXT NOT NULL,
+  error_category TEXT,
+  error_message TEXT,
+  requested_by TEXT NOT NULL,
+  chain_label TEXT,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  completed_at TEXT,
+  failed_at TEXT,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_runs_project_id ON agent_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_chain_id ON agent_runs(chain_id);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_created_at ON agent_runs(created_at);
+
 CREATE TABLE IF NOT EXISTS runner_status (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
@@ -205,7 +238,11 @@ CREATE TABLE IF NOT EXISTS runner_status (
   runner_id TEXT NOT NULL,
   version TEXT NOT NULL,
   workspace_path TEXT,
+  workspace_alias TEXT,
   permissions TEXT NOT NULL,
+  capabilities TEXT NOT NULL DEFAULT '{}',
+  git_status TEXT NOT NULL DEFAULT '{}',
+  validation_commands TEXT NOT NULL DEFAULT '[]',
   last_heartbeat_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

@@ -3,6 +3,7 @@ window.AGENT_SWARM_NAV = {
   agents: ["智能体管理", "全局视图 / 智能体管理"],
   tasks: ["任务管理", "全局视图 / 任务管理"],
   workflow: ["工作流编排", "全局视图 / 工作流编排"],
+  agentRuns: ["Agent Run 记录", "全局视图 / Agent Run 记录"],
   knowledge: ["知识库管理", "全局视图 / 知识库管理"],
   code: ["代码与知识", "全局视图 / 代码与知识"],
   runtime: ["运行与调度", "全局视图 / 运行与调度"],
@@ -39,6 +40,13 @@ window.AGENT_SWARM_STATUS = {
     waiting: { label: "等待中", tone: "warn" },
     failed: { label: "异常", tone: "danger" },
   },
+  agentRun: {
+    succeeded: { label: "已完成", tone: "ok" },
+    failed: { label: "已失败", tone: "danger" },
+    blocked: { label: "已阻塞", tone: "warn" },
+    running: { label: "进行中", tone: "ok" },
+    queued: { label: "排队中", tone: "neutral" },
+  },
 };
 
 window.AGENT_SWARM_DATA = {
@@ -74,6 +82,8 @@ window.AGENT_SWARM_DATA = {
   },
   approvalRequests: [],
   taskQueue: [],
+  agentRuns: [],
+  runtimeEvents: [],
   agents: [
     { avatar: "A", name: "架构师 Agent", version: "v0.2.0", status: "running" },
     { avatar: "B", name: "前端 Agent", version: "v0.2.0", status: "running" },

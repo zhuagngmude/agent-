@@ -1,3 +1,8 @@
+const {
+  createAgentRunChain,
+  summarizeAgentRunChain,
+} = require("./agent-runs");
+
 const projectId = "project_agent_swarm";
 
 const status = {
@@ -261,6 +266,20 @@ function cloneValue(value) {
 
 const initialApprovalState = approvals.map((approval) => cloneValue(approval));
 const initialTaskState = tasks.map((task) => cloneValue(task));
+const initialAgentRunGeneration = createAgentRunChain({
+  projectId,
+  agents,
+  chainId: "agent_run_chain_seed",
+  createdAt: "2026-06-09T00:00:00Z",
+  body: {
+    idea: "本地客户线索跟进工具",
+    constraints: "Mock/SQLite only; no real Runner; no real model calls",
+    requestedBy: "seed-sqlite",
+    chainLabel: "默认 Agent Run 示例链",
+  },
+});
+const agentRuns = initialAgentRunGeneration.agentRuns.map((run) => cloneValue(run));
+const initialAgentRunState = agentRuns.map((run) => cloneValue(run));
 
 const workflows = [
   {
@@ -301,8 +320,8 @@ const workflows = [
 
 const runnerJobs = [];
 const initialRunnerJobState = runnerJobs.map((job) => ({ ...job }));
-const runtimeEvents = [];
-const initialRuntimeEventState = runtimeEvents.map((event) => ({ ...event }));
+const runtimeEvents = initialAgentRunGeneration.runtimeEvents.map((event) => cloneValue(event));
+const initialRuntimeEventState = runtimeEvents.map((event) => cloneValue(event));
 const agentConfigApplications = [];
 const initialAgentConfigApplicationState = agentConfigApplications.map((item) => ({ ...item }));
 const runnerStatus = {
@@ -310,13 +329,50 @@ const runnerStatus = {
   runnerId: "local_runner_001",
   version: "0.1.0",
   workspacePath: "F:/projects/agent-swarm",
+  workspaceAlias: "agent-swarm",
   permissions: {
     readFiles: true,
     writeFiles: "approval_required",
     executeCommands: "approval_required",
     networkRequests: "approval_required",
   },
+  capabilities: {
+    reportsStatus: true,
+    reportsGitStatus: true,
+    reportsDirtyWorkspace: true,
+    supportsValidationCommands: true,
+    executesCommands: false,
+    writesFiles: false,
+    modifiesGit: false,
+    networkRequests: false,
+  },
+  gitStatus: {
+    branch: "local-trial",
+    dirty: false,
+    ahead: 0,
+    behind: 0,
+    checkpointRequired: true,
+    statusSource: "runner_reported_mock",
+  },
+  validationCommands: [
+    {
+      id: "verify_mock_flows",
+      label: "Mock flow verification",
+      command: "powershell -ExecutionPolicy Bypass -File scripts\\verify-mock-flows.ps1",
+      allowed: false,
+      mode: "preview_only",
+    },
+    {
+      id: "verify_sqlite_flows",
+      label: "SQLite flow verification",
+      command: "powershell -ExecutionPolicy Bypass -File scripts\\verify-sqlite-flows.ps1",
+      allowed: false,
+      mode: "preview_only",
+    },
+  ],
+  lastHeartbeatAt: "2026-06-09T00:00:00Z",
 };
+const initialRunnerStatusState = cloneValue(runnerStatus);
 
 const gitCheckpoints = [
   {
@@ -396,6 +452,9 @@ function dashboard() {
   const activeAgents = agents.filter((item) => item.status === "running").length;
   const activeTasks = tasks.filter((item) => item.status === "running" || item.status === "queued").length;
   const completedTasks = tasks.filter((item) => item.status === "completed").length;
+  const agentRunChains = new Set(agentRuns.map((run) => run.chainId)).size;
+  const completedAgentRuns = agentRuns.filter((run) => run.status === "succeeded").length;
+  const failedAgentRuns = agentRuns.filter((run) => run.status === "failed").length;
 
   return {
     project,
@@ -405,21 +464,22 @@ function dashboard() {
       activeTasks,
       gitCheckpoints: gitCheckpoints.length,
       tokenUsage: "-",
-      modelCount: settings.models.length,
+      agentRuns: agentRunChains,
     },
     workflowSummary: {
       totalAgents: agents.length,
       totalTasks: tasks.length,
+      totalAgentRuns: agentRuns.length,
       completedTasks,
       successRate: tasks.length ? completedTasks / tasks.length : 0,
+      completedAgentRuns,
+      failedAgentRuns,
       averageResponseMs: 0,
     },
     workflows,
-    runnerStatus: {
-      ...runnerStatus,
-      lastHeartbeatAt: new Date().toISOString(),
-    },
+    runnerStatus: cloneValue(runnerStatus),
     runnerJobs,
+    agentRuns,
     runtimeEvents,
     agentConfigApplications,
     pendingApprovals: approvals,
@@ -436,6 +496,11 @@ function resetRuntimeData() {
   approvals.splice(0, approvals.length, ...initialApprovalState.map((approval) => cloneValue(approval)));
   tasks.splice(0, tasks.length, ...initialTaskState.map((task) => cloneValue(task)));
   runnerJobs.splice(0, runnerJobs.length, ...initialRunnerJobState.map((job) => cloneValue(job)));
+  Object.keys(runnerStatus).forEach((key) => {
+    delete runnerStatus[key];
+  });
+  Object.assign(runnerStatus, cloneValue(initialRunnerStatusState));
+  agentRuns.splice(0, agentRuns.length, ...initialAgentRunState.map((run) => cloneValue(run)));
   runtimeEvents.splice(0, runtimeEvents.length, ...initialRuntimeEventState.map((event) => cloneValue(event)));
   agentConfigApplications.splice(
     0,
@@ -453,6 +518,7 @@ module.exports = {
   workflows,
   runnerStatus,
   runnerJobs,
+  agentRuns,
   runtimeEvents,
   agentConfigApplications,
   approvals,

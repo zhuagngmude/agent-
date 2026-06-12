@@ -41,6 +41,18 @@
 - `targetService=project_plan` 的审批通过后，只会生成 5 个 queued 任务和 5 条只读 Runner request 记录。
 - 这些 Runner request 记录必须是 `runner_request_readonly`，不能执行命令、写文件、改 Git、发网络请求、调用模型或触发 Agent。
 
+### Agent Run 记录链
+
+- `POST /api/projects/:projectId/agent-run-requests`
+- `GET /api/projects/:projectId/agent-runs`
+
+行为要点：
+
+- 只生成本地可追踪的 Agent Run 记录链，不直接写项目文件、不改 Git、不创建任务、不创建 Runner job。
+- 每条记录只保存摘要、模型、token、成本、错误和 parent chain 关系，不保存原始 prompt、provider payload 或密钥。
+- `simulateFailureRole` 只用于本地失败注入，不会扩大权限，也不会触发真实 Runner。
+- `GET /api/projects/:projectId/agent-runs` 只提供链路列表、选中链路和 runtime event 审计视图。
+
 ### Agent 配置安全闭环
 
 - `POST /api/agents/:agentId/change-requests`
@@ -97,6 +109,7 @@
 - `GET /api/projects/:projectId/workflows`
 - `GET /api/projects/:projectId/runner/status`
 - `GET /api/projects/:projectId/runner/jobs`
+- `GET /api/projects/:projectId/agent-runs`
 - `GET /api/projects/:projectId/execution-requests`
 - `GET /api/projects/:projectId/runtime-events`
 - `GET /api/projects/:projectId/git/checkpoints`

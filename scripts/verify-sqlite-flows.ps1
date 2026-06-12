@@ -226,6 +226,93 @@ try {
   Assert-Equal $runtimeState.mode "sqlite" "Runtime state endpoint should report SQLite mode."
   Assert-True ($runtimeState.sqliteRuntimeState -eq $true) "Runtime state should be SQLite-backed."
 
+  Write-Step "Verify Agent Run chain recording and read-only view."
+  $agentRunRequest = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/agent-run-requests" -Body @{
+    idea = "Build a local customer lead tracker"
+    constraints = "SQLite mode only; no real Runner; no real model calls"
+    requestedBy = "verify_sqlite_flows"
+    chainLabel = "SQLite verification Agent Run"
+    simulateFailureRole = "qa"
+  }
+  Assert-Equal $agentRunRequest.chain.status "failed" "SQLite Agent Run chain should report the injected failure."
+  Assert-Equal @($agentRunRequest.agentRuns).Count 7 "SQLite Agent Run chain should include seven runs."
+  Assert-Equal @($agentRunRequest.agentRuns | Where-Object { $_.status -eq "failed" }).Count 1 "SQLite Agent Run chain should fail exactly one run."
+  Assert-True ($agentRunRequest.sideEffects.callsRealModel -eq $false) "SQLite Agent Run chain should not call a real model."
+  Assert-True ($agentRunRequest.sideEffects.createsRunnerJobs -eq $false) "SQLite Agent Run chain should not create Runner jobs."
+  Assert-True ($agentRunRequest.sideEffects.triggersAgents -eq $false) "SQLite Agent Run chain should not trigger Agents."
+
+  $agentRuns = Invoke-Json -Method "GET" -Path "/api/projects/$projectId/agent-runs"
+  Assert-True (@($agentRuns.agentRunChains).Count -ge 2) "SQLite Agent Run read-only view should include the seed chain and the new chain."
+  Assert-Equal $agentRuns.selectedChain.chainId $agentRunRequest.chain.chainId "SQLite Agent Run view should select the newest chain."
+  Assert-Equal @($agentRuns.selectedChain.agentRuns).Count 7 "SQLite selected Agent Run chain should include seven runs."
+
+  Write-Step "Verify SQLite Runner status connection, heartbeat, and disconnect stay no-exec."
+  $runnerDisconnected = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/runner/status/disconnect" -Body @{
+    requestedBy = "verify_sqlite_flows"
+    reason = "prepare sqlite status connection check"
+  }
+  Assert-Equal $runnerDisconnected.runnerStatus.connected $false "SQLite Runner status should disconnect."
+  Assert-True ($runnerDisconnected.sideEffects.executesRunner -eq $false) "SQLite Runner status disconnect should not execute Runner."
+  $runnerConnected = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/runner/status/connect" -Body @{
+    runnerId = "verify_sqlite_runner"
+    version = "0.1.0"
+    workspaceAlias = "agent-swarm"
+    workspacePath = "F:/projects/agent-swarm"
+    permissions = @{
+      readFiles = $true
+      writeFiles = "approval_required"
+      executeCommands = "approval_required"
+      networkRequests = "approval_required"
+    }
+    capabilities = @{
+      reportsStatus = $true
+      reportsGitStatus = $true
+      reportsDirtyWorkspace = $true
+      supportsValidationCommands = $true
+      executesCommands = $false
+      writesFiles = $false
+      modifiesGit = $false
+      networkRequests = $false
+    }
+    gitStatus = @{
+      branch = "verify-sqlite"
+      dirty = $false
+      ahead = 0
+      behind = 0
+      checkpointRequired = $true
+    }
+    validationCommands = @(
+      @{
+        id = "verify_sqlite_flows"
+        label = "SQLite flow verification"
+        command = "powershell -ExecutionPolicy Bypass -File scripts\verify-sqlite-flows.ps1"
+        allowed = $false
+        mode = "preview_only"
+      }
+    )
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $runnerConnected.runnerStatus.connected $true "SQLite Runner status should connect."
+  Assert-Equal $runnerConnected.runnerStatus.workspaceAlias "agent-swarm" "SQLite Runner status should keep workspace alias."
+  Assert-Equal $runnerConnected.runnerStatus.capabilities.executesCommands $false "SQLite Runner status should report command execution disabled."
+  Assert-Equal $runnerConnected.runnerStatus.gitStatus.dirty $false "SQLite Runner status should report clean workspace."
+  Assert-True ($runnerConnected.sideEffects.executesRunner -eq $false) "SQLite Runner status connect should not execute Runner."
+  $runnerHeartbeat = Invoke-Json -Method "POST" -Path "/api/projects/$projectId/runner/status/heartbeat" -Body @{
+    runnerId = "verify_sqlite_runner"
+    workspaceAlias = "agent-swarm"
+    gitStatus = @{
+      branch = "verify-sqlite"
+      dirty = $true
+      ahead = 0
+      behind = 0
+      checkpointRequired = $true
+    }
+    requestedBy = "verify_sqlite_flows"
+  }
+  Assert-Equal $runnerHeartbeat.runnerStatus.connected $true "SQLite Runner heartbeat should keep Runner connected."
+  Assert-Equal $runnerHeartbeat.runnerStatus.gitStatus.dirty $true "SQLite Runner heartbeat should update dirty workspace status."
+  Assert-True ($runnerHeartbeat.sideEffects.writesProjectFiles -eq $false) "SQLite Runner heartbeat should not write project files."
+
   Write-Step "Verify task start -> complete persists in SQLite."
   $taskStart = Invoke-Json -Method "POST" -Path "/api/tasks/task_task_state_api/start"
   Assert-Equal $taskStart.task.status "running" "Task should be running after start."

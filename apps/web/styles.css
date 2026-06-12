@@ -292,7 +292,8 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.6;
 }
 .project-plan-request textarea,
-.project-plan-request input {
+.project-plan-request input,
+.project-plan-request select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -842,6 +843,12 @@ li strong { color: var(--green); font-size: 13px; }
 .data-table.selectable tbody tr:hover { background: #fbfbfe; }
 .data-table.selectable tbody tr.active { background: #f3f1ff; box-shadow: inset 3px 0 0 var(--purple); }
 .task-table-wrap { overflow: auto; }
+.data-table td p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.data-table td strong { display: block; }
 .task-detail { min-height: 420px; }
 .task-files { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fbfbfe; overflow: hidden; }
 .task-files h3 { margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }

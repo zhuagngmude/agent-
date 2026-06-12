@@ -26,6 +26,7 @@
         <button data-page="agents"><span>⚭</span>智能体管理</button>
         <button data-page="tasks"><span>☷</span>任务管理</button>
         <button data-page="workflow"><span>⇄</span>工作流编排</button>
+        <button data-page="agentRuns"><span>⟳</span>Agent Run 记录</button>
         <button data-page="knowledge"><span>▣</span>知识库管理</button>
         <button data-page="code"><span>⌘</span>代码与知识</button>
         <button data-page="runtime"><span>◇</span>运行与调度</button>
@@ -256,6 +257,70 @@
           <div class="card-head"><h2>工作流编排</h2><div class="tabs"><button class="active" type="button" disabled>流程视图</button><button type="button" disabled title="依赖视图未接入">依赖视图</button></div></div>
           <div id="workflowPage"></div>
         </article>
+      </section>
+
+      <section class="page-view" id="agentRuns">
+        <article class="panel wide">
+          <div class="card-head">
+            <h2>Agent Run 记录 <em id="agentRunCount">0</em></h2>
+            <span class="badge orange" id="agentRunChainBadge">只读</span>
+          </div>
+          <div class="project-plan-request agent-run-request">
+            <div>
+              <span>阶段 3</span>
+              <strong>Agent Run 记录链</strong>
+              <p>输入需求后，本地只会生成可追踪的 Agent Run 链，不会写文件、不会启用 Runner、不会调用真实模型。</p>
+            </div>
+            <label>
+              <span>需求</span>
+              <textarea id="agentRunIdea" rows="4">整理一个本地客户线索跟进工具</textarea>
+            </label>
+            <label>
+              <span>约束</span>
+              <input id="agentRunConstraints" type="text" value="Mock/SQLite only; no real Runner; no real model calls">
+            </label>
+            <label>
+              <span>失败注入角色</span>
+              <select id="agentRunFailureRole">
+                <option value="">不模拟失败</option>
+                <option value="architect">Architect</option>
+                <option value="scheduler">Scheduler</option>
+                <option value="frontend">Frontend</option>
+                <option value="backend">Backend</option>
+                <option value="qa">QA</option>
+                <option value="docs">Docs</option>
+                <option value="reviewer">Reviewer</option>
+              </select>
+            </label>
+            <div class="agent-change-submit">
+              <button class="neutral-action" id="submitAgentRunRequest" type="button">生成 Agent Run 链</button>
+            </div>
+            <p class="approval-feedback" id="agentRunFeedback" role="status"></p>
+          </div>
+        </article>
+
+        <div class="approval-review agent-run-review">
+          <article class="approval-card">
+            <div class="card-head">
+              <h2>Agent Run 链 <em id="agentRunChainCount">0</em></h2>
+              <button class="text-link" type="button" disabled title="链路详情直接在本页展示">查看原始记录</button>
+            </div>
+            <div class="task-table-wrap">
+              <table class="data-table selectable" id="agentRunChainTable">
+                <thead><tr><th>链</th><th>请求人</th><th>状态</th><th>Runs</th><th>更新时间</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel agent-run-detail-panel">
+            <div class="card-head">
+              <h2>Agent Run 详情</h2>
+              <span class="badge orange" id="agentRunDetailStatus">只读</span>
+            </div>
+            <div id="agentRunDetail"></div>
+          </article>
+        </div>
       </section>
 
       <section class="page-view" id="knowledge">

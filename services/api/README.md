@@ -28,6 +28,7 @@ agent-config-fields.js
 agent-config-transaction-plan.js
 agent-config-rollback-request.js
 agent-config-version-history.js
+agent-runs.js
 model-gateway.js
 model-gateway-adapters.js
 model-gateway-provider-config.js
@@ -36,6 +37,8 @@ model-gateway-redaction.js
 model-gateway-model-calls.js
 project-plan.js
 ```
+
+`agent-runs.js` 负责本地 Agent Run 记录链的生成、链路摘要和零副作用约束。`POST /api/projects/:projectId/agent-run-requests` 会把一条本地 Agent Run 链写入 Mock / SQLite，`GET /api/projects/:projectId/agent-runs` 会返回链路列表、选中链和 runtime event 视图，但它们都不得调用真实 Runner、写项目文件、改 Git 或调用 provider。
 
 `agent-permissions.js` 负责 mock Agent 权限 profile 边界。`POST /api/agents/:agentId/change-requests` 在创建审批前验证 `changeType=permission`。安全 profile 会创建 Agent 配置审批，并把 `permissionValidation` 记录到 `changeRequest`；禁止 capability、未知 capability、未支持 profile 和 `all=true` 会返回 `422 agent_permission_validation_failed`，不写 runtime state 或 SQLite。
 

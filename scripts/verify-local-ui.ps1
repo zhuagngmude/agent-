@@ -205,6 +205,18 @@ try {
   Assert-True ((Invoke-PageEval -Expression "() => document.querySelector('#projectPlanIdea')?.tagName === 'TEXTAREA'") -eq $true) "Workflow page should render the project idea input."
   Assert-True ((Invoke-PageEval -Expression "() => document.querySelector('#submitProjectPlanRequest')?.disabled === false") -eq $true) "Project plan request button should be available in local UI."
 
+  Invoke-PageClickByDataPage -Page "agentRuns"
+  Assert-TextContains (Invoke-PageText -Selector "#agentRuns") "Agent Run" "Agent Run page should render the record chain panel."
+  $agentRunChainCountBefore = Invoke-PageEval -Expression "() => Number(document.querySelector('#agentRunChainCount')?.innerText || '0')"
+  $agentRunCountBefore = Invoke-PageEval -Expression "() => Number(document.querySelector('#agentRunCount')?.innerText || '0')"
+  Invoke-PageEval -Expression "() => { const idea = document.querySelector('#agentRunIdea'); if (idea) idea.value = 'Build a local customer lead tracker'; const constraints = document.querySelector('#agentRunConstraints'); if (constraints) constraints.value = 'SQLite mode only; no real Runner; no real model calls'; const failureRole = document.querySelector('#agentRunFailureRole'); if (failureRole) failureRole.value = 'qa'; return true; }" | Out-Null
+  Invoke-PageEval -Expression "() => { const button = document.querySelector('#submitAgentRunRequest'); if (button) button.click(); return true; }" | Out-Null
+  Start-Sleep -Milliseconds 1200
+  Assert-TextContains (Invoke-PageText -Selector "#agentRunFeedback") "Agent Run" "Agent Run submission should surface feedback."
+  Assert-True ((Invoke-PageEval -Expression "() => Number(document.querySelector('#agentRunChainCount')?.innerText || '0') >= $($agentRunChainCountBefore + 1)") -eq $true) "Agent Run page should refresh after creating a new chain."
+  Assert-True ((Invoke-PageEval -Expression "() => Number(document.querySelector('#agentRunCount')?.innerText || '0') >= $($agentRunCountBefore + 7)") -eq $true) "Agent Run page should add seven run records."
+  Assert-True ((Invoke-PageEval -Expression "() => document.querySelector('#agentRunDetailStatus')?.classList.contains('red') === true") -eq $true) "Agent Run detail should show the injected failure."
+
   Invoke-PageClickByDataPage -Page "approval"
   Assert-TextContains (Invoke-PageText -Selector "#approval") "Runner job" "Approval page should describe Runner jobs."
 

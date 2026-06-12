@@ -23,15 +23,16 @@ powershell -ExecutionPolicy Bypass -File scripts\stop-local.ps1
 
 1. `verify-project-plan-flow.ps1` 先确认项目计划审批与只读 Runner 队列的 helper 约束。
 2. `verify-mock-flows.ps1` 再检查 Mock 流程和安全边界。
-3. `verify-sqlite-flows.ps1` 再检查 SQLite 流程和持久化边界。
+3. `verify-sqlite-flows.ps1` 再检查 SQLite 流程、Agent Run 记录链和持久化边界。
 4. `verify-agent-config-safety-loop.ps1` 再确认 Agent 配置 apply / version / rollback 闭环。
 5. `verify-model-gateway.ps1` 再确认 Model Gateway 仍是禁用态和只读边界。
 6. `verify-real-model-admission.ps1` 再确认阶段 2 真实模型准入预备层仍不调用 provider、不写模型记录、不创建审批 / 任务 / Runner request。
-7. `verify-local-ui.ps1` 最后做浏览器烟测。
+7. `verify-local-ui.ps1` 最后做浏览器烟测，包括 Agent Run 记录页。
 
 ## 现场检查点
 
 - Dashboard 能看到项目、任务、审批、Runner 状态和本地试用状态。
+- Agent Run 页面能看到链路列表、单链详情和本地创建入口。
 - 项目计划审批通过后，只生成五个 queued 任务和五条只读 Runner request 记录。
 - Agent config 审批通过后，默认只会进入 `pending_apply`，不会直接改配置，不会生成 Runner job。
 - rollback 预检只返回只读 diff，不创建审批，不写入运行时状态。

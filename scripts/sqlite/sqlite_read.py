@@ -18,7 +18,17 @@ def bool_from_int(value):
 
 
 def pick(row, key, fallback=""):
-    return row[key] if row[key] is not None else fallback
+    try:
+        return row[key] if row[key] is not None else fallback
+    except (KeyError, IndexError):
+        return fallback
+
+
+def json_pick(row, key, fallback):
+    try:
+        return from_json(row[key], fallback)
+    except (KeyError, IndexError):
+        return fallback
 
 
 def project_row_to_api(row):
@@ -153,6 +163,35 @@ def agent_config_version_row_to_api(row):
     }
 
 
+def agent_run_row_to_api(row):
+    return {
+        "id": row["id"],
+        "projectId": row["project_id"],
+        "chainId": row["chain_id"],
+        "rootRunId": row["root_run_id"],
+        "parentRunId": pick(row, "parent_run_id"),
+        "sequence": row["sequence"],
+        "role": row["role"],
+        "agentId": pick(row, "agent_id"),
+        "agentName": row["agent_name"],
+        "model": row["model"],
+        "status": row["status"],
+        "inputSummary": pick(row, "input_summary"),
+        "outputSummary": pick(row, "output_summary"),
+        "tokenUsage": from_json(row["token_usage"], {}),
+        "costEstimate": from_json(row["cost_estimate"], {}),
+        "errorCategory": pick(row, "error_category"),
+        "errorMessage": pick(row, "error_message"),
+        "requestedBy": pick(row, "requested_by"),
+        "chainLabel": pick(row, "chain_label"),
+        "createdAt": pick(row, "created_at"),
+        "startedAt": pick(row, "started_at"),
+        "completedAt": pick(row, "completed_at"),
+        "failedAt": pick(row, "failed_at"),
+        "updatedAt": pick(row, "updated_at"),
+    }
+
+
 def workflow_row_to_api(row):
     return {
         "id": row["id"],
@@ -176,7 +215,11 @@ def runner_status_row_to_api(row):
         "runnerId": row["runner_id"],
         "version": row["version"],
         "workspacePath": pick(row, "workspace_path"),
+        "workspaceAlias": pick(row, "workspace_alias"),
         "permissions": from_json(row["permissions"], {}),
+        "capabilities": json_pick(row, "capabilities", {}),
+        "gitStatus": json_pick(row, "git_status", {}),
+        "validationCommands": json_pick(row, "validation_commands", []),
         "lastHeartbeatAt": pick(row, "last_heartbeat_at"),
     }
 
@@ -235,6 +278,18 @@ def fetch_mapped_list(connection, sql, mapper):
     return [mapper(row) for row in connection.execute(sql, (project_id,)).fetchall()]
 
 
+def table_exists(connection, table_name):
+    row = connection.execute(
+        """
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = ?
+        """,
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
 def attach_agent_relationships(connection, agents):
     agent_by_id = {agent["id"]: agent for agent in agents}
     for row in connection.execute(
@@ -256,11 +311,14 @@ def attach_agent_relationships(connection, agents):
             parent["childAgentIds"].append(row["child_agent_id"])
 
 
-def build_dashboard(project, agents, tasks, approvals, workflows, runner_status, runner_jobs, applications, git_checkpoints, knowledge_updates, runtime_events):
+def build_dashboard(project, agents, tasks, approvals, workflows, runner_status, agent_runs, runner_jobs, applications, git_checkpoints, knowledge_updates, runtime_events):
     active_agents = sum(1 for agent in agents if agent["status"] == "running")
     pending_approvals = sum(1 for approval in approvals if approval["status"] == "pending")
     active_tasks = sum(1 for task in tasks if task["status"] in ("running", "queued"))
     completed_tasks = sum(1 for task in tasks if task["status"] == "completed")
+    completed_agent_runs = sum(1 for agent_run in agent_runs if agent_run["status"] == "succeeded")
+    failed_agent_runs = sum(1 for agent_run in agent_runs if agent_run["status"] == "failed")
+    agent_run_chain_count = len({agent_run["chainId"] for agent_run in agent_runs})
 
     return {
         "project": project,
@@ -270,17 +328,22 @@ def build_dashboard(project, agents, tasks, approvals, workflows, runner_status,
             "activeTasks": active_tasks,
             "gitCheckpoints": len(git_checkpoints),
             "tokenUsage": "-",
-            "modelCount": 3,
+            "agentRuns": agent_run_chain_count,
+            "modelCount": len({agent["model"] for agent in agents if agent["model"]}),
         },
         "workflowSummary": {
             "totalAgents": len(agents),
             "totalTasks": len(tasks),
+            "totalAgentRuns": len(agent_runs),
             "completedTasks": completed_tasks,
+            "completedAgentRuns": completed_agent_runs,
+            "failedAgentRuns": failed_agent_runs,
             "successRate": 0.923,
             "averageResponseMs": 1200,
         },
         "workflows": workflows,
         "runnerStatus": runner_status,
+        "agentRuns": agent_runs,
         "runnerJobs": runner_jobs,
         "agentConfigApplications": applications,
         "runtimeEvents": runtime_events,
@@ -381,6 +444,20 @@ with sqlite3.connect(db_file) as connection:
         workflow_row_to_api,
     )
 
+    if table_exists(connection, "agent_runs"):
+        agent_runs = fetch_mapped_list(
+            connection,
+            """
+            SELECT *
+            FROM agent_runs
+            WHERE project_id = ?
+            ORDER BY created_at, sequence, id
+            """,
+            agent_run_row_to_api,
+        )
+    else:
+        agent_runs = []
+
     runner_status_row = connection.execute(
         """
         SELECT *
@@ -431,6 +508,7 @@ with sqlite3.connect(db_file) as connection:
         approvals,
         workflows,
         runner_status,
+        agent_runs,
         runner_jobs,
         applications,
         git_checkpoints,
@@ -445,6 +523,7 @@ with sqlite3.connect(db_file) as connection:
         "approvals": approvals,
         "workflows": workflows,
         "runnerStatus": runner_status,
+        "agentRuns": agent_runs,
         "runnerJobs": runner_jobs,
         "agentConfigApplications": applications,
         "agentConfigVersions": agent_config_versions,
