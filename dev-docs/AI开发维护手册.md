@@ -14,6 +14,7 @@
 - `packages/ui` 已完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，并已在 `OverviewPage` 接入项目、Agent、Task、Approval 的只读数据。
 - `apps/desktop` 已完成 Tauri/Rust 最小宿主，SQLite 运行库写入 Tauri app data 目录，不写入 `data/local/`。
 - Tauri/Rust + SQLite 只读骨架正式验收文档见 `docs/tauri-readonly-skeleton-acceptance.md`。
+- 教程 #11 已裁剪为单机 Tauri 写入安全边界，见 `docs/write-commands-security-design.md`。
 - 旧原型归档方案已确认：`apps/web/`、`services/api/`、`design/index.html` 等冻结为参考资产，不再作为正式主线扩展。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
@@ -51,7 +52,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档和旧原型归档方案已确认；下一步先跑完验收证据并提交，再进入旧原型到共享 UI 的页面迁移清单。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档、写入安全边界裁剪文档和旧原型归档方案已确认；下一步进入写入 commands / 状态机 / 审批规则设计，不直接开写。
 
 ## 任务触发口径（简版）
 
@@ -77,6 +78,7 @@
 6. 宿主本地能力层和数据库方案确认：已完成，SQLite 最小闭环已接入 `get_project`。
 7. 旧原型归档方案确认：已完成，见 `dev-docs/旧原型归档方案.md`。
 8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化、seed 读链路、`projects / agents / tasks / approvals` 只读 commands、`OverviewPage` 只读数据接入和 Tauri 只读骨架正式验收文档。
+9. 写入 commands 安全边界裁剪：已完成，见 `docs/write-commands-security-design.md`。
 
 ## 候选技术栈口径
 
