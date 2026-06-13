@@ -3,6 +3,7 @@ import type { TableProps } from "antd";
 
 import { StatusBadge } from "../components/StatusBadge";
 import { zhText } from "../i18n/zh";
+import { useDesktopHostProject } from "../utils/desktopHost";
 
 type TaskRow = {
   key: string;
@@ -35,6 +36,8 @@ const columns: TableProps<TaskRow>["columns"] = [
 ];
 
 export function OverviewPage() {
+  const desktopHost = useDesktopHostProject();
+
   return (
     <Space orientation="vertical" size={16} className="page-stack">
       <div className="page-heading">
@@ -59,6 +62,34 @@ export function OverviewPage() {
           </Card>
         </Col>
       </Row>
+
+      <Card title="桌面宿主连接">
+        {desktopHost.status === "connected" ? (
+          <Space size={8} wrap>
+            <Tag color="success">已连接</Tag>
+            <Typography.Text>{desktopHost.project.name}</Typography.Text>
+            <Typography.Text type="secondary">{desktopHost.project.phase}</Typography.Text>
+          </Space>
+        ) : null}
+        {desktopHost.status === "loading" ? (
+          <Space size={8} wrap>
+            <Tag color="processing">连接中</Tag>
+            <Typography.Text type="secondary">正在读取 Rust 宿主项目状态</Typography.Text>
+          </Space>
+        ) : null}
+        {desktopHost.status === "browser" ? (
+          <Space size={8} wrap>
+            <Tag>浏览器预览</Tag>
+            <Typography.Text type="secondary">当前未运行在 Tauri 桌面宿主内</Typography.Text>
+          </Space>
+        ) : null}
+        {desktopHost.status === "error" ? (
+          <Space size={8} wrap>
+            <Tag color="error">连接失败</Tag>
+            <Typography.Text type="secondary">{desktopHost.message}</Typography.Text>
+          </Space>
+        ) : null}
+      </Card>
 
       <Card title="下一批工程任务">
         <Table<TaskRow> columns={columns} dataSource={taskRows} pagination={false} />

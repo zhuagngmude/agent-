@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../../../packages/ui/dist",
     "devUrl": "http://127.0.0.1:5173",
-    "beforeDevCommand": "cd ../../packages/ui && npm run dev -- --host 127.0.0.1 --port 5173",
+    "beforeDevCommand": "cd ../../packages/ui && npm run dev -- --host 127.0.0.1 --port 5173 --strictPort",
     "beforeBuildCommand": "cd ../../packages/ui && npm run build"
   },
   "app": {
