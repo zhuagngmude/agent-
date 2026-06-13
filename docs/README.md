@@ -30,6 +30,7 @@
 
 - [sqlite-seed-plan.md](./sqlite-seed-plan.md)
 - [tech-stack-notes.md](./tech-stack-notes.md)
+- [tauri-readonly-skeleton-acceptance.md](./tauri-readonly-skeleton-acceptance.md)：Tauri/Rust + SQLite 只读骨架正式验收。
 
 ## 验证
 
