@@ -11,7 +11,7 @@
 - 当前已定形态：单人自用、本地桌面工具、桌面端主入口，Web 仅辅助预览或后续扩展入口。
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
 - 重新立项后的工程初始化期间明确不做：不继续手搓前端，不继续扩展 Node.js 原生 HTTP 后端，不直接删除旧目录，不把真实 Runner / 真实模型 / 云同步 / 完整权限系统混进当前主线。
-- `packages/ui` 已完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，只作为共享 UI 起点。
+- `packages/ui` 已完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，并已在 `OverviewPage` 接入项目、Agent、Task、Approval 的只读数据。
 - `apps/desktop` 已完成 Tauri/Rust 最小宿主，SQLite 运行库写入 Tauri app data 目录，不写入 `data/local/`。
 - 旧原型归档方案已确认：`apps/web/`、`services/api/`、`design/index.html` 等冻结为参考资产，不再作为正式主线扩展。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
@@ -40,7 +40,7 @@
 - 重新立项后的工程初始化期间，只做已确认架构内的最小闭环和只读链路；不要写完整真实业务功能。
 - 不要继续在 `apps/web` 的原生 HTML / CSS / JavaScript 上叠新功能。
 - 不要继续扩展 `services/api/server.js` 的 Node.js 原生 HTTP 路由作为正式后端方案。
-- 新工程初始化已完成 `packages/ui`、`apps/desktop` 和 SQLite 最小读链路；旧原型迁移仍必须等归档方案确认后再做。
+- 新工程初始化已完成 `packages/ui`、`apps/desktop`、SQLite 最小读链路和 Overview 只读数据接入；旧原型迁移按归档方案逐步做。
 - 治理文档、交接文档和阶段路线默认使用中文；英文只保留在代码标识、API、命令、环境变量和路径中。
 - 改 AI 操作边界时，先同步 `docs/Agent宪法.md` 和 `docs/AI开发细则.md`，再同步本手册和交接说明。
 - 改 API 就更新 `docs/api-draft.md`。
@@ -50,7 +50,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands 和旧原型归档方案已确认；下一步让 `packages/ui` 消费真实只读数据。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入和旧原型归档方案已确认；下一步进入旧原型到共享 UI 的页面迁移清单。
 
 ## 任务触发口径（简版）
 
@@ -75,7 +75,7 @@
 5. Tauri/Rust 桌面宿主方案确认：已完成，并已初始化最小 Tauri 宿主。
 6. 宿主本地能力层和数据库方案确认：已完成，SQLite 最小闭环已接入 `get_project`。
 7. 旧原型归档方案确认：已完成，见 `dev-docs/旧原型归档方案.md`。
-8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化、seed 读链路和 `projects / agents / tasks / approvals` 只读 commands。
+8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化、seed 读链路、`projects / agents / tasks / approvals` 只读 commands 和 `OverviewPage` 只读数据接入。
 
 ## 候选技术栈口径
 

@@ -8,16 +8,154 @@ export type ProjectSummary = {
   phase: string;
 };
 
-export type DesktopHostState =
-  | { status: "browser" }
-  | { status: "loading" }
-  | { status: "connected"; project: ProjectSummary }
-  | { status: "error"; message: string };
+export type AgentSummary = {
+  id: string;
+  project_id: string;
+  name: string;
+  role: string;
+  status: string;
+  model: string | null;
+  permissions: string[];
+  created_at: string;
+  updated_at: string;
+};
 
-export function useDesktopHostProject(): DesktopHostState {
-  const [state, setState] = useState<DesktopHostState>(() => {
+export type TaskSummary = {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: string;
+  assigned_agent_id: string | null;
+  depends_on: string[];
+  risk_level: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "cancelled"
+  | "failed"
+  | "waiting_user";
+
+export type ApprovalSummary = {
+  id: string;
+  project_id: string;
+  task_id: string | null;
+  request_agent_id: string;
+  target_service: string;
+  operation_types: string[];
+  status: string;
+  risk_level: string;
+  reason: string | null;
+  reject_reason: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DesktopHostOverviewData = {
+  project: ProjectSummary;
+  agents: AgentSummary[];
+  tasks: TaskSummary[];
+  approvals: ApprovalSummary[];
+};
+
+export type DesktopHostOverviewState =
+  | ({ status: "browser" } & DesktopHostOverviewData)
+  | { status: "loading" }
+  | ({ status: "connected" } & DesktopHostOverviewData)
+  | ({ status: "error"; message: string } & DesktopHostOverviewData);
+
+const fallbackOverviewData: DesktopHostOverviewData = {
+  project: {
+    id: "browser_preview",
+    name: "agent蜂群",
+    status: "preview",
+    phase: "浏览器预览",
+  },
+  agents: [
+    {
+      id: "agent_architect",
+      project_id: "browser_preview",
+      name: "架构师 Agent",
+      role: "architect",
+      status: "running",
+      model: "gpt-high-reasoning",
+      permissions: ["read_project", "plan_tasks", "review_architecture"],
+      created_at: "",
+      updated_at: "",
+    },
+    {
+      id: "agent_frontend",
+      project_id: "browser_preview",
+      name: "前端 Agent",
+      role: "frontend",
+      status: "running",
+      model: "claude-ui",
+      permissions: ["read_project", "write_frontend_patch"],
+      created_at: "",
+      updated_at: "",
+    },
+  ],
+  tasks: [
+    {
+      id: "task_frontend_mock_data",
+      project_id: "browser_preview",
+      title: "抽出前端 mock 数据模型",
+      description: "浏览器预览 fallback 数据。",
+      status: "completed",
+      priority: "high",
+      assigned_agent_id: "agent_frontend",
+      depends_on: [],
+      risk_level: "low",
+      created_at: "",
+      updated_at: "",
+    },
+    {
+      id: "task_runner_approval_page",
+      project_id: "browser_preview",
+      title: "打磨 Runner 审批确认页",
+      description: "浏览器预览 fallback 数据。",
+      status: "running",
+      priority: "high",
+      assigned_agent_id: "agent_frontend",
+      depends_on: ["task_frontend_mock_data"],
+      risk_level: "high",
+      created_at: "",
+      updated_at: "",
+    },
+  ],
+  approvals: [
+    {
+      id: "approval_runner_permissions",
+      project_id: "browser_preview",
+      task_id: null,
+      request_agent_id: "agent_architect",
+      target_service: "runner",
+      operation_types: ["file_write", "git_checkpoint", "audit_log_update"],
+      status: "pending",
+      risk_level: "high",
+      reason: "浏览器预览 fallback 数据。",
+      reject_reason: null,
+      approved_at: null,
+      rejected_at: null,
+      created_at: "",
+      updated_at: "",
+    },
+  ],
+};
+
+export function useDesktopHostOverview(): DesktopHostOverviewState {
+  const [state, setState] = useState<DesktopHostOverviewState>(() => {
     if (!isTauriHost()) {
-      return { status: "browser" };
+      return { status: "browser", ...fallbackOverviewData };
     }
 
     return { status: "loading" };
@@ -30,15 +168,20 @@ export function useDesktopHostProject(): DesktopHostState {
 
     let mounted = true;
 
-    invoke<ProjectSummary>("get_project")
-      .then((project) => {
+    Promise.all([
+      invoke<ProjectSummary>("get_project"),
+      invoke<AgentSummary[]>("list_agents"),
+      invoke<TaskSummary[]>("list_tasks"),
+      invoke<ApprovalSummary[]>("list_approvals"),
+    ])
+      .then(([project, agents, tasks, approvals]) => {
         if (mounted) {
-          setState({ status: "connected", project });
+          setState({ status: "connected", project, agents, tasks, approvals });
         }
       })
       .catch((error: unknown) => {
         if (mounted) {
-          setState({ status: "error", message: String(error) });
+          setState({ status: "error", message: String(error), ...fallbackOverviewData });
         }
       });
 
