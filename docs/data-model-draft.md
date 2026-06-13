@@ -20,7 +20,68 @@
 - 时间字段统一用 ISO datetime。
 - 可变结构优先用 JSON 字段承载。
 
-## 核心表
+## 第一版最小落库（当前阶段执行）
+
+以下三张表是 MVP 骨架阶段确认要建的，其他表暂缓。
+
+### `agents`
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 如 `agent_architect` |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| name | TEXT | NOT NULL | 名称 |
+| role | TEXT | NOT NULL | 角色 |
+| status | TEXT | NOT NULL | running / idle / stopped |
+| model | TEXT | — | 使用的模型标识 |
+| permissions | TEXT | — | JSON 数组，如 `["read_project","plan_tasks"]` |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| updated_at | TEXT | NOT NULL | ISO 时间 |
+
+暂不建 `agent_relationships` 表。父子关系第一版不落地。
+
+### `tasks`
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 如 `task_001` |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| title | TEXT | NOT NULL | 标题 |
+| description | TEXT | — | 描述 |
+| status | TEXT | NOT NULL | queued / running / completed / blocked |
+| priority | TEXT | NOT NULL | low / medium / high |
+| assigned_agent_id | TEXT | — | 分配给哪个 Agent |
+| depends_on | TEXT | — | JSON 数组，如 `["task_001"]` |
+| risk_level | TEXT | — | low / medium / high |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| updated_at | TEXT | NOT NULL | ISO 时间 |
+
+### `approvals`
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 如 `approval_001` |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| task_id | TEXT | — | 关联的 Task |
+| request_agent_id | TEXT | NOT NULL | 发起审批的 Agent |
+| target_service | TEXT | NOT NULL | 审批目标：runner / agent_config / project_plan |
+| operation_types | TEXT | NOT NULL | JSON 数组，如 `["file_write","git_checkpoint"]` |
+| status | TEXT | NOT NULL | pending / approved / rejected / patch_only |
+| risk_level | TEXT | NOT NULL | low / medium / high |
+| reason | TEXT | — | 审批原因 |
+| reject_reason | TEXT | — | 拒绝原因 |
+| approved_at | TEXT | — | 批准时间 |
+| rejected_at | TEXT | — | 拒绝时间 |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| updated_at | TEXT | NOT NULL | ISO 时间 |
+
+关键约束：
+- `target_service = project_plan` 时不生成可执行 Runner job。
+- `target_service = agent_config` 时只进入 `pending_apply`，不直接改 Agent 当前态。
+
+---
+
+## 核心表（后续阶段）
 
 ### `projects`
 
@@ -188,11 +249,11 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 ## 迁移顺序
 
-1. 先保留 Mock 结构兼容的 SQLite。
-2. 先落 `projects`, `agents`, `agent_relationships`, `tasks`, `approvals`, `workflows`。
-3. 再补 `agent_config_versions`, `agent_config_applications`, `agent_runs`, `runtime_events`, `runner_jobs`。
+1. `001_initial_sqlite` — 第一版最小落库：`projects` + `agents` + `tasks` + `approvals`（当前阶段）。
+2. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
+3. 再补审计与执行层：`agent_runs`、`runtime_events`、`runner_jobs`、`runner_status`。
 4. 阶段 2 先只固定 `model_calls` 结构草案和 Mock / SQLite 写入草案；建表和真正写入必须等 Model Gateway 正式入口、脱敏、成本、错误分类和验证脚本都补齐后再做。
-5. 最后再考虑云端数据库映射。
+5. 辅助表按需：`knowledge_updates`、`git_checkpoints`。
 
 ## 已定稿的几条规则
 
