@@ -22,7 +22,20 @@
 
 ## 第一版最小落库（当前阶段执行）
 
-以下三张表是 MVP 骨架阶段确认要建的，其他表暂缓。
+以下四张表是 MVP 骨架阶段确认要建的，其他表暂缓。
+
+### `projects`
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 如 `project_agent_swarm` |
+| name | TEXT | NOT NULL | 项目名称 |
+| status | TEXT | NOT NULL | 项目状态 |
+| phase | TEXT | — | 当前阶段 |
+| description | TEXT | — | 项目描述 |
+| workspace_path | TEXT | — | 本地工作区路径 |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| updated_at | TEXT | NOT NULL | ISO 时间 |
 
 ### `agents`
 
