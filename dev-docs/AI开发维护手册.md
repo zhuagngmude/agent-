@@ -50,7 +50,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 最小闭环和旧原型归档方案已确认；下一步继续补齐只读 commands。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands 和旧原型归档方案已确认；下一步让 `packages/ui` 消费真实只读数据。
 
 ## 任务触发口径（简版）
 
@@ -75,7 +75,7 @@
 5. Tauri/Rust 桌面宿主方案确认：已完成，并已初始化最小 Tauri 宿主。
 6. 宿主本地能力层和数据库方案确认：已完成，SQLite 最小闭环已接入 `get_project`。
 7. 旧原型归档方案确认：已完成，见 `dev-docs/旧原型归档方案.md`。
-8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化与 seed 读链路。
+8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化、seed 读链路和 `projects / agents / tasks / approvals` 只读 commands。
 
 ## 候选技术栈口径
 

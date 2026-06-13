@@ -78,19 +78,19 @@ apps/desktop/src-tauri/src/
 ### projects
 | command | 说明 |
 |---------|------|
-| `get_project` | 获取当前项目信息 |
+| `get_project` | 获取当前项目信息（已实现） |
 
 ### agents
 | command | 说明 |
 |---------|------|
-| `list_agents` | Agent 列表 |
+| `list_agents` | Agent 列表（已实现，只读） |
 | `create_agent` | 创建 Agent（需审批） |
 | `update_agent_status` | 更新 Agent 状态（需审批） |
 
 ### tasks
 | command | 说明 |
 |---------|------|
-| `list_tasks` | 任务列表 |
+| `list_tasks` | 任务列表（已实现，只读） |
 | `create_task` | 创建任务（需审批） |
 | `update_task_status` | 更新任务状态（需审批） |
 | `assign_task_agent` | 分配 Agent（需审批） |
@@ -98,7 +98,7 @@ apps/desktop/src-tauri/src/
 ### approvals
 | command | 说明 |
 |---------|------|
-| `list_approvals` | 审批列表 |
+| `list_approvals` | 审批列表（已实现，只读） |
 | `create_approval` | 创建审批申请 |
 | `approve_approval` | 批准 |
 | `reject_approval` | 拒绝 |

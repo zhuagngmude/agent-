@@ -13,7 +13,12 @@ pub fn run() {
             app.manage(db_state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::projects::get_project])
+        .invoke_handler(tauri::generate_handler![
+            commands::projects::get_project,
+            commands::agents::list_agents,
+            commands::tasks::list_tasks,
+            commands::approvals::list_approvals
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

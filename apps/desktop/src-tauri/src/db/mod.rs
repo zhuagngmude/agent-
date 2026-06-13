@@ -238,6 +238,7 @@ struct SeedApproval {
 #[cfg(test)]
 mod tests {
     use super::initialize;
+    use crate::services::{agents::list_agents, approvals::list_approvals, tasks::list_tasks};
     use rusqlite::Connection;
     use std::{
         fs,
@@ -261,6 +262,28 @@ mod tests {
             assert_eq!(count_rows(&connection, "agents"), 6);
             assert_eq!(count_rows(&connection, "tasks"), 4);
             assert_eq!(count_rows(&connection, "approvals"), 3);
+
+            let agents = list_agents(&connection).expect("agents should be readable");
+            assert_eq!(agents.len(), 6);
+            assert!(agents
+                .iter()
+                .any(|agent| agent.id == "agent_architect" && agent.permissions.len() == 3));
+
+            let tasks = list_tasks(&connection).expect("tasks should be readable");
+            assert_eq!(tasks.len(), 4);
+            assert!(tasks.iter().any(|task| {
+                task.id == "task_runner_approval_page"
+                    && task.depends_on == vec!["task_frontend_mock_data".to_string()]
+            }));
+
+            let approvals = list_approvals(&connection).expect("approvals should be readable");
+            assert_eq!(approvals.len(), 3);
+            assert!(approvals.iter().any(|approval| {
+                approval.id == "approval_runner_permissions"
+                    && approval
+                        .operation_types
+                        .contains(&"git_checkpoint".to_string())
+            }));
         }
         drop(state);
 
