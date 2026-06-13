@@ -19,6 +19,9 @@ $textExtensions = @(
 $skipParts = @(
   ".git",
   "node_modules",
+  "dist",
+  "build",
+  "coverage",
   "data\local",
   "logs",
   "design\image2",
@@ -51,7 +54,11 @@ Get-ChildItem -LiteralPath $rootPath -Recurse -File | ForEach-Object {
   $fileUri = [System.Uri]::new($_.FullName)
   $relative = [System.Uri]::UnescapeDataString($rootUri.MakeRelativeUri($fileUri).ToString()).Replace("/", "\")
   foreach ($part in $skipParts) {
-    if ($relative.StartsWith($part, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (
+      $relative.Equals($part, [System.StringComparison]::OrdinalIgnoreCase) -or
+      $relative.StartsWith("${part}\", [System.StringComparison]::OrdinalIgnoreCase) -or
+      ($relative.IndexOf("\${part}\", [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+    ) {
       return
     }
   }

@@ -22,9 +22,12 @@ node_modules/
 dist/
 build/
 coverage/
+*.tsbuildinfo
+*.log
 __pycache__/
 *.pyc
 .playwright-cli/
+target/
 
 # Local runner state
 .runner/

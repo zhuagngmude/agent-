@@ -32,17 +32,14 @@
 当前建议方案：
 
 ```text
+桌面主入口：
+Tauri 2 + Rust
+
 前端 UI：
 React + TypeScript + Vite + Ant Design
 
-桌面端：
-Tauri + Rust
-
-后端：
-Fastify 或 NestJS
-
 本地数据库：
-SQLite + Prisma 或 Drizzle
+SQLite + rusqlite
 
 后续云端数据库：
 PostgreSQL / Supabase
@@ -91,18 +88,17 @@ Rust 不负责重新绘制一套 UI。桌面端应加载和复用 `packages/ui` 
 
 ## 后端方案
 
-旧后端是 Node.js 原生 HTTP server，适合 MVP 验证，但不适合作为正式工程继续扩展。
+当前项目不再单独起网络后端服务。
 
-候选方案：
+Rust 宿主负责：
 
-- Fastify：轻量、性能好、迁移成本较低。
-- NestJS：结构更完整，适合大型模块化后端，但初期成本更高。
+- 本地文件能力
+- Git 状态和 checkpoint
+- SQLite 访问
+- 本地权限边界
+- 本地安全能力
 
-重新立项时需要决定：
-
-- 是否继续使用 Node.js / TypeScript 后端。
-- API 契约如何和前端共享。
-- Model Gateway、Approval Service、Agent Run、Runner Bridge 分别放在哪些模块。
+后续如果确实需要服务化能力，再单独讨论是否增加 API 层，但当前重立项阶段不做。
 
 ## 数据库方案
 
@@ -136,8 +132,7 @@ Rust 不负责重新绘制一套 UI。桌面端应加载和复用 `packages/ui` 
 
 1. 确认前端是否采用 React + TypeScript + Vite + Ant Design。
 2. 确认桌面端是否采用 Tauri + Rust。
-3. 确认后端采用 Fastify 还是 NestJS。
-4. 确认本地数据库继续 SQLite，并选择 Prisma 或 Drizzle。
-5. 确认 `packages/ui` 是唯一 UI 源码。
-6. 确认 `apps/web` 和 `apps/desktop` 只作为运行入口。
-7. 确认旧原型归档和迁移方案。
+3. 确认本地数据库继续 SQLite，并选择是否直接用 rusqlite 或再加一层 ORM。
+4. 确认 `packages/ui` 是唯一 UI 源码。
+5. 确认 `apps/web` 和 `apps/desktop` 只作为运行入口。
+6. 确认旧原型归档和迁移方案。

@@ -2,6 +2,5 @@
 
 用户直接打开或使用的应用入口。
 
-- `web/`: 电脑端 Web App，当前主要前端。
-- `desktop/`: 后续桌面应用封装，例如 Tauri 或 Electron。
-
+- `desktop/`: 桌面主入口，后续承载 Tauri 2 + Rust 宿主和本地能力层。
+- `web/`: 浏览器辅助预览入口，共享同一套 UI 源码。

@@ -8,7 +8,7 @@
 - 当前状态：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已收口；阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程。
 - 阶段 2 只保留 helper-only scaffold：不建真实表、不写 `model_calls`、不导入 provider SDK、不读取 raw key、不发 provider 请求。
 - 阶段 3 只保留本地记录链和审计视图：不触发真实 Agent、不调用真实模型、不启用 Runner。
-- Web App 优先，桌面端后续再接入；Mock / SQLite 优先，真实数据库后续再接入。
+- 桌面主入口优先，Web 只做辅助预览；Mock / SQLite 优先，真实数据库后续再接入。
 
 ## 先读顺序
 

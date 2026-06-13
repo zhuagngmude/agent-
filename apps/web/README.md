@@ -1,12 +1,6 @@
 # apps/web
 
-电脑端 Web App。
+浏览器辅助预览入口预留目录。
 
-当前阶段是静态前端原型，直接打开：
-
-```text
-index.html
-```
-
-后续如果升级为 Next.js / React 工程，本目录继续作为 Web App 根目录。
-Agent config real apply is displayed as a read-only gate in the Agents page and local trial Settings panel. The Web App does not submit real apply requests. Real Agent config writes still require the API process feature flag, SQLite mode, dry-run proof, second confirmation, requestedBy, Git checkpoint acknowledgement, and rollback acceptance.
+当前旧静态原型只作为参考，不再继续在原生 HTML / CSS / JavaScript 上叠功能。
+后续 Web 入口直接消费 `packages/ui`，和桌面端共用同一套 UI 源码。

@@ -1,6 +1,6 @@
 # packages/shared
 
-共享类型和状态码预留目录。
+跨端共享类型、状态和工具预留目录。
 
 后续应优先放：
 
@@ -9,4 +9,3 @@
 - AgentStatus
 - RunnerJobStatus
 - API response 类型
-
