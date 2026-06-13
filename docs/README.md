@@ -32,6 +32,7 @@
 - [tech-stack-notes.md](./tech-stack-notes.md)
 - [tauri-readonly-skeleton-acceptance.md](./tauri-readonly-skeleton-acceptance.md)：Tauri/Rust + SQLite 只读骨架正式验收。
 - [write-commands-security-design.md](./write-commands-security-design.md)：教程 #11 在单机 Tauri 写入 commands 中的安全边界裁剪。
+- [write-commands-design.md](./write-commands-design.md)：写入 commands 的参数、校验、返回值和副作用边界设计。
 
 ## 验证
 
