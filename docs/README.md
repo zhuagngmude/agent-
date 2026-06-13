@@ -4,7 +4,8 @@
 
 ## 先读这里
 
-- [Agent宪法.md](./Agent宪法.md)：AI、Agent、Model Gateway、Runner 和审批链的中文治理边界。
+- [Agent宪法.md](./Agent宪法.md)：AI、Agent、Model Gateway、Runner 和审批链的中文治理总规则。
+- [AI开发细则.md](./AI开发细则.md)：前端、数据库、Tauri/Rust、Git 和文档同步的执行细则。
 - [api-draft.md](./api-draft.md)：当前 API 契约和阶段边界。
 - [data-model-draft.md](./data-model-draft.md)：当前实体和数据表草案。
 - [demo-checklist.md](./demo-checklist.md)：本地演示和验证清单。

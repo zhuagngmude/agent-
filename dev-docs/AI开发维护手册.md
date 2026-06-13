@@ -4,14 +4,15 @@
 
 ## 当前项目状态
 
-- 当前进入“重新立项讨论中”。在技术栈、目录架构和共享 UI 方案确认前，不继续写业务代码。
+- 当前进入“重新立项后的工程初始化落地”。技术栈、目录架构、共享 UI、Tauri/Rust 桌面宿主和 SQLite 最小闭环已确认。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
 - 当前已定形态：单人自用、本地桌面工具、桌面端主入口，Web 仅辅助预览或后续扩展入口。
 - 明确不做：真实 Runner、真实模型、云同步、完整权限系统
-- 重新立项期间明确不做：不继续手搓前端，不继续扩展 Node.js 原生 HTTP 后端，不直接接 Tauri，不直接删除旧目录。
-- `packages/ui` 已提前完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，只作为共享 UI 起点，不接真实业务能力。
+- 重新立项后的工程初始化期间明确不做：不继续手搓前端，不继续扩展 Node.js 原生 HTTP 后端，不直接删除旧目录，不把真实 Runner / 真实模型 / 云同步 / 完整权限系统混进当前主线。
+- `packages/ui` 已完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，只作为共享 UI 起点。
+- `apps/desktop` 已完成 Tauri/Rust 最小宿主，SQLite 运行库写入 Tauri app data 目录，不写入 `data/local/`。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
 - 阶段 2 当前已完成 `model_calls` 结构草案、`Model Gateway正式入口设计.md`、provider config resolver helper、redaction / response limiter helper、helper-only `model_calls` 写入 / 迁移草案和禁用态 route 草案；阶段 2 已收口，未建表、未写 `model_calls`、未导入 SDK、未读取或返回 raw key、未发 provider 请求。
@@ -21,24 +22,25 @@
 
 1. `AGENTS.md`
 2. `docs/Agent宪法.md`
-3. `docs/README.md`
-4. `docs/api-draft.md`
-5. `docs/data-model-draft.md`
-6. `docs/demo-checklist.md`
-7. `dev-docs/新窗口交接说明.md`
-8. `dev-docs/应用真正可用落地计划.md`
-9. `dev-docs/真实模型接入准入规格.md`
-10. `dev-docs/Model Gateway正式入口设计.md`
+3. `docs/AI开发细则.md`
+4. `docs/README.md`
+5. `docs/api-draft.md`
+6. `docs/data-model-draft.md`
+7. `docs/demo-checklist.md`
+8. `dev-docs/新窗口交接说明.md`
+9. `dev-docs/应用真正可用落地计划.md`
+10. `dev-docs/真实模型接入准入规格.md`
+11. `dev-docs/Model Gateway正式入口设计.md`
 
 ## 维护原则
 
 - 小步提交，变更必须可验证。
-- 重新立项讨论期间，只改路线、架构、技术栈和交接文档；不要写业务代码。
+- 重新立项后的工程初始化期间，只做已确认架构内的最小闭环和只读链路；不要写完整真实业务功能。
 - 不要继续在 `apps/web` 的原生 HTML / CSS / JavaScript 上叠新功能。
 - 不要继续扩展 `services/api/server.js` 的 Node.js 原生 HTTP 路由作为正式后端方案。
-- 新工程初始化已先从 `packages/ui` 最小骨架开始；桌面宿主、数据库和旧原型迁移仍必须等对应方案确认后再做。
+- 新工程初始化已完成 `packages/ui`、`apps/desktop` 和 SQLite 最小读链路；旧原型迁移仍必须等归档方案确认后再做。
 - 治理文档、交接文档和阶段路线默认使用中文；英文只保留在代码标识、API、命令、环境变量和路径中。
-- 改 AI 操作边界时，先同步 `docs/Agent宪法.md`，再同步本手册和交接说明。
+- 改 AI 操作边界时，先同步 `docs/Agent宪法.md` 和 `docs/AI开发细则.md`，再同步本手册和交接说明。
 - 改 API 就更新 `docs/api-draft.md`。
 - 改数据结构就更新 `docs/data-model-draft.md`。
 - 改验收流程就更新 `docs/demo-checklist.md` 和 `scripts/README.md`。
@@ -46,7 +48,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构和共享 UI 方案已确认；`packages/ui` 最小工程骨架已建立；下一步进入 Tauri/Rust 桌面宿主方案确认。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主和 SQLite 最小闭环已确认；下一步进入旧原型归档方案确认，并继续补齐只读 commands。
 
 ## 任务触发口径（简版）
 
@@ -68,10 +70,10 @@
 2. 技术栈确认：已完成。
 3. 新项目目录架构确认：已完成。
 4. 共享 UI 方案确认：已完成，并已建立 `packages/ui` 最小工程骨架。
-5. Tauri/Rust 桌面宿主方案确认：下一步。
-6. 宿主本地能力层和数据库方案确认：未开始。
+5. Tauri/Rust 桌面宿主方案确认：已完成，并已初始化最小 Tauri 宿主。
+6. 宿主本地能力层和数据库方案确认：已完成，SQLite 最小闭环已接入 `get_project`。
 7. 旧原型归档方案确认：未开始。
-8. 新工程初始化：已提前启动 `packages/ui` 骨架，桌面宿主和数据库工程暂不开始。
+8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化与 seed 读链路。
 
 ## 候选技术栈口径
 

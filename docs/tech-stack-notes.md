@@ -2,7 +2,7 @@
 
 日期：2026-06-12
 
-本文记录 `agent蜂群` 的当前实际技术栈、老师反馈后的调整方向，以及重新立项讨论阶段的候选技术栈。当前只讨论方案，不写业务代码。
+本文记录 `agent蜂群` 的当前实际技术栈、老师反馈后的调整方向，以及重新立项后已确认的正式技术栈。当前只做已确认架构内的最小闭环和只读链路，不写完整真实业务功能。
 
 ## 当前实际技术栈
 
@@ -24,12 +24,12 @@
 - 不继续手搓前端。
 - 不继续把原生 Node.js HTTP server 扩展为正式后端。
 - 不直接在旧目录上叠功能。
-- 不直接初始化新工程，直到技术栈、目录结构和迁移方案确认。
+- 已确认的新工程按最小闭环推进，不在未确认范围内扩展。
 - 旧 MVP 作为原型和验证资产保留，后续按新架构选择性迁移。
 
-## 候选正式技术栈
+## 已确认正式技术栈
 
-当前建议方案：
+当前确认方案：
 
 ```text
 桌面主入口：
@@ -39,10 +39,10 @@ Tauri 2 + Rust
 React + TypeScript + Vite + Ant Design
 
 本地数据库：
-SQLite + rusqlite
+SQLite + rusqlite（运行库放 Tauri app data 目录）
 
 后续云端数据库：
-PostgreSQL / Supabase
+PostgreSQL / Supabase（单机本地版稳定后再讨论）
 
 共享 UI：
 packages/ui 作为唯一 UI 源码
@@ -66,7 +66,7 @@ apps/web 和 apps/desktop 作为运行入口
 packages/ui
 ```
 
-`apps/web` 和 `apps/desktop` 不再各自维护一套 UI，它们只作为运行入口消费 `packages/ui`。
+`apps/web` 和 `apps/desktop` 不再各自维护一套 UI，它们只作为运行入口消费 `packages/ui`。当前 `packages/ui` 已完成 React + TypeScript + Vite + Ant Design 最小骨架。
 
 ## 桌面端方案
 
@@ -85,6 +85,8 @@ Rust 的职责：
 - 本地安全能力。
 
 Rust 不负责重新绘制一套 UI。桌面端应加载和复用 `packages/ui` 中的 React UI，避免 Web 和桌面两套界面分裂。
+
+当前 `apps/desktop` 已初始化 Tauri 2 + Rust 最小宿主，并接通 `get_project` -> SQLite 只读链路。
 
 ## 后端方案
 
@@ -119,8 +121,7 @@ Rust 宿主负责：
 
 ## 暂不做
 
-- 不直接开始 React 重写。
-- 不直接接 Tauri。
+- 不直接开始完整 React 业务重写。
 - 不直接删除旧前端目录。
 - 不继续扩展原生 HTML / CSS / JavaScript UI。
 - 不继续扩展 Node.js 原生 HTTP server 作为正式后端。
@@ -128,11 +129,9 @@ Rust 宿主负责：
 - 不启用真实 Runner。
 - 不做云同步或完整权限系统。
 
-## 下一步决策清单
+## 下一步清单
 
-1. 确认前端是否采用 React + TypeScript + Vite + Ant Design。
-2. 确认桌面端是否采用 Tauri + Rust。
-3. 确认本地数据库继续 SQLite，并选择是否直接用 rusqlite 或再加一层 ORM。
-4. 确认 `packages/ui` 是唯一 UI 源码。
-5. 确认 `apps/web` 和 `apps/desktop` 只作为运行入口。
-6. 确认旧原型归档和迁移方案。
+1. 确认旧原型归档和迁移方案。
+2. 补齐 `agents / tasks / approvals` 只读 Tauri commands。
+3. 让 `packages/ui` 从 SQLite 读取真实只读数据。
+4. 确认 `packages/agent-core`、`packages/shared` 和桌面宿主层的长期拆分。

@@ -14,6 +14,7 @@
 
 ```text
 docs/Agent宪法.md
+docs/AI开发细则.md
 docs/README.md
 dev-docs/README.md
 dev-docs/AI开发维护手册.md
@@ -68,7 +69,7 @@ scripts/README.md
 - 改数据结构同步 `docs/data-model-draft.md`。
 - 改演示或验收流程同步 `docs/demo-checklist.md` 和 `scripts/README.md`。
 - 改阶段状态同步 `dev-docs/下一步开发路线.md`。
-- 改 AI 操作边界同步 `docs/Agent宪法.md`、`dev-docs/AI开发维护手册.md` 和 `dev-docs/新窗口交接说明.md`。
+- 改 AI 操作边界同步 `docs/Agent宪法.md`、`docs/AI开发细则.md`、`dev-docs/AI开发维护手册.md` 和 `dev-docs/新窗口交接说明.md`。
 
 ## 常用验证
 
