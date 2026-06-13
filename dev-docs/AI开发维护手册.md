@@ -13,6 +13,7 @@
 - 重新立项后的工程初始化期间明确不做：不继续手搓前端，不继续扩展 Node.js 原生 HTTP 后端，不直接删除旧目录，不把真实 Runner / 真实模型 / 云同步 / 完整权限系统混进当前主线。
 - `packages/ui` 已完成最小可运行工程骨架：React + TypeScript + Vite + Ant Design，只作为共享 UI 起点。
 - `apps/desktop` 已完成 Tauri/Rust 最小宿主，SQLite 运行库写入 Tauri app data 目录，不写入 `data/local/`。
+- 旧原型归档方案已确认：`apps/web/`、`services/api/`、`design/index.html` 等冻结为参考资产，不再作为正式主线扩展。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
 - 阶段 2 当前已完成 `model_calls` 结构草案、`Model Gateway正式入口设计.md`、provider config resolver helper、redaction / response limiter helper、helper-only `model_calls` 写入 / 迁移草案和禁用态 route 草案；阶段 2 已收口，未建表、未写 `model_calls`、未导入 SDK、未读取或返回 raw key、未发 provider 请求。
@@ -31,6 +32,7 @@
 9. `dev-docs/应用真正可用落地计划.md`
 10. `dev-docs/真实模型接入准入规格.md`
 11. `dev-docs/Model Gateway正式入口设计.md`
+12. `dev-docs/旧原型归档方案.md`
 
 ## 维护原则
 
@@ -48,7 +50,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主和 SQLite 最小闭环已确认；下一步进入旧原型归档方案确认，并继续补齐只读 commands。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 最小闭环和旧原型归档方案已确认；下一步继续补齐只读 commands。
 
 ## 任务触发口径（简版）
 
@@ -72,7 +74,7 @@
 4. 共享 UI 方案确认：已完成，并已建立 `packages/ui` 最小工程骨架。
 5. Tauri/Rust 桌面宿主方案确认：已完成，并已初始化最小 Tauri 宿主。
 6. 宿主本地能力层和数据库方案确认：已完成，SQLite 最小闭环已接入 `get_project`。
-7. 旧原型归档方案确认：未开始。
+7. 旧原型归档方案确认：已完成，见 `dev-docs/旧原型归档方案.md`。
 8. 新工程初始化：进行中，已完成 `packages/ui`、`apps/desktop`、SQLite 初始化与 seed 读链路。
 
 ## 候选技术栈口径

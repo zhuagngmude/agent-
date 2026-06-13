@@ -131,7 +131,7 @@ Rust 宿主负责：
 
 ## 下一步清单
 
-1. 确认旧原型归档和迁移方案。
-2. 补齐 `agents / tasks / approvals` 只读 Tauri commands。
-3. 让 `packages/ui` 从 SQLite 读取真实只读数据。
-4. 确认 `packages/agent-core`、`packages/shared` 和桌面宿主层的长期拆分。
+1. 补齐 `agents / tasks / approvals` 只读 Tauri commands。
+2. 让 `packages/ui` 从 SQLite 读取真实只读数据。
+3. 确认 `packages/agent-core`、`packages/shared` 和桌面宿主层的长期拆分。
+4. 按 `dev-docs/旧原型归档方案.md` 逐步迁移旧原型价值，不直接删除旧目录。
