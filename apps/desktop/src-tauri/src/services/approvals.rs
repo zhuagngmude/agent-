@@ -659,6 +659,31 @@ mod tests {
     }
 
     #[test]
+    fn approve_approval_rejects_approval_from_another_project() {
+        let mut connection = setup_connection();
+
+        insert_other_project_approval(&connection, "approval_other_project");
+
+        let error = approve_approval(
+            &mut connection,
+            ApprovalIdInput {
+                id: "approval_other_project".to_string(),
+            },
+        )
+        .expect_err("approval from another project should not be found");
+
+        assert!(error.contains("not_found"));
+        let status: String = connection
+            .query_row(
+                "SELECT status FROM approvals WHERE id = ?1 AND project_id = ?2",
+                params!["approval_other_project", "other_project"],
+                |row| row.get(0),
+            )
+            .expect("other project approval should still exist");
+        assert_eq!(status, "pending");
+    }
+
+    #[test]
     fn reject_approval_marks_pending_approval_as_rejected() {
         let mut connection = setup_connection();
         insert_approval(&connection, "approval_pending", "pending", "approval");
@@ -874,5 +899,69 @@ mod tests {
                 ],
             )
             .expect("approval should insert");
+    }
+
+    fn insert_other_project_approval(connection: &Connection, approval_id: &str) {
+        connection
+            .execute(
+                "INSERT INTO projects (
+                    id, name, status, phase, description, workspace_path, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    "other_project",
+                    "other",
+                    "running",
+                    "test",
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    "2",
+                    "2"
+                ],
+            )
+            .expect("other project should insert");
+        connection
+            .execute(
+                "INSERT INTO agents (
+                    id, project_id, name, role, status, model, permissions,
+                    created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    "agent_other",
+                    "other_project",
+                    "Other agent",
+                    "reviewer",
+                    "idle",
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    "2",
+                    "2"
+                ],
+            )
+            .expect("other project agent should insert");
+        connection
+            .execute(
+                "INSERT INTO approvals (
+                    id, project_id, task_id, request_agent_id, target_service, operation_types,
+                    status, risk_level, reason, reject_reason, approved_at, rejected_at,
+                    created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                params![
+                    approval_id,
+                    "other_project",
+                    Option::<String>::None,
+                    "agent_other",
+                    "approval",
+                    r#"["approval_approve"]"#,
+                    "pending",
+                    "medium",
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    "2",
+                    "2"
+                ],
+            )
+            .expect("other project approval should insert");
     }
 }
