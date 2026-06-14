@@ -29,6 +29,22 @@
 
 ## 目前的核心契约
 
+### 新 Tauri/Rust project_plan commands（阶段 24 设计）
+
+阶段 24 在新架构中不继续扩展旧 Node.js HTTP route，而是通过 Tauri invoke 暴露明确 command：
+
+- `create_project_plan_draft`
+- `approve_project_plan`
+- `list_project_plan_drafts`
+- `list_runner_requests`
+
+行为要点：
+
+- `create_project_plan_draft` 只生成本地确定性 `project_plan` 草案和 pending 审批，不创建任务，不创建 Runner request，不调用模型。
+- `approve_project_plan` 是 project_plan 的唯一实例化入口，必须二次确认；审批通过后确定性创建 5 个 queued 任务和 5 条只读 `runner_requests`。
+- 通用 `approve_approval` 不得被改成自动实例化 project plan；它仍只做普通审批状态流转。
+- `runner_requests` 只表示只读队列记录，不是可执行 Runner job，不能执行命令、写文件、改 Git、发网络请求、调用模型或触发 Agent。
+
 ### 项目计划闭环
 
 - `POST /api/projects/:projectId/project-plan-requests`
@@ -36,6 +52,7 @@
 
 行为要点：
 
+- 本节是旧 Node.js / Mock 原型契约，保留为迁移参考，不作为新 Tauri/Rust 主线继续扩展。
 - 只能由本地确定性模板生成 `project_plan` 草案。
 - 草案阶段不能创建任务，也不能创建 Runner request queue 记录。
 - `targetService=project_plan` 的审批通过后，只会生成 5 个 queued 任务和 5 条只读 Runner request 记录。

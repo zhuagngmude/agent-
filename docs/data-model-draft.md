@@ -152,14 +152,29 @@ Agent Run 记录链。核心字段：`id`, `project_id`, `chain_id`, `root_run_i
 - `token_usage` 和 `cost_estimate` 只能保存粗粒度结果，不能保存账单凭据或原始 provider 响应。
 - 失败注入只能停留在本地记录链，不得扩权，不得改写任务或 Runner 请求。
 
-### `runner_jobs`
+### `project_plan_drafts`
 
-只读 Runner 队列记录。核心字段：`id`, `project_id`, `approval_id`, `task_id`, `status`, `operation_types`, `affected_files`, `checkpoint_commit`, `safety_note`, `created_at`, `updated_at`。
+阶段：阶段 24 设计已出，待 migration 004 实现。
+
+项目计划草案表。核心字段：`id`, `project_id`, `approval_id`, `idea`, `constraints`, `summary`, `status`, `generated_by`, `requested_by`, `created_at`, `updated_at`。
+
+关键约束：
+- 只保存本地确定性模板草案，不保存真实模型 raw prompt 或 raw response。
+- `generated_by` 第一版固定为 `local_deterministic_template`。
+- 创建草案时只写 `project_plan_drafts` 和 pending `project_plan` approval，不创建任务或 Runner request。
+- 审批通过后状态进入 `instantiated`，且同一 approval 不能重复实例化。
+
+### `runner_requests`
+
+阶段：阶段 24 设计已出，待 migration 004 实现。旧文档和旧原型里有时称为 `runner_jobs`，新 Tauri/Rust 主线第一版使用 `runner_requests`，避免误解成可执行 Runner job。
+
+只读 Runner request 队列记录。核心字段：`id`, `project_id`, `approval_id`, `task_id`, `status`, `operation_types`, `affected_files`, `checkpoint`, `safety_note`, `created_at`, `updated_at`。
 
 关键约束：
 - 目前只允许承载 `runner_request_readonly` 之类的队列语义。
 - 不代表真实 Runner 执行许可。
-- `project_plan` 生成的记录必须关联任务，但 `checkpoint_commit` 为空。
+- `project_plan` 生成的记录必须关联任务，但 `checkpoint` 为空。
+- 只允许虚拟 affected files，不代表真实文件写入范围。
 
 ### `workflows` / `workflow_steps`
 
@@ -265,10 +280,11 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 ## 迁移顺序
 
 1. `001_initial_sqlite` — 第一版最小落库：`projects` + `agents` + `tasks` + `approvals`（当前阶段）。
-2. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
-3. 再补审计与执行层：`agent_runs`、`runtime_events`、`runner_jobs`、`runner_status`。
-4. 阶段 23 已通过 `003_add_model_calls.sql` 建立 `model_calls` SQLite 审计表；真正写入必须等阶段 24 之后的 Model Gateway 真实调用准入、脱敏、成本、错误分类和验证脚本都补齐后再做。
-5. 辅助表按需：`knowledge_updates`、`git_checkpoints`。
+2. `002_add_agent_runs` — Agent Run 记录链 + `runtime_events`。
+3. `003_add_model_calls` — `model_calls` helper-only 审计表。
+4. 阶段 24 设计为 `004_add_project_plan_workflow`：`project_plan_drafts` + `runner_requests`，用于迁移旧 MVP-0.3 的项目计划审批闭环。
+5. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
+6. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
 
 ## 已定稿的几条规则
 
