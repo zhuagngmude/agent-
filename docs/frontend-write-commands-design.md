@@ -2,7 +2,7 @@
 
 日期：2026-06-14
 
-本文是第 13 步的设计文档，定义前端如何最小化接入 6 个写入 commands，不重写整套页面。
+本文是第 13 步的设计文档，定义前端如何最小化接入已验收的写入 commands，不重写整套页面。
 
 ## 一、总边界
 
@@ -15,6 +15,8 @@
 ## 二、封装函数（desktopHost.ts 新增）
 
 所有函数签名返回 `Promise<T>`，调用方用 try/catch + message 处理错误。
+
+第一版前端只封装并暴露 5 个 UI 会使用的写入函数：`createTask`、`updateTaskStatus`、`approveApproval`、`rejectApproval`、`patchOnlyApproval`。Rust 侧已验收的 `create_approval` 暂不暴露 UI，由后续业务流程触发时再接入。
 
 ### 2.1 createTask
 
@@ -239,7 +241,7 @@ Rust 层返回的错误消息已经稳定：`invalid_input: ...`、`not_found: .
 
 - 修改 `packages/ui/src/utils/desktopHost.ts`
   - 导出 `isTauriHost`
-  - 新增 6 个写入函数
+  - 新增 5 个前端写入函数
   - `useDesktopHostOverview` 新增 `refresh`
 
 ### 提交 3：feat: 接入 Overview 写入交互

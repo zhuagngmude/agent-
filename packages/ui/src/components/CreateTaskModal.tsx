@@ -26,9 +26,7 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
       message.success("任务已创建");
       onCreated();
     } catch (error) {
-      if (error instanceof Error && error.message) {
-        message.error(error.message);
-      }
+      showSubmitError(error);
     }
   };
 
@@ -50,7 +48,7 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
       }}
       okText="创建"
       cancelText="取消"
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" initialValues={{ priority: "medium" }}>
         <Form.Item
@@ -105,4 +103,19 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
       </Form>
     </Modal>
   );
+}
+
+function showSubmitError(error: unknown): void {
+  if (isFormValidationError(error)) {
+    return;
+  }
+
+  const text = error instanceof Error ? error.message : String(error);
+  if (text) {
+    message.error(text);
+  }
+}
+
+function isFormValidationError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "errorFields" in error;
 }
