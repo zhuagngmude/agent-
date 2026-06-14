@@ -12,6 +12,8 @@ const INITIAL_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/001_initial_sqlite.sql");
 const AGENT_RUN_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/002_add_agent_runs.sql");
+const MODEL_CALLS_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/003_add_model_calls.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -38,6 +40,7 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
 
     run_initial_migration(&connection)?;
     run_agent_run_migration(&connection)?;
+    run_model_calls_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
 
     Ok(DbState {
@@ -52,6 +55,11 @@ fn run_initial_migration(connection: &Connection) -> InitResult<()> {
 
 fn run_agent_run_migration(connection: &Connection) -> InitResult<()> {
     connection.execute_batch(AGENT_RUN_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_model_calls_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(MODEL_CALLS_MIGRATION_SQL)?;
     Ok(())
 }
 
@@ -270,6 +278,9 @@ mod tests {
             assert_eq!(count_rows(&connection, "agents"), 6);
             assert_eq!(count_rows(&connection, "tasks"), 4);
             assert_eq!(count_rows(&connection, "approvals"), 3);
+            assert_eq!(count_rows(&connection, "agent_runs"), 0);
+            assert_eq!(count_rows(&connection, "runtime_events"), 0);
+            assert_eq!(count_rows(&connection, "model_calls"), 0);
 
             let agents = list_agents(&connection).expect("agents should be readable");
             assert_eq!(agents.len(), 6);
@@ -302,6 +313,9 @@ mod tests {
             assert_eq!(count_rows(&connection, "agents"), 6);
             assert_eq!(count_rows(&connection, "tasks"), 4);
             assert_eq!(count_rows(&connection, "approvals"), 3);
+            assert_eq!(count_rows(&connection, "agent_runs"), 0);
+            assert_eq!(count_rows(&connection, "runtime_events"), 0);
+            assert_eq!(count_rows(&connection, "model_calls"), 0);
         }
         drop(state);
 

@@ -1,3 +1,4 @@
+pub mod model_calls;
 pub mod project_plan;
 pub mod provider_config;
 pub mod redaction;
