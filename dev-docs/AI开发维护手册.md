@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 当前进入“重新立项后的工程初始化落地”。技术栈、目录架构、共享 UI、Tauri/Rust 桌面宿主和 SQLite 最小闭环已确认。
+- 当前进入”Tauri 桌面写入交互验收收口”。前端共享 UI 已接入写入命令，补充了浏览器预览降级和 refresh 刷新机制，见 `docs/tauri-desktop-write-interaction-acceptance.md`。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -17,6 +17,7 @@
 - 教程 #11 已裁剪为单机 Tauri 写入安全边界，见 `docs/write-commands-security-design.md`。
 - 写入 commands 设计已完成，`create_task`、`update_task_status`、`create_approval`、`approve_approval`、`reject_approval`、`patch_only_approval` 均见 `docs/write-commands-design.md`。
 - 写入 commands Rust 实现和正式验收已完成，6 个 command 均已接入 Tauri invoke，见 `docs/write-commands-acceptance.md`。
+- 前端共享 UI 写入接入已完成，5 个写入函数已封装，OverviewPage 已接入任务创建、状态变更和审批操作，见 `docs/frontend-write-commands-design.md` 和 `docs/tauri-desktop-write-interaction-acceptance.md`。
 - 旧原型归档方案已确认：`apps/web/`、`services/api/`、`design/index.html` 等冻结为参考资产，不再作为正式主线扩展。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
@@ -84,6 +85,8 @@
 10. 写入 commands 设计：已完成，见 `docs/write-commands-design.md`。
 11. 写入 commands Rust 实现：已完成，6 个 command 均已接入 Tauri invoke 并通过 Rust 测试。
 12. 写入 commands 正式验收：已完成，见 `docs/write-commands-acceptance.md`。
+13. 前端共享 UI 写入接入：已完成，见 `docs/frontend-write-commands-design.md`。
+14. Tauri 桌面写入交互验收：已完成，见 `docs/tauri-desktop-write-interaction-acceptance.md`。
 
 ## 候选技术栈口径
 
