@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export type ProjectSummary = {
@@ -72,6 +72,74 @@ export type DesktopHostOverviewState =
   | { status: "loading" }
   | ({ status: "connected" } & DesktopHostOverviewData)
   | ({ status: "error"; message: string } & DesktopHostOverviewData);
+
+// ---------------------------------------------------------------------------
+// 写入输入类型（与 Rust services 层对齐）
+// ---------------------------------------------------------------------------
+
+export type CreateTaskInput = {
+  title: string;
+  description?: string | null;
+  priority: "low" | "medium" | "high";
+  assigned_agent_id?: string | null;
+  depends_on?: string[];
+  risk_level?: "low" | "medium" | "high" | null;
+};
+
+export type UpdateTaskStatusInput = {
+  id: string;
+  status: TaskStatus;
+};
+
+// ---------------------------------------------------------------------------
+// Tauri 环境检测
+// ---------------------------------------------------------------------------
+
+export function isTauriHost(): boolean {
+  return "__TAURI_INTERNALS__" in window;
+}
+
+function requireTauri(): void {
+  if (!isTauriHost()) {
+    throw new Error("当前运行在浏览器预览模式，写入操作不可用。请启动 Tauri 桌面宿主。");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 写入 commands 封装
+// ---------------------------------------------------------------------------
+
+export async function createTask(input: CreateTaskInput): Promise<{ task: TaskSummary }> {
+  requireTauri();
+  return invoke("create_task", { input });
+}
+
+export async function updateTaskStatus(input: UpdateTaskStatusInput): Promise<{ task: TaskSummary }> {
+  requireTauri();
+  return invoke("update_task_status", { input });
+}
+
+export async function approveApproval(id: string): Promise<{ approval: ApprovalSummary }> {
+  requireTauri();
+  return invoke("approve_approval", { input: { id } });
+}
+
+export async function rejectApproval(
+  id: string,
+  rejectReason?: string | null,
+): Promise<{ approval: ApprovalSummary }> {
+  requireTauri();
+  return invoke("reject_approval", { input: { id, reject_reason: rejectReason ?? null } });
+}
+
+export async function patchOnlyApproval(id: string): Promise<{ approval: ApprovalSummary }> {
+  requireTauri();
+  return invoke("patch_only_approval", { input: { id } });
+}
+
+// ---------------------------------------------------------------------------
+// Fallback 数据（浏览器预览模式）
+// ---------------------------------------------------------------------------
 
 const fallbackOverviewData: DesktopHostOverviewData = {
   project: {
@@ -152,7 +220,14 @@ const fallbackOverviewData: DesktopHostOverviewData = {
   ],
 };
 
-export function useDesktopHostOverview(): DesktopHostOverviewState {
+// ---------------------------------------------------------------------------
+// 数据读取 Hook
+// ---------------------------------------------------------------------------
+
+export function useDesktopHostOverview(): DesktopHostOverviewState & { refresh: () => void } {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
+
   const [state, setState] = useState<DesktopHostOverviewState>(() => {
     if (!isTauriHost()) {
       return { status: "browser", ...fallbackOverviewData };
@@ -188,11 +263,7 @@ export function useDesktopHostOverview(): DesktopHostOverviewState {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
-  return state;
-}
-
-function isTauriHost(): boolean {
-  return "__TAURI_INTERNALS__" in window;
+  return { ...state, refresh };
 }
