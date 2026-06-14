@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 20 “Agent Run 记录视图只读迁移”已收口。`agent_runs` + `runtime_events` 表已建 migration 002，Rust 只读 command 已注册，共享类型和状态常量已补，`AgentRunsPage` 已接入侧边栏。41 个 Rust 测试通过，未新增写入、未接模型、未开 Runner。
+- 阶段 21 “真实模型接入新架构适配设计”已出，见 `dev-docs/阶段21-真实模型接入新架构适配设计.md`。已定义 Tauri command 入口、Provider 策略、密钥方案、model_calls 约束和五阶段规划。本阶段只做设计，不发请求、不导 SDK、不建表。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -43,6 +43,7 @@
 15. `dev-docs/阶段17-长期分层边界设计.md`
 16. `dev-docs/阶段19-冻结模块解冻评估.md`
 17. `dev-docs/阶段20-AgentRun只读迁移设计.md`
+18. `dev-docs/阶段21-真实模型接入新架构适配设计.md`
 
 ## 维护原则
 
@@ -60,7 +61,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 20 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架、阶段 19 冻结模块解冻评估和阶段 20 Agent Run 记录视图只读迁移已确认；6 个页面已全部有实质内容。下一步评估后续阶段方向，但必须继续保持 Runner、真实模型和文件写入关闭。
+- 当前阶段 21 设计已出，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架、阶段 19 冻结模块解冻评估和阶段 20 Agent Run 记录视图只读迁移已确认；6 个页面已全部有实质内容。下一步评估后续阶段方向，但必须继续保持 Runner、真实模型和文件写入关闭。
 
 ## 任务触发口径（简版）
 
@@ -98,6 +99,7 @@
 18. 共享类型与规则骨架：已完成。`packages/shared` 和 `packages/agent-core` 已建纯 TypeScript 骨架，UI 已接入。
 19. 冻结模块解冻评估：已完成，见 `dev-docs/阶段19-冻结模块解冻评估.md`。
 20. Agent Run 记录视图只读迁移：已完成。Migration 002 + Rust 只读 command + TS 类型 + AgentRunsPage 页面均已实现，41 个 Rust 测试通过。
+21. 真实模型接入新架构适配设计：已出，见 `dev-docs/阶段21-真实模型接入新架构适配设计.md`。
 
 ## 候选技术栈口径
 
