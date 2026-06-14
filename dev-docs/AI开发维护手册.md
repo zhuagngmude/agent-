@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 16 “独立页面拆分”已收口，见 `dev-docs/阶段16-独立页面拆分方案.md`。OverviewPage 已拆分为 5 个独立页面（总览仪表盘、任务 CRUD、Agent 只读、审批操作、设置占位），侧边栏导航完成多页面切换，数据提升至 App.tsx 统一管理。
+- 阶段 17 “长期分层边界设计”已收口，见 `dev-docs/阶段17-长期分层边界设计.md`。六层边界、调用方向、旧模块冻结条件和阶段 18 最小骨架目标已确认。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -40,6 +40,7 @@
 12. `dev-docs/旧原型归档方案.md`
 13. `dev-docs/旧原型页面迁移清单.md`
 14. `dev-docs/阶段16-独立页面拆分方案.md`
+15. `dev-docs/阶段17-长期分层边界设计.md`
 
 ## 维护原则
 
@@ -57,7 +58,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单和阶段 16 独立页面拆分已确认；下一步进入长期分层确认和冻结模块解冻条件评估，但必须继续保持 Runner、真实模型和文件写入关闭。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分和阶段 17 长期分层边界设计已确认；下一步进入阶段 18 共享类型与规则骨架，但必须继续保持 Runner、真实模型、Git 执行和文件写入关闭。
 
 ## 任务触发口径（简版）
 
@@ -91,6 +92,7 @@
 14. Tauri 桌面写入交互验收：已完成，见 `docs/tauri-desktop-write-interaction-acceptance.md`。
 15. 旧原型页面迁移清单：已完成，见 `dev-docs/旧原型页面迁移清单.md`。
 16. 独立页面拆分：已完成，见 `dev-docs/阶段16-独立页面拆分方案.md`。
+17. 长期分层边界设计：已完成，见 `dev-docs/阶段17-长期分层边界设计.md`。
 
 ## 候选技术栈口径
 
