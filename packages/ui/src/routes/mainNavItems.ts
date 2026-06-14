@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { Bot, ClipboardCheck, LayoutDashboard, ListChecks, Settings } from "lucide-react";
+import { Activity, Bot, ClipboardCheck, LayoutDashboard, ListChecks, Settings } from "lucide-react";
 
-export type PageKey = "overview" | "tasks" | "agents" | "approvals" | "settings";
+export type PageKey = "overview" | "tasks" | "agents" | "approvals" | "settings" | "agentRuns";
 
 export type MainNavItem = {
   key: PageKey;
@@ -15,4 +15,5 @@ export const mainNavItems: MainNavItem[] = [
   { key: "agents", label: "Agent 编排", icon: Bot },
   { key: "approvals", label: "审批确认", icon: ClipboardCheck },
   { key: "settings", label: "系统设置", icon: Settings },
+  { key: "agentRuns", label: "运行记录", icon: Activity },
 ];

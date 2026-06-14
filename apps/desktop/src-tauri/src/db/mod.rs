@@ -10,6 +10,8 @@ use std::{
 const DATABASE_FILE_NAME: &str = "agent-swarm.sqlite";
 const INITIAL_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/001_initial_sqlite.sql");
+const AGENT_RUN_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/002_add_agent_runs.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -35,6 +37,7 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     connection.pragma_update(None, "foreign_keys", "ON")?;
 
     run_initial_migration(&connection)?;
+    run_agent_run_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
 
     Ok(DbState {
@@ -44,6 +47,11 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
 
 fn run_initial_migration(connection: &Connection) -> InitResult<()> {
     connection.execute_batch(INITIAL_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_agent_run_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(AGENT_RUN_MIGRATION_SQL)?;
     Ok(())
 }
 

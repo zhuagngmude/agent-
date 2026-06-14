@@ -16,6 +16,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::projects::get_project,
             commands::agents::list_agents,
+            commands::agent_runs::list_agent_runs,
+            commands::agent_runs::list_runtime_events,
             commands::tasks::list_tasks,
             commands::tasks::create_task,
             commands::tasks::update_task_status,

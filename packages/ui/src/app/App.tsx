@@ -3,6 +3,7 @@ import { Spin } from "antd";
 
 import { AppShell } from "../layouts/AppShell";
 import type { PageKey } from "../routes/mainNavItems";
+import { AgentRunsPage } from "../pages/AgentRunsPage";
 import { AgentsPage } from "../pages/AgentsPage";
 import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { OverviewPage } from "../pages/OverviewPage";
@@ -33,6 +34,8 @@ export function App() {
         return <ApprovalsPage approvals={data.approvals} refresh={refresh} canWrite={canWrite} />;
       case "settings":
         return <SettingsPage project={data.project} />;
+      case "agentRuns":
+        return <AgentRunsPage />;
     }
   };
 

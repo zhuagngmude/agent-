@@ -9,5 +9,7 @@ export type {
   UpdateTaskStatusInput,
 } from "./types/task";
 
+export type { AgentRunStatus, AgentRunSummary, RuntimeEventSummary } from "./types/agent-run";
+
 export { TITLE_MAX_LENGTH, DESC_MAX_LENGTH, REASON_MAX_LENGTH } from "./constants/limits";
 export { PRIORITY_VALUES, RISK_LEVEL_VALUES, TARGET_SERVICE_VALUES } from "./constants/enums";
