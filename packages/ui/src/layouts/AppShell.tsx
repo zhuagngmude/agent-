@@ -2,16 +2,19 @@ import type { ReactNode } from "react";
 import { Button, Layout, Space, Tag, Typography } from "antd";
 import { Bell, GitBranch, Settings } from "lucide-react";
 
+import type { PageKey } from "../routes/mainNavItems";
 import { mainNavItems } from "../routes/mainNavItems";
 
 const { Header, Sider, Content } = Layout;
 const { Text, Title } = Typography;
 
 type AppShellProps = {
+  activePage: PageKey;
+  onNavigate: (page: PageKey) => void;
   children: ReactNode;
 };
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ activePage, onNavigate, children }: AppShellProps) {
   return (
     <Layout className="app-shell">
       <Sider width={248} className="app-shell__sider">
@@ -28,7 +31,12 @@ export function AppShell({ children }: AppShellProps) {
             <button
               key={item.key}
               type="button"
-              className={item.active ? "app-shell__nav-item is-active" : "app-shell__nav-item"}
+              className={
+                activePage === item.key
+                  ? "app-shell__nav-item is-active"
+                  : "app-shell__nav-item"
+              }
+              onClick={() => onNavigate(item.key)}
             >
               <item.icon size={17} aria-hidden="true" />
               <span>{item.label}</span>
@@ -46,9 +54,9 @@ export function AppShell({ children }: AppShellProps) {
           <Space size={12}>
             <Tag color="blue">Tauri 预留</Tag>
             <Tag color="default">Runner 关闭</Tag>
-            <Button icon={<GitBranch size={16} />} aria-label="Git 保存点" />
-            <Button icon={<Bell size={16} />} aria-label="通知" />
-            <Button icon={<Settings size={16} />} aria-label="设置" />
+            <Button icon={<GitBranch size={16} />} aria-label="Git 保存点" disabled />
+            <Button icon={<Bell size={16} />} aria-label="通知" disabled />
+            <Button icon={<Settings size={16} />} aria-label="设置" disabled />
           </Space>
         </Header>
 
