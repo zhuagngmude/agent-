@@ -45,7 +45,7 @@ pub fn check_forbidden_value_patterns(text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 脱敏函数（阶段 22 helper-only，阶段 24 真实调用时使用）
+/// 脱敏函数（阶段 22 helper-only，后续真实模型阶段使用）
 #[allow(dead_code)]
 pub fn redact_secrets(text: &str) -> String {
     let mut result = text.to_string();

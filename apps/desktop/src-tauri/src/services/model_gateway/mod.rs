@@ -16,7 +16,7 @@ use crate::services::model_gateway::redaction::check_forbidden_value_patterns;
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize, PartialEq, Debug)]
-#[allow(dead_code)] // InputRejected/DraftReady 预留给阶段 24
+#[allow(dead_code)] // InputRejected/DraftReady 预留给后续真实模型阶段
 pub enum DraftStatus {
     FeatureDisabled,
     ProviderConfigError,
@@ -60,7 +60,7 @@ pub fn create_project_plan_draft(
         check_forbidden_value_patterns(c)?;
     }
 
-    // 2. 预留二次确认字段（阶段 24 前不强制校验）
+    // 2. 预留二次确认字段（后续真实模型阶段前不强制校验）
     let _ = second_confirm;
     let _ = confirm_text;
 
@@ -103,7 +103,7 @@ pub fn create_project_plan_draft(
     Ok(ProjectPlanModelDraftResponse {
         status: DraftStatus::FeatureDisabled.to_string(),
         error_category: Some("feature_disabled".into()),
-        summary: Some("Model Gateway 脚手架已就绪，真实调用在阶段 24 启用。".into()),
+        summary: Some("Model Gateway 脚手架已就绪，真实调用仍需后续准入阶段启用。".into()),
         warnings: vec![],
     })
 }

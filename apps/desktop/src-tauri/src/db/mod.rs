@@ -14,6 +14,8 @@ const AGENT_RUN_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/002_add_agent_runs.sql");
 const MODEL_CALLS_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/003_add_model_calls.sql");
+const PROJECT_PLAN_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/004_add_project_plan_workflow.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -41,6 +43,7 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     run_initial_migration(&connection)?;
     run_agent_run_migration(&connection)?;
     run_model_calls_migration(&connection)?;
+    run_project_plan_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
 
     Ok(DbState {
@@ -60,6 +63,11 @@ fn run_agent_run_migration(connection: &Connection) -> InitResult<()> {
 
 fn run_model_calls_migration(connection: &Connection) -> InitResult<()> {
     connection.execute_batch(MODEL_CALLS_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_project_plan_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(PROJECT_PLAN_MIGRATION_SQL)?;
     Ok(())
 }
 
@@ -284,6 +292,8 @@ mod tests {
             assert_eq!(count_rows(&connection, "agent_runs"), 0);
             assert_eq!(count_rows(&connection, "runtime_events"), 0);
             assert_eq!(count_rows(&connection, "model_calls"), 0);
+            assert_eq!(count_rows(&connection, "project_plan_drafts"), 0);
+            assert_eq!(count_rows(&connection, "runner_requests"), 0);
 
             let agents = list_agents(&connection).expect("agents should be readable");
             assert_eq!(agents.len(), 6);
@@ -319,6 +329,8 @@ mod tests {
             assert_eq!(count_rows(&connection, "agent_runs"), 0);
             assert_eq!(count_rows(&connection, "runtime_events"), 0);
             assert_eq!(count_rows(&connection, "model_calls"), 0);
+            assert_eq!(count_rows(&connection, "project_plan_drafts"), 0);
+            assert_eq!(count_rows(&connection, "runner_requests"), 0);
         }
         drop(state);
 

@@ -13,7 +13,7 @@ pub enum ProviderConfigStatus {
 
 pub struct ProviderConfig {
     pub status: ProviderConfigStatus,
-    #[allow(dead_code)] // 预留给阶段 24 adapter 使用
+    #[allow(dead_code)] // 预留给后续真实模型 adapter 使用
     pub default_model: String,
     #[allow(dead_code)]
     pub allowed_models: Vec<String>,

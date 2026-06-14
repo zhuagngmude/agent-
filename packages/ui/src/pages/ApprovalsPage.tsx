@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { App as AntdApp, Button, Card, Popconfirm, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
+import { isProjectPlanApprovalTarget } from "@agent-swarm/agent-core";
 import type { ApprovalSummary } from "@agent-swarm/shared";
 import { approveApproval, patchOnlyApproval, rejectApproval } from "../utils/desktopHost";
 
@@ -127,6 +128,9 @@ export function ApprovalsPage({ approvals, refresh, canWrite }: ApprovalsPagePro
           width: 220,
           render: (_: unknown, row: ApprovalRow) => {
             if (row.status !== "pending") return null;
+            if (isProjectPlanApprovalTarget(row.service)) {
+              return <Typography.Text type="secondary">请到“项目计划”页二次确认</Typography.Text>;
+            }
 
             return (
               <Space size={4} wrap>

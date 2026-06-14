@@ -252,6 +252,12 @@ fn transition_approval(
         return Err("not_found: approval not found".to_string());
     }
 
+    if next_status == "approved" && current_approval.target_service == "project_plan" {
+        return Err(
+            "invalid_input: project_plan approvals must use approve_project_plan".to_string(),
+        );
+    }
+
     ensure_approval_transition_allowed(&current_approval.status)?;
 
     let now = current_timestamp();

@@ -245,7 +245,7 @@ ApproveProjectPlanResponse {
 
 补充约束：
 
-- `approve_approval` 即使遇到 `target_service=project_plan`，也仍只能执行普通审批状态流转，不得创建任务、Runner request、runtime event 或用户项目文件。
+- `approve_approval` 遇到 `target_service=project_plan` 时必须拒绝通过，避免绕过二次确认把计划卡成已批准但未实例化。
 - 真正实例化计划只能走 `approve_project_plan`。
 
 ## 六、模板规则

@@ -8,4 +8,5 @@ export const TARGET_SERVICE_VALUES = [
   "runner",
   "agent_config",
   "model_gateway",
+  "project_plan",
 ] as const;

@@ -3,6 +3,16 @@ export type { ApprovalSummary } from "./types/approval";
 export type { DesktopHostOverviewData, DesktopHostOverviewState } from "./types/host";
 export type { ProjectSummary } from "./types/project";
 export type {
+  ApproveProjectPlanInput,
+  ApproveProjectPlanResponse,
+  CreateProjectPlanDraftInput,
+  CreateProjectPlanDraftResponse,
+  PlannedTaskSummary,
+  ProjectPlanDraftSummary,
+  ProjectPlanSideEffects,
+  RunnerRequestSummary,
+} from "./types/project-plan";
+export type {
   CreateTaskInput,
   TaskStatus,
   TaskSummary,

@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
 // model_calls helper-only 写入草案
 // 当前阶段 canWrite=false，不落盘，不接收 raw key/prompt/response
-// 所有类型和函数预留给阶段 24，通过测试覆盖，非测试代码尚未调用。
+// 所有类型和函数预留给后续真实模型阶段，通过测试覆盖，非测试代码尚未调用。
 // ---------------------------------------------------------------------------
 
 use serde::Serialize;
 
 /// 错误分类（13 类，以阶段 21 第七节为权威源）
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)] // 预留给阶段 24 写入 model_calls
+#[allow(dead_code)] // 预留给后续真实模型阶段写入 model_calls
 pub enum ModelCallErrorCategory {
     FeatureDisabled,
     MissingKey,
@@ -46,7 +46,7 @@ impl ModelCallErrorCategory {
 }
 
 #[derive(Serialize, Debug)]
-#[allow(dead_code)] // 预留给阶段 24
+#[allow(dead_code)] // 预留给后续真实模型阶段
 pub struct ModelCallDraft {
     pub can_write: bool,
     pub reason: String,
@@ -54,7 +54,7 @@ pub struct ModelCallDraft {
 }
 
 #[derive(Serialize, Debug)]
-#[allow(dead_code)] // 预留给阶段 24
+#[allow(dead_code)] // 预留给后续真实模型阶段
 pub struct ModelCallDraftFields {
     pub id: String,
     pub project_id: String,
@@ -80,7 +80,7 @@ pub struct ModelCallDraftFields {
 /// 当前阶段 canWrite 恒为 false，不落盘。
 /// error_message 不接收自由文本——只从 error_category 枚举取值，
 /// 确保 draft 中不出现 raw key、raw prompt、raw response 或 provider error 原文。
-#[allow(dead_code)] // 预留给阶段 24
+#[allow(dead_code)] // 预留给后续真实模型阶段
 pub fn build_model_call_draft(
     project_id: &str,
     purpose: &str,
@@ -98,7 +98,7 @@ pub fn build_model_call_draft(
 
     ModelCallDraft {
         can_write: false,
-        reason: "阶段 23：model_calls 仅 helper-only 草案，feature_disabled 时不落盘。阶段 24/25 真实调用开启且调用确实发生后，canWrite 才为 true。".into(),
+        reason: "阶段 23：model_calls 仅 helper-only 草案，feature_disabled 时不落盘。后续真实调用开启且调用确实发生后，canWrite 才为 true。".into(),
         draft_fields: Some(ModelCallDraftFields {
             id,
             project_id: project_id.into(),
@@ -123,13 +123,13 @@ pub fn build_model_call_draft(
 }
 
 /// 固定时间戳，仅用于阶段 23 测试草案。
-/// 阶段 24 真实写入 model_calls 时必须替换为 chrono::Utc::now() 或等价实时时间源。
+/// 后续真实写入 model_calls 时必须替换为 chrono::Utc::now() 或等价实时时间源。
 fn chrono_now() -> String {
     "2026-06-15T00:00:00Z".into()
 }
 
 /// 固定 ID 后缀，仅用于阶段 23 测试草案。
-/// 阶段 24 真实写入必须替换为 uuid v4/v7 或等价唯一 ID 生成。
+/// 后续真实写入必须替换为 uuid v4/v7 或等价唯一 ID 生成。
 fn uuid_suffix() -> String {
     "00000000".into()
 }

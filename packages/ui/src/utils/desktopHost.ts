@@ -5,10 +5,16 @@ import { invoke } from "@tauri-apps/api/core";
 export type {
   AgentSummary,
   ApprovalSummary,
+  ApproveProjectPlanInput,
+  ApproveProjectPlanResponse,
+  CreateProjectPlanDraftInput,
+  CreateProjectPlanDraftResponse,
   CreateTaskInput,
   DesktopHostOverviewData,
   DesktopHostOverviewState,
   ProjectSummary,
+  ProjectPlanDraftSummary,
+  RunnerRequestSummary,
   TaskStatus,
   TaskSummary,
   UpdateTaskStatusInput,
@@ -17,10 +23,16 @@ export type {
 import type {
   AgentSummary,
   ApprovalSummary,
+  ApproveProjectPlanInput,
+  ApproveProjectPlanResponse,
+  CreateProjectPlanDraftInput,
+  CreateProjectPlanDraftResponse,
   CreateTaskInput,
   DesktopHostOverviewData,
   DesktopHostOverviewState,
   ProjectSummary,
+  ProjectPlanDraftSummary,
+  RunnerRequestSummary,
   TaskSummary,
   UpdateTaskStatusInput,
 } from "@agent-swarm/shared";
@@ -69,6 +81,30 @@ export async function rejectApproval(
 export async function patchOnlyApproval(id: string): Promise<{ approval: ApprovalSummary }> {
   requireTauri();
   return invoke("patch_only_approval", { input: { id } });
+}
+
+export async function createProjectPlanDraft(
+  input: CreateProjectPlanDraftInput,
+): Promise<CreateProjectPlanDraftResponse> {
+  requireTauri();
+  return invoke("create_project_plan_draft", { input });
+}
+
+export async function approveProjectPlan(
+  input: ApproveProjectPlanInput,
+): Promise<ApproveProjectPlanResponse> {
+  requireTauri();
+  return invoke("approve_project_plan", { input });
+}
+
+export async function listProjectPlanDrafts(): Promise<ProjectPlanDraftSummary[]> {
+  requireTauri();
+  return invoke("list_project_plan_drafts");
+}
+
+export async function listRunnerRequests(): Promise<RunnerRequestSummary[]> {
+  requireTauri();
+  return invoke("list_runner_requests");
 }
 
 // ---------------------------------------------------------------------------

@@ -14,17 +14,17 @@
 
 - 表未建（`001_initial_sqlite.sql` 不含 `model_calls`）
 - 草案在旧 Node 代码中，新 Tauri/Rust 架构完全没有 `model_calls` 的表结构
-- 阶段 24 一旦接入真实 provider 调用，必须有对应的审计表记录每次调用
+- 后续一旦接入真实 provider 调用，必须有对应的审计表记录每次调用
 
 ### 1.2 建表时机
 
-当前（阶段 22）`request_project_plan_model_draft` 已注册但返回 `feature_disabled`。阶段 23 建表后，阶段 24 接入真实调用时：
+当前（阶段 22）`request_project_plan_model_draft` 已注册但返回 `feature_disabled`。阶段 23 建表后，后续真实模型阶段接入真实调用时：
 
 - 成功调用 → 写入 `model_calls` 脱敏记录
 - 失败/超时/被拒绝 → 写入 `model_calls` 错误记录
 - Feature flag 关闭 → 不写入
 
-如果等到阶段 24 才建表，migration 和 command 修改会在同一个阶段引入，增加回归风险。**提前建表可以验证 migration 执行无误、表结构可查询，且不影响任何现有功能。**
+如果等到真实调用阶段才建表，migration 和 command 修改会在同一个阶段引入，增加回归风险。**提前建表可以验证 migration 执行无误、表结构可查询，且不影响任何现有功能。**
 
 ## 二、表字段设计
 
@@ -110,7 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 
 - `feature_disabled` 表示整个调用链路未被激活——没有请求、没有响应、没有错误。写入一条 `status=blocked` 的记录会产生无意义的审计噪音
 - 与旧准入规格一致：旧 `model-gateway-model-calls.js` 的 `canWrite=false`，`feature_disabled` 时不落盘
-- 阶段 24 真实调用开启后：成功/失败/超时/错误**才**写入 `model_calls` + `runtime_events`，此时每条记录都有实际的事件可审计
+- 后续真实调用开启后：成功/失败/超时/错误**才**写入 `model_calls` + `runtime_events`，此时每条记录都有实际的事件可审计
 
 `feature_disabled` 时的行为：直接返回内存中的 `ProjectPlanModelDraftResponse`，不碰任何持久化存储。
 

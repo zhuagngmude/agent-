@@ -7,6 +7,7 @@ import { AgentRunsPage } from "../pages/AgentRunsPage";
 import { AgentsPage } from "../pages/AgentsPage";
 import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { OverviewPage } from "../pages/OverviewPage";
+import { ProjectPlanPage } from "../pages/ProjectPlanPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { TasksPage } from "../pages/TasksPage";
 import { useDesktopHostOverview } from "../utils/desktopHost";
@@ -26,6 +27,8 @@ export function App() {
     switch (activePage) {
       case "overview":
         return <OverviewPage {...data} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} />;
+      case "projectPlan":
+        return <ProjectPlanPage approvals={data.approvals} refreshOverview={refresh} canWrite={canWrite} />;
       case "tasks":
         return <TasksPage tasks={data.tasks} agents={data.agents} refresh={refresh} canWrite={canWrite} />;
       case "agents":

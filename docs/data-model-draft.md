@@ -154,7 +154,7 @@ Agent Run 记录链。核心字段：`id`, `project_id`, `chain_id`, `root_run_i
 
 ### `project_plan_drafts`
 
-阶段：阶段 24 设计已出，待 migration 004 实现。
+阶段：阶段 24 已完成，migration 004 已实现。
 
 项目计划草案表。核心字段：`id`, `project_id`, `approval_id`, `idea`, `constraints`, `summary`, `status`, `generated_by`, `requested_by`, `created_at`, `updated_at`。
 
@@ -166,7 +166,7 @@ Agent Run 记录链。核心字段：`id`, `project_id`, `chain_id`, `root_run_i
 
 ### `runner_requests`
 
-阶段：阶段 24 设计已出，待 migration 004 实现。旧文档和旧原型里有时称为 `runner_jobs`，新 Tauri/Rust 主线第一版使用 `runner_requests`，避免误解成可执行 Runner job。
+阶段：阶段 24 已完成，migration 004 已实现。旧文档和旧原型里有时称为 `runner_jobs`，新 Tauri/Rust 主线第一版使用 `runner_requests`，避免误解成可执行 Runner job。
 
 只读 Runner request 队列记录。核心字段：`id`, `project_id`, `approval_id`, `task_id`, `status`, `operation_types`, `affected_files`, `checkpoint`, `safety_note`, `created_at`, `updated_at`。
 
@@ -282,7 +282,7 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 1. `001_initial_sqlite` — 第一版最小落库：`projects` + `agents` + `tasks` + `approvals`（当前阶段）。
 2. `002_add_agent_runs` — Agent Run 记录链 + `runtime_events`。
 3. `003_add_model_calls` — `model_calls` helper-only 审计表。
-4. 阶段 24 设计为 `004_add_project_plan_workflow`：`project_plan_drafts` + `runner_requests`，用于迁移旧 MVP-0.3 的项目计划审批闭环。
+4. `004_add_project_plan_workflow` — `project_plan_drafts` + `runner_requests`，用于迁移旧 MVP-0.3 的项目计划审批闭环（阶段 24 已完成）。
 5. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
 6. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
 
