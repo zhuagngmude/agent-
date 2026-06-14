@@ -6,7 +6,9 @@ pub mod redaction;
 use serde::Serialize;
 
 use crate::services::model_gateway::project_plan::validate_input;
-use crate::services::model_gateway::provider_config::{resolve_provider_config, ProviderConfigStatus};
+use crate::services::model_gateway::provider_config::{
+    resolve_provider_config, ProviderConfigStatus,
+};
 use crate::services::model_gateway::redaction::check_forbidden_value_patterns;
 
 // ---------------------------------------------------------------------------
@@ -14,7 +16,7 @@ use crate::services::model_gateway::redaction::check_forbidden_value_patterns;
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize, PartialEq, Debug)]
-#[allow(dead_code)]  // InputRejected/DraftReady 预留给阶段 24
+#[allow(dead_code)] // InputRejected/DraftReady 预留给阶段 24
 pub enum DraftStatus {
     FeatureDisabled,
     ProviderConfigError,
@@ -81,12 +83,15 @@ pub fn create_project_plan_draft(
     if config.status != ProviderConfigStatus::Configured {
         return Ok(ProjectPlanModelDraftResponse {
             status: DraftStatus::ProviderConfigError.to_string(),
-            error_category: Some(match config.status {
-                ProviderConfigStatus::MissingKey => "missing_key",
-                ProviderConfigStatus::MissingBaseUrl => "missing_base_url",
-                ProviderConfigStatus::InvalidBaseUrl => "invalid_base_url",
-                _ => "provider_config_error",
-            }.into()),
+            error_category: Some(
+                match config.status {
+                    ProviderConfigStatus::MissingKey => "missing_key",
+                    ProviderConfigStatus::MissingBaseUrl => "missing_base_url",
+                    ProviderConfigStatus::InvalidBaseUrl => "invalid_base_url",
+                    _ => "provider_config_error",
+                }
+                .into(),
+            ),
             summary: None,
             warnings: vec![],
         });

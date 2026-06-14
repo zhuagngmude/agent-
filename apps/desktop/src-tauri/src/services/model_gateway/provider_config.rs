@@ -13,7 +13,7 @@ pub enum ProviderConfigStatus {
 
 pub struct ProviderConfig {
     pub status: ProviderConfigStatus,
-    #[allow(dead_code)]  // 预留给阶段 24 adapter 使用
+    #[allow(dead_code)] // 预留给阶段 24 adapter 使用
     pub default_model: String,
     #[allow(dead_code)]
     pub allowed_models: Vec<String>,
@@ -33,9 +33,7 @@ fn resolve(key: Option<&str>, base_url: Option<&str>) -> ProviderConfig {
     let status = match (key, base_url) {
         (None, _) => ProviderConfigStatus::MissingKey,
         (_, None) => ProviderConfigStatus::MissingBaseUrl,
-        (Some(_), Some(url)) if !is_valid_base_url(url) => {
-            ProviderConfigStatus::InvalidBaseUrl
-        }
+        (Some(_), Some(url)) if !is_valid_base_url(url) => ProviderConfigStatus::InvalidBaseUrl,
         _ => ProviderConfigStatus::Configured,
     };
 
@@ -105,7 +103,9 @@ mod tests {
         assert_eq!(config.status, ProviderConfigStatus::Configured);
         assert_eq!(config.default_model, "gpt-5.4-mini");
         assert!(config.allowed_models.contains(&"gpt-5.4-mini".into()));
-        assert!(config.allowed_purposes.contains(&"project_plan_generation".into()));
+        assert!(config
+            .allowed_purposes
+            .contains(&"project_plan_generation".into()));
     }
 
     #[test]

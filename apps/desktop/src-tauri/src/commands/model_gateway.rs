@@ -1,8 +1,6 @@
 use serde::Deserialize;
 
-use crate::services::model_gateway::{
-    create_project_plan_draft, ProjectPlanModelDraftResponse,
-};
+use crate::services::model_gateway::{create_project_plan_draft, ProjectPlanModelDraftResponse};
 
 /// 阶段 22：只接受 idea / constraints / second_confirm / confirm_text 四个字段。
 /// `#[serde(deny_unknown_fields)]` 确保前端无法传入 apiKey、baseUrl、provider、model 等字段。

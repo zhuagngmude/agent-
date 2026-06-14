@@ -259,7 +259,11 @@ mod tests {
             let connection = state.connection().expect("connection should be available");
             list_agent_runs(&connection).expect("list_agent_runs should succeed")
         };
-        assert_eq!(runs.len(), 1, "should only return runs for the current project");
+        assert_eq!(
+            runs.len(),
+            1,
+            "should only return runs for the current project"
+        );
         assert_eq!(runs[0].id, "run_a");
         drop(state);
         let _ = fs::remove_dir_all(test_dir);

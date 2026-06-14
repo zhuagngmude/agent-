@@ -8,7 +8,7 @@ use serde::Serialize;
 
 /// 错误分类（13 类，以阶段 21 第七节为权威源）
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]  // 预留给阶段 24 写入 model_calls
+#[allow(dead_code)] // 预留给阶段 24 写入 model_calls
 pub enum ModelCallErrorCategory {
     FeatureDisabled,
     MissingKey,
@@ -46,7 +46,7 @@ impl ModelCallErrorCategory {
 }
 
 #[derive(Serialize, Debug)]
-#[allow(dead_code)]  // 预留给阶段 24
+#[allow(dead_code)] // 预留给阶段 24
 pub struct ModelCallDraft {
     pub can_write: bool,
     pub reason: String,
@@ -54,7 +54,7 @@ pub struct ModelCallDraft {
 }
 
 #[derive(Serialize, Debug)]
-#[allow(dead_code)]  // 预留给阶段 24
+#[allow(dead_code)] // 预留给阶段 24
 pub struct ModelCallDraftFields {
     pub id: String,
     pub project_id: String,
@@ -80,7 +80,7 @@ pub struct ModelCallDraftFields {
 /// 当前阶段 canWrite 恒为 false，不落盘。
 /// error_message 不接收自由文本——只从 error_category 枚举取值，
 /// 确保 draft 中不出现 raw key、raw prompt、raw response 或 provider error 原文。
-#[allow(dead_code)]  // 预留给阶段 24
+#[allow(dead_code)] // 预留给阶段 24
 pub fn build_model_call_draft(
     project_id: &str,
     purpose: &str,
@@ -152,10 +152,7 @@ mod tests {
             ModelCallErrorCategory::FeatureDisabled,
         );
         assert_eq!(draft.can_write, false, "阶段 23 的 canWrite 应为 false");
-        assert!(
-            draft.reason.contains("阶段 23"),
-            "reason 应说明当前阶段"
-        );
+        assert!(draft.reason.contains("阶段 23"), "reason 应说明当前阶段");
     }
 
     #[test]

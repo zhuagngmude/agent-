@@ -255,11 +255,9 @@ struct SeedApproval {
 mod tests {
     use super::initialize;
     use crate::services::{
-    agents::list_agents,
-    approvals::list_approvals,
-    model_gateway::create_project_plan_draft,
-    tasks::list_tasks,
-};
+        agents::list_agents, approvals::list_approvals, model_gateway::create_project_plan_draft,
+        tasks::list_tasks,
+    };
     use rusqlite::Connection;
     use std::{
         fs,
@@ -341,15 +339,36 @@ mod tests {
                 .filter_map(|r| r.ok())
                 .collect();
             let expected = vec![
-                "id", "project_id", "purpose", "provider", "model", "status",
-                "request_hash", "structured_summary", "token_usage", "cost_estimate",
-                "error_category", "error_message", "redaction_applied", "duration_ms",
-                "related_approval_id", "runtime_event_id", "created_at", "updated_at",
+                "id",
+                "project_id",
+                "purpose",
+                "provider",
+                "model",
+                "status",
+                "request_hash",
+                "structured_summary",
+                "token_usage",
+                "cost_estimate",
+                "error_category",
+                "error_message",
+                "redaction_applied",
+                "duration_ms",
+                "related_approval_id",
+                "runtime_event_id",
+                "created_at",
+                "updated_at",
             ];
             for col in &expected {
-                assert!(columns.contains(&col.to_string()), "column {col} should exist");
+                assert!(
+                    columns.contains(&col.to_string()),
+                    "column {col} should exist"
+                );
             }
-            assert_eq!(columns.len(), 18, "model_calls should have exactly 18 columns");
+            assert_eq!(
+                columns.len(),
+                18,
+                "model_calls should have exactly 18 columns"
+            );
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);
@@ -361,16 +380,27 @@ mod tests {
         {
             let connection = state.connection().expect("connection should be available");
             let mut stmt = connection
-                .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='model_calls'")
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='model_calls'",
+                )
                 .expect("should be able to query sqlite_master");
             let indexes: Vec<String> = stmt
                 .query_map([], |row| row.get(0))
                 .expect("should map indexes")
                 .filter_map(|r| r.ok())
                 .collect();
-            assert!(indexes.iter().any(|i| i.contains("project_id")), "should have project_id index");
-            assert!(indexes.iter().any(|i| i.contains("status")), "should have status index");
-            assert!(indexes.iter().any(|i| i.contains("created_at")), "should have created_at index");
+            assert!(
+                indexes.iter().any(|i| i.contains("project_id")),
+                "should have project_id index"
+            );
+            assert!(
+                indexes.iter().any(|i| i.contains("status")),
+                "should have status index"
+            );
+            assert!(
+                indexes.iter().any(|i| i.contains("created_at")),
+                "should have created_at index"
+            );
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);
@@ -383,9 +413,9 @@ mod tests {
             let connection = state.connection().expect("connection should be available");
             let before = count_rows(&connection, "model_calls");
 
-            let _response = create_project_plan_draft(
-                "测试想法", &None, false, &None,
-            ).expect("should return feature_disabled response");
+            let response = create_project_plan_draft("测试想法", &None, false, &None)
+                .expect("should return feature_disabled response");
+            assert_eq!(response.status, "feature_disabled");
 
             let after = count_rows(&connection, "model_calls");
             assert_eq!(before, after, "feature_disabled 不应写入 model_calls");
@@ -402,9 +432,9 @@ mod tests {
             let connection = state.connection().expect("connection should be available");
             let before = count_rows(&connection, "runtime_events");
 
-            let _response = create_project_plan_draft(
-                "测试想法", &None, false, &None,
-            ).expect("should return feature_disabled response");
+            let response = create_project_plan_draft("测试想法", &None, false, &None)
+                .expect("should return feature_disabled response");
+            assert_eq!(response.status, "feature_disabled");
 
             let after = count_rows(&connection, "runtime_events");
             assert_eq!(before, after, "feature_disabled 不应写入 runtime_events");

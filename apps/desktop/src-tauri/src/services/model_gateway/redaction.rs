@@ -10,7 +10,10 @@ pub fn check_forbidden_value_patterns(text: &str) -> Result<(), String> {
     // "sk-" 开头 + 20 位以上字母数字
     if let Some(pos) = lower.find("sk-") {
         let after = &text[pos + 3..];
-        let alnum_count = after.chars().take_while(|c| c.is_ascii_alphanumeric()).count();
+        let alnum_count = after
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .count();
         if alnum_count >= 20 {
             return Err("输入包含疑似 API key 的值，已被拒绝".into());
         }
@@ -51,7 +54,10 @@ pub fn redact_secrets(text: &str) -> String {
     // sk- 密钥脱敏
     if let Some(pos) = lower.find("sk-") {
         let after = &text[pos + 3..];
-        let alnum_count = after.chars().take_while(|c| c.is_ascii_alphanumeric()).count();
+        let alnum_count = after
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .count();
         if alnum_count >= 20 {
             let start = pos;
             let end = pos + 3 + alnum_count;
