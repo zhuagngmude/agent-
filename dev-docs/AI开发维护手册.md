@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 当前进入”Tauri 桌面写入交互验收收口”。前端共享 UI 已接入写入命令，补充了浏览器预览降级和 refresh 刷新机制，见 `docs/tauri-desktop-write-interaction-acceptance.md`。
+- 阶段 14 “Tauri 桌面写入交互验收”已收口。前端共享 UI 已接入写入命令，补充了浏览器预览降级和 refresh 刷新机制，见 `docs/tauri-desktop-write-interaction-acceptance.md`。下一步进入旧原型页面迁移清单、独立页面拆分和长期分层确认。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -55,7 +55,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收和旧原型归档方案已确认；下一步可以进入前端共享 UI 写入接入，但必须继续保持 Runner、真实模型和文件写入关闭。
+- 当前阶段 2 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、Overview 只读数据接入、Tauri 只读骨架验收文档、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收和旧原型归档方案已确认；下一步可以进入旧原型页面迁移清单、独立页面拆分和长期分层确认，但必须继续保持 Runner、真实模型和文件写入关闭。
 
 ## 任务触发口径（简版）
 

@@ -20,6 +20,8 @@
 e0b92ef docs: 设计前端写入 commands 接入
 e7b77bb feat: 封装前端写入 commands 调用
 7cd9b02 feat: 接入 Overview 写入交互
+25fce9c fix: 修复前端写入交互验收问题
+a1d565f fix: 修复前端写入交互验收问题
 ```
 
 ## 二、分层验收
@@ -114,7 +116,7 @@ OverviewPage 审批操作列
 | 场景 | 预期行为 | 验收结果 |
 |------|----------|----------|
 | 新建任务按钮 | 显示但 disabled + tooltip | 通过 |
-| CreateTaskModal 打开 | 触发 `message.warning("浏览器预览模式不支持写入操作")` | 通过 |
+| CreateTaskModal 打开 | 浏览器模式下按钮 disabled，不进入 Modal；写入函数仍保留 `requireTauri()` 守卫 | 通过 |
 | 任务操作列 | 不渲染（`showWriteUI = false`） | 通过 |
 | 审批操作列 | 不渲染（`showWriteUI = false`） | 通过 |
 | 只读数据 | fallback 数据正常展示 | 通过（前一轮已验收） |
@@ -130,7 +132,7 @@ OverviewPage 审批操作列
 前端写入接入不引入新的副作用。已确认：
 
 - 前端只通过 `desktopHost.ts` 中的封装函数调用 Tauri invoke
-- 不绕过封装直接写 `invoke(...)` 
+- 不绕过封装直接写 `invoke(...)`
 - 不访问 SQLite 文件系统
 - 不执行本地命令
 - 不写用户项目文件
