@@ -1,8 +1,9 @@
 use crate::{
     db::DbState,
     services::tasks::{
-        create_task as create_task_record, list_tasks as list_task_records, CreateTaskInput,
-        CreateTaskResponse, TaskSummary,
+        create_task as create_task_record, list_tasks as list_task_records,
+        update_task_status as update_task_status_record, CreateTaskInput, CreateTaskResponse,
+        TaskSummary, UpdateTaskStatusInput, UpdateTaskStatusResponse,
     },
 };
 
@@ -19,4 +20,13 @@ pub fn create_task(
 ) -> Result<CreateTaskResponse, String> {
     let mut connection = state.connection()?;
     create_task_record(&mut connection, input)
+}
+
+#[tauri::command]
+pub fn update_task_status(
+    state: tauri::State<'_, DbState>,
+    input: UpdateTaskStatusInput,
+) -> Result<UpdateTaskStatusResponse, String> {
+    let mut connection = state.connection()?;
+    update_task_status_record(&mut connection, input)
 }

@@ -39,6 +39,17 @@ pub struct CreateTaskResponse {
     pub task: TaskSummary,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateTaskStatusInput {
+    pub id: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UpdateTaskStatusResponse {
+    pub task: TaskSummary,
+}
+
 pub fn list_tasks(connection: &Connection) -> Result<Vec<TaskSummary>, String> {
     let mut statement = connection
         .prepare(
@@ -123,6 +134,50 @@ pub fn create_task(
 
     let task = get_task_by_id(connection, &id)?;
     Ok(CreateTaskResponse { task })
+}
+
+pub fn update_task_status(
+    connection: &mut Connection,
+    input: UpdateTaskStatusInput,
+) -> Result<UpdateTaskStatusResponse, String> {
+    let project_id = get_current_project_id(connection)?;
+    let task_id = normalize_required_text(input.id, 1, 200, "id")?;
+    let next_status = normalize_task_status(input.status)?;
+    let current_task = get_task_by_id(connection, &task_id)?;
+
+    if current_task.project_id != project_id {
+        return Err("not_found: task not found".to_string());
+    }
+
+    ensure_task_transition_allowed(&current_task.status, &next_status)?;
+
+    let now = current_timestamp();
+    let tx = connection.transaction().map_err(|error| {
+        format!("database_error: start update task status transaction failed: {error}")
+    })?;
+    let changed = tx
+        .execute(
+            "UPDATE tasks
+             SET status = ?1, updated_at = ?2
+             WHERE id = ?3 AND project_id = ?4",
+            params![
+                next_status.as_str(),
+                now.as_str(),
+                task_id.as_str(),
+                project_id.as_str()
+            ],
+        )
+        .map_err(|error| format!("database_error: update task status failed: {error}"))?;
+
+    if changed != 1 {
+        return Err("not_found: task not found".to_string());
+    }
+
+    tx.commit()
+        .map_err(|error| format!("database_error: commit update task status failed: {error}"))?;
+
+    let task = get_task_by_id(connection, &task_id)?;
+    Ok(UpdateTaskStatusResponse { task })
 }
 
 fn parse_string_list(value: &str) -> Vec<String> {
@@ -222,6 +277,22 @@ fn normalize_enum(value: String, allowed: &[&str], field: &str) -> Result<String
     }
 }
 
+fn normalize_task_status(value: String) -> Result<String, String> {
+    normalize_enum(
+        value,
+        &[
+            "queued",
+            "running",
+            "blocked",
+            "waiting_user",
+            "completed",
+            "failed",
+            "cancelled",
+        ],
+        "status",
+    )
+}
+
 fn normalize_optional_enum(
     value: Option<String>,
     allowed: &[&str],
@@ -319,6 +390,30 @@ fn ensure_task_belongs_to_project(
     }
 }
 
+fn ensure_task_transition_allowed(current: &str, next: &str) -> Result<(), String> {
+    let allowed = matches!(
+        (current, next),
+        ("queued", "running")
+            | ("queued", "cancelled")
+            | ("running", "completed")
+            | ("running", "blocked")
+            | ("running", "waiting_user")
+            | ("running", "failed")
+            | ("running", "cancelled")
+            | ("blocked", "running")
+            | ("waiting_user", "running")
+            | ("waiting_user", "cancelled")
+    );
+
+    if allowed {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid_transition: task status cannot change from {current} to {next}"
+        ))
+    }
+}
+
 fn generate_task_id() -> String {
     format!("task_{}", timestamp_nanos())
 }
@@ -336,7 +431,9 @@ fn timestamp_nanos() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::{create_task, parse_string_list, CreateTaskInput};
+    use super::{
+        create_task, parse_string_list, update_task_status, CreateTaskInput, UpdateTaskStatusInput,
+    };
     use rusqlite::{params, Connection};
 
     const INITIAL_MIGRATION_SQL: &str =
@@ -465,6 +562,95 @@ mod tests {
         assert!(error.contains("invalid_input"));
     }
 
+    #[test]
+    fn update_task_status_allows_valid_transitions() {
+        let mut connection = setup_connection();
+
+        let running = update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "task_existing".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .expect("queued task should start");
+        assert_eq!(running.task.status, "running");
+
+        let completed = update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "task_existing".to_string(),
+                status: "completed".to_string(),
+            },
+        )
+        .expect("running task should complete");
+        assert_eq!(completed.task.status, "completed");
+    }
+
+    #[test]
+    fn update_task_status_rejects_terminal_transition() {
+        let mut connection = setup_connection();
+        set_task_status(&connection, "task_existing", "completed");
+
+        let error = update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "task_existing".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .expect_err("completed task should not restart");
+
+        assert!(error.contains("invalid_transition"));
+    }
+
+    #[test]
+    fn update_task_status_rejects_invalid_status() {
+        let mut connection = setup_connection();
+
+        let error = update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "task_existing".to_string(),
+                status: "review".to_string(),
+            },
+        )
+        .expect_err("invalid status should fail");
+
+        assert!(error.contains("invalid_input"));
+    }
+
+    #[test]
+    fn update_task_status_rejects_unknown_task() {
+        let mut connection = setup_connection();
+
+        let error = update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "missing_task".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .expect_err("unknown task should fail");
+
+        assert!(error.contains("not_found"));
+    }
+
+    #[test]
+    fn update_task_status_does_not_create_approval_or_runner_records() {
+        let mut connection = setup_connection();
+        update_task_status(
+            &mut connection,
+            UpdateTaskStatusInput {
+                id: "task_existing".to_string(),
+                status: "running".to_string(),
+            },
+        )
+        .expect("status should update");
+
+        assert_eq!(count_rows(&connection, "approvals"), 0);
+    }
+
     fn input_with_title(title: &str) -> CreateTaskInput {
         CreateTaskInput {
             title: title.to_string(),
@@ -547,5 +733,14 @@ mod tests {
                 row.get(0)
             })
             .expect("table should be queryable")
+    }
+
+    fn set_task_status(connection: &Connection, task_id: &str, status: &str) {
+        connection
+            .execute(
+                "UPDATE tasks SET status = ?1 WHERE id = ?2",
+                params![status, task_id],
+            )
+            .expect("task status should update");
     }
 }
