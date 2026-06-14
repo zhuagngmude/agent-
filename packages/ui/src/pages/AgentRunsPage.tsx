@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Card, Space, Spin, Table, Tag, Typography } from "antd";
+import { Alert, Card, Space, Spin, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { invoke } from "@tauri-apps/api/core";
 import { Activity } from "lucide-react";
 
 import type { AgentRunSummary, RuntimeEventSummary } from "@agent-swarm/shared";
@@ -42,6 +43,7 @@ type RunRow = {
 
 export function AgentRunsPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [runs, setRuns] = useState<AgentRunSummary[]>([]);
   const [events, setEvents] = useState<RuntimeEventSummary[]>([]);
 
@@ -57,7 +59,6 @@ export function AgentRunsPage() {
 
     async function fetchData() {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
         const [r, e] = await Promise.all([
           invoke<AgentRunSummary[]>("list_agent_runs"),
           invoke<RuntimeEventSummary[]>("list_runtime_events"),
@@ -65,11 +66,13 @@ export function AgentRunsPage() {
         if (!cancelled) {
           setRuns(r);
           setEvents(e);
+          setError(null);
         }
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setRuns([]);
           setEvents([]);
+          setError(err instanceof Error ? err.message : String(err));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -149,6 +152,16 @@ export function AgentRunsPage() {
           Agent Run 链记录与运行时审计事件（只读）
         </Typography.Text>
       </div>
+
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="读取运行记录失败"
+          description={error}
+          closable
+        />
+      )}
 
       <Card title="运行链">
         <Table<ChainRow>

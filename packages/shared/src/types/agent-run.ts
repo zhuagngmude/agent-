@@ -1,4 +1,4 @@
-/** Agent Run 状态（与旧 proto 对齐，使用 succeeded 而非 completed） */
+/** Agent Run 状态（与旧原型对齐，使用 succeeded 而非 completed） */
 export type AgentRunStatus = "queued" | "running" | "succeeded" | "failed" | "blocked";
 
 export type AgentRunSummary = {
