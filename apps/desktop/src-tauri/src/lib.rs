@@ -15,6 +15,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::projects::get_project,
+            commands::model_gateway::request_project_plan_model_draft,
             commands::agents::list_agents,
             commands::agent_runs::list_agent_runs,
             commands::agent_runs::list_runtime_events,
