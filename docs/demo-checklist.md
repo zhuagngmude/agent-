@@ -2,6 +2,8 @@
 
 当前用途：给人类和后续 AI 一个可重复的本地验收入口。当前仍是 Mock / SQLite 优先阶段，不调用真实模型，不执行真实 Runner。
 
+重新立项后的 Tauri/Rust 写入 commands 已完成正式验收，见 `docs/write-commands-acceptance.md`。该验收只覆盖本地 SQLite 记录写入和状态流转，不代表开放真实 Runner、真实模型或用户项目文件写入。
+
 ## 启动
 
 ```powershell
@@ -28,6 +30,7 @@ powershell -ExecutionPolicy Bypass -File scripts\stop-local.ps1
 5. `verify-model-gateway.ps1` 再确认 Model Gateway 仍是禁用态和只读边界。
 6. `verify-real-model-admission.ps1` 再确认阶段 2 真实模型准入预备层仍不调用 provider、不写模型记录、不创建审批 / 任务 / Runner request。
 7. `verify-local-ui.ps1` 最后做浏览器烟测，包括 Agent Run 记录页。
+8. 新架构写入 commands 验收见 `docs/write-commands-acceptance.md`，核心命令为 `cargo check`、`cargo test` 和 `git diff --check`。
 
 ## 现场检查点
 

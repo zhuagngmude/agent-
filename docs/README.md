@@ -33,9 +33,10 @@
 - [tauri-readonly-skeleton-acceptance.md](./tauri-readonly-skeleton-acceptance.md)：Tauri/Rust + SQLite 只读骨架正式验收。
 - [write-commands-security-design.md](./write-commands-security-design.md)：教程 #11 在单机 Tauri 写入 commands 中的安全边界裁剪。
 - [write-commands-design.md](./write-commands-design.md)：写入 commands 的参数、校验、返回值和副作用边界设计。
+- [write-commands-acceptance.md](./write-commands-acceptance.md)：6 个 Tauri/Rust 写入 commands 的正式验收记录。
 
 ## 验证
 
 验证脚本说明见 [../scripts/README.md](../scripts/README.md)。
 
-当前阶段：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已收口，只保留 helper-only scaffold；阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程。当前不开放真实 Runner、真实模型调用或云同步。
+当前阶段：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已收口，只保留 helper-only scaffold；阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程；重新立项后的写入 commands 已完成正式验收。当前不开放真实 Runner、真实模型调用或云同步。

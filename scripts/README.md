@@ -29,6 +29,8 @@ Local startup and verification entrypoints for `agent-swarm`.
 
 The mock / SQLite flow scripts now also cover Agent Run chain recording, execution request lifecycle transitions, read-only execution request views, and runtime event auditing.
 
+Tauri/Rust write commands are accepted through Rust checks instead of a PowerShell script. See [docs/write-commands-acceptance.md](../docs/write-commands-acceptance.md) for the current `create_task`, `update_task_status`, `create_approval`, `approve_approval`, `reject_approval`, and `patch_only_approval` evidence.
+
 ## Ports
 
 - `8787`: manual local trial default
