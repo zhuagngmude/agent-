@@ -17,6 +17,7 @@ pub fn run() {
             commands::projects::get_project,
             commands::agents::list_agents,
             commands::tasks::list_tasks,
+            commands::tasks::create_task,
             commands::approvals::list_approvals
         ])
         .run(tauri::generate_context!())
