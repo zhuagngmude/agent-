@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 18 “共享类型与规则骨架”已收口。`packages/shared`（跨端类型、DTO、常量）和 `packages/agent-core`（状态转换、终态判断、领域规则纯函数）已建纯 TypeScript 骨架；`packages/ui` 通过 tsconfig paths 从两个新包导入，不再本地定义跨端类型和状态转换规则。未新增 npm 依赖，Runner/真实模型/Git 执行仍关闭。
+- 阶段 19 “冻结模块解冻评估”文档已出，待修后收口，见 `dev-docs/阶段19-冻结模块解冻评估.md`。7个冻结模块已分级：Agent Run 建议只读迁移，Runner/真实模型/Git 继续冻结。下一阶段建议做 Agent Run 记录视图只读迁移。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -41,6 +41,7 @@
 13. `dev-docs/旧原型页面迁移清单.md`
 14. `dev-docs/阶段16-独立页面拆分方案.md`
 15. `dev-docs/阶段17-长期分层边界设计.md`
+16. `dev-docs/阶段19-冻结模块解冻评估.md`
 
 ## 维护原则
 
@@ -58,7 +59,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 18 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计和阶段 18 共享类型与规则骨架已确认；下一步进入冻结模块解冻条件评估和后续实现阶段范围确认，但必须继续保持 Runner、真实模型和文件写入关闭。
+- 当前阶段 19 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架和阶段 19 冻结模块解冻评估已确认；下一步进入 Agent Run 记录视图只读迁移，但必须继续保持 Runner、真实模型和文件写入关闭。
 
 ## 任务触发口径（简版）
 
@@ -94,6 +95,7 @@
 16. 独立页面拆分：已完成，见 `dev-docs/阶段16-独立页面拆分方案.md`。
 17. 长期分层边界设计：已完成，见 `dev-docs/阶段17-长期分层边界设计.md`。
 18. 共享类型与规则骨架：已完成。`packages/shared` 和 `packages/agent-core` 已建纯 TypeScript 骨架，UI 已接入。
+19. 冻结模块解冻评估：已完成，见 `dev-docs/阶段19-冻结模块解冻评估.md`。
 
 ## 候选技术栈口径
 
