@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 23 “model_calls helper-only 迁移设计”已出，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。17 字段审计表、禁止存储清单、feature_disabled 不落盘策略、7 项测试计划和回滚方案均已定义。
+- 阶段 23 “model_calls helper-only 迁移设计”已出，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。18 字段审计表、禁止存储清单、feature_disabled 不落盘策略、7 项测试计划和回滚方案均已定义。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。

@@ -28,7 +28,7 @@
 
 ### 2.1 完整字段清单
 
-字段对齐旧 `model-gateway-model-calls.js` 中定义的 `modelCallColumns`（20 列），精简掉当前不用的列：
+字段对齐旧 `model-gateway-model-calls.js` 中定义的 `modelCallColumns`（原 20+ 列），精简为 18 个字段（含 id）：
 
 ```sql
 -- 003_add_model_calls.sql
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS model_calls (
   structured_summary    TEXT,                   -- 结构化、脱敏、限长后的摘要
   token_usage           TEXT,                   -- JSON：{ prompt, completion, total }
   cost_estimate         TEXT,                   -- JSON：{ amount, currency }
-  error_category        TEXT,                   -- feature_disabled | missing_key | timeout | ...
+  error_category        TEXT,                   -- 13 类，以阶段 21 第七节为准（feature_disabled | missing_key | missing_base_url | invalid_base_url | unsupported_provider | unsupported_model | invalid_purpose | forbidden_field | timeout | provider_error | response_too_large | redaction_failed | unknown）
   error_message         TEXT,                   -- 脱敏后的错误描述
   redaction_applied     INTEGER NOT NULL DEFAULT 0,  -- 0 | 1
   duration_ms           INTEGER,               -- 调用耗时（毫秒）
@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 | 字段 | 来源 | 必填 |
 |------|------|------|
 | `id` | 生成（`model_call_{purpose}_{timestamp}_{uuid8}`） | 是 |
-| `project_id` | 当前项目 ID（`services/projects::get_current_project`） | 是 |
+| `project_id` | 调用 `services::projects::get_current_project(connection)` 后取 `.id` | 是 |
 | `purpose` | 固定 `"project_plan_generation"` | 是 |
 | `provider` | `provider_config` 解析结果 | 是 |
 | `model` | `provider_config` 解析结果 | 是 |
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 | `structured_summary` | 脱敏+限长后的摘要 | 否 |
 | `token_usage` | JSON，粗粒度 `{prompt, completion, total}` | 否（禁用态为 `{}`） |
 | `cost_estimate` | JSON，粗粒度 `{amount, currency}` | 否（禁用态为 `{}`） |
-| `error_category` | 错误分类枚举 | 否 |
+| `error_category` | 错误分类（13 类，以阶段 21 第七节为权威源） | 否 |
 | `error_message` | 脱敏后的错误描述 | 否 |
 | `redaction_applied` | 是否执行了脱敏 | 是 |
 | `duration_ms` | 调用耗时 | 否（禁用态为空） |
@@ -135,7 +135,7 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 | 测试 | 说明 |
 |------|------|
 | `model_calls_table_exists_after_migration` | 验证 003 migration 后表存在 |
-| `model_calls_table_has_expected_columns` | 验证 17 个字段齐全 |
+| `model_calls_table_has_expected_columns` | 验证 18 个字段齐全 |
 | `model_calls_table_is_empty_after_migration` | 验证初始为空 |
 | `model_calls_indexes_exist` | 验证 3 个索引存在 |
 | `feature_disabled_does_not_write_model_calls` | 调用 `request_project_plan_model_draft` 后查询 `SELECT COUNT(*) FROM model_calls` 仍为 0 |
