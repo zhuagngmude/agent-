@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { App as AntdApp, Button, Card, Popconfirm, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
-import type { ApprovalSummary } from "../utils/desktopHost";
+import type { ApprovalSummary } from "@agent-swarm/shared";
 import { approveApproval, patchOnlyApproval, rejectApproval } from "../utils/desktopHost";
 
 // ---------------------------------------------------------------------------

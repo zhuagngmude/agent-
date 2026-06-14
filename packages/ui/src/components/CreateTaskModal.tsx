@@ -1,5 +1,5 @@
 import { App as AntdApp, Form, Input, Modal, Radio, Select } from "antd";
-import type { AgentSummary, CreateTaskInput } from "../utils/desktopHost";
+import type { AgentSummary, CreateTaskInput } from "@agent-swarm/shared";
 import { createTask, isTauriHost } from "../utils/desktopHost";
 
 type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];

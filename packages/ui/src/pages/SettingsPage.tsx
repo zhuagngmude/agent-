@@ -1,6 +1,6 @@
 import { Alert, Card, Descriptions, Space, Typography } from "antd";
 
-import type { ProjectSummary } from "../utils/desktopHost";
+import type { ProjectSummary } from "@agent-swarm/shared";
 
 // ---------------------------------------------------------------------------
 // Props

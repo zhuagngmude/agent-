@@ -1,95 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-export type ProjectSummary = {
-  id: string;
-  name: string;
-  status: string;
-  phase: string;
-};
+// 跨端类型从 packages/shared 导入，在此重导出以保持现有引用路径兼容
+export type {
+  AgentSummary,
+  ApprovalSummary,
+  CreateTaskInput,
+  DesktopHostOverviewData,
+  DesktopHostOverviewState,
+  ProjectSummary,
+  TaskStatus,
+  TaskSummary,
+  UpdateTaskStatusInput,
+} from "@agent-swarm/shared";
 
-export type AgentSummary = {
-  id: string;
-  project_id: string;
-  name: string;
-  role: string;
-  status: string;
-  model: string | null;
-  permissions: string[];
-  created_at: string;
-  updated_at: string;
-};
-
-export type TaskSummary = {
-  id: string;
-  project_id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: string;
-  assigned_agent_id: string | null;
-  depends_on: string[];
-  risk_level: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type TaskStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "blocked"
-  | "cancelled"
-  | "failed"
-  | "waiting_user";
-
-export type ApprovalSummary = {
-  id: string;
-  project_id: string;
-  task_id: string | null;
-  request_agent_id: string;
-  target_service: string;
-  operation_types: string[];
-  status: string;
-  risk_level: string;
-  reason: string | null;
-  reject_reason: string | null;
-  approved_at: string | null;
-  rejected_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type DesktopHostOverviewData = {
-  project: ProjectSummary;
-  agents: AgentSummary[];
-  tasks: TaskSummary[];
-  approvals: ApprovalSummary[];
-};
-
-export type DesktopHostOverviewState =
-  | ({ status: "browser" } & DesktopHostOverviewData)
-  | { status: "loading" }
-  | ({ status: "connected" } & DesktopHostOverviewData)
-  | ({ status: "error"; message: string } & DesktopHostOverviewData);
-
-// ---------------------------------------------------------------------------
-// 写入输入类型（与 Rust services 层对齐）
-// ---------------------------------------------------------------------------
-
-export type CreateTaskInput = {
-  title: string;
-  description?: string | null;
-  priority: "low" | "medium" | "high";
-  assigned_agent_id?: string | null;
-  depends_on?: string[];
-  risk_level?: "low" | "medium" | "high" | null;
-};
-
-export type UpdateTaskStatusInput = {
-  id: string;
-  status: TaskStatus;
-};
+import type {
+  AgentSummary,
+  ApprovalSummary,
+  CreateTaskInput,
+  DesktopHostOverviewData,
+  DesktopHostOverviewState,
+  ProjectSummary,
+  TaskSummary,
+  UpdateTaskStatusInput,
+} from "@agent-swarm/shared";
 
 // ---------------------------------------------------------------------------
 // Tauri 环境检测

@@ -1,6 +1,6 @@
 import { Alert, Card, Col, Row, Space, Statistic, Tag, Typography } from "antd";
 
-import type { AgentSummary, ApprovalSummary, ProjectSummary, TaskSummary } from "../utils/desktopHost";
+import type { AgentSummary, ApprovalSummary, ProjectSummary, TaskSummary } from "@agent-swarm/shared";
 
 // ---------------------------------------------------------------------------
 // Props

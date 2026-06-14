@@ -2,9 +2,10 @@ import { useCallback, useState } from "react";
 import { App as AntdApp, Button, Card, Popconfirm, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
+import { taskStatusTransitions } from "@agent-swarm/agent-core";
+import type { AgentSummary, TaskStatus, TaskSummary } from "@agent-swarm/shared";
 import { CreateTaskModal } from "../components/CreateTaskModal";
 import { StatusBadge } from "../components/StatusBadge";
-import type { AgentSummary, TaskStatus, TaskSummary } from "../utils/desktopHost";
 import { updateTaskStatus } from "../utils/desktopHost";
 
 // ---------------------------------------------------------------------------
@@ -21,26 +22,20 @@ type TaskRow = {
 };
 
 // ---------------------------------------------------------------------------
-// 状态转换映射
+// 状态转换展示元数据（中文标签、危险样式），转换规则在 @agent-swarm/agent-core
 // ---------------------------------------------------------------------------
 
-const statusTransitions: Record<string, Array<{ status: TaskStatus; label: string; danger?: boolean }>> = {
-  queued: [
-    { status: "running", label: "开始" },
-    { status: "cancelled", label: "取消", danger: true },
-  ],
-  running: [
-    { status: "completed", label: "完成" },
-    { status: "blocked", label: "阻塞" },
-    { status: "waiting_user", label: "等待用户" },
-    { status: "failed", label: "失败", danger: true },
-    { status: "cancelled", label: "取消", danger: true },
-  ],
-  blocked: [{ status: "running", label: "恢复" }],
-  waiting_user: [
-    { status: "running", label: "恢复" },
-    { status: "cancelled", label: "取消", danger: true },
-  ],
+const transitionMeta: Record<string, { label: string; danger?: boolean }> = {
+  "queued->running": { label: "开始" },
+  "queued->cancelled": { label: "取消", danger: true },
+  "running->completed": { label: "完成" },
+  "running->blocked": { label: "阻塞" },
+  "running->waiting_user": { label: "等待用户" },
+  "running->failed": { label: "失败", danger: true },
+  "running->cancelled": { label: "取消", danger: true },
+  "blocked->running": { label: "恢复" },
+  "waiting_user->running": { label: "恢复" },
+  "waiting_user->cancelled": { label: "取消", danger: true },
 };
 
 // ---------------------------------------------------------------------------
@@ -118,22 +113,26 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
           key: "actions",
           width: 240,
           render: (_: unknown, row: TaskRow) => {
-            const transitions = statusTransitions[row.status];
-            if (!transitions || transitions.length === 0) return null;
+            const nextStatuses = taskStatusTransitions[row.status];
+            if (!nextStatuses || nextStatuses.length === 0) return null;
 
             return (
               <Space size={4} wrap>
-                {transitions.map((t) => (
-                  <Popconfirm
-                    key={t.status}
-                    title={`确定将任务状态改为「${t.label}」？`}
-                    onConfirm={() => handleStatusChange(row.id, t.status)}
-                  >
-                    <Button size="small" danger={t.danger}>
-                      {t.label}
-                    </Button>
-                  </Popconfirm>
-                ))}
+                {nextStatuses.map((nextStatus) => {
+                  const meta = transitionMeta[`${row.status}->${nextStatus}`];
+                  if (!meta) return null;
+                  return (
+                    <Popconfirm
+                      key={nextStatus}
+                      title={`确定将任务状态改为「${meta.label}」？`}
+                      onConfirm={() => handleStatusChange(row.id, nextStatus)}
+                    >
+                      <Button size="small" danger={meta.danger}>
+                        {meta.label}
+                      </Button>
+                    </Popconfirm>
+                  );
+                })}
               </Space>
             );
           },

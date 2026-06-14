@@ -1,7 +1,7 @@
 import { Card, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
-import type { AgentSummary } from "../utils/desktopHost";
+import type { AgentSummary } from "@agent-swarm/shared";
 
 // ---------------------------------------------------------------------------
 // 行数据类型
