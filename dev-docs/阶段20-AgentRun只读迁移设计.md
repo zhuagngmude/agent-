@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
 CREATE INDEX IF NOT EXISTS idx_agent_runs_project_id ON agent_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_chain_id ON agent_runs(chain_id);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_created_at ON agent_runs(created_at);
 
 -- 运行时审计事件（纯只读，agent_run 详情中展示）
 
@@ -103,7 +104,7 @@ failed    — 已失败
 blocked   — 已阻塞
 ```
 
-注意：旧数据中的 `agentRun.status` 使用 `succeeded`（不是 `completed`）。新 `packages/agent-core` 的常量应同时包含两者，以兼容旧数据。
+注意：旧 Agent Run 状态使用 `succeeded`（不是 `completed`）。保持 `succeeded`，不要混用 Task 领域的 `completed`。
 
 **Agent Run 角色**（来自旧 `agent-runs.js` 第1-68行）：
 ```
@@ -268,13 +269,7 @@ export function isTerminalAgentRunStatus(status: AgentRunStatus): boolean {
 
 **新建 `packages/ui/src/pages/AgentRunsPage.tsx`**
 
-组件 Props：
-```ts
-type AgentRunsPageProps = {
-  agentRuns: AgentRunSummary[];
-  runtimeEvents: RuntimeEventSummary[];
-};
-```
+AgentRunsPage 无外部 props，内部通过 `invoke("list_agent_runs")` 和 `invoke("list_runtime_events")` 自取数据（`useState` + `useEffect`）。不扩展 `useDesktopHostOverview` hook，不依赖 App.tsx 传 props。浏览器 fallback：返回空数组。
 
 页面结构（使用 Ant Design 组件，不手写 CSS）：
 ```
@@ -295,11 +290,6 @@ Space (page-stack)
 - 展开行：按 `sequence` 排序展示该 chain 的全部 run
 - Runtime events：按 `entity_type = "agent_run"` 且 `entity_id` 匹配筛选
 
-**数据获取：**
-- 不调用 `useDesktopHostOverview()`（该 hook 不包含 agent_runs）
-- 在 `AgentRunsPage` 内部通过 Tauri invoke 直接调用 `list_agent_runs` 和 `list_runtime_events`
-- 浏览器 fallback：返回空数组
-
 **导航集成：**
 
 `mainNavItems.ts` 新增：
@@ -314,17 +304,11 @@ export type PageKey =
   | "agentRuns";
 ```
 
-`App.tsx` 中 `renderPage()` 的 switch 新增：
+`App.tsx` 的 `renderPage()` switch 新增：
 ```ts
 case "agentRuns":
-  return <AgentRunsPage agentRuns={...} runtimeEvents={...} />;
+  return <AgentRunsPage />;
 ```
-
-AgentRunsPage 的数据获取方式：因为当前 `useDesktopHostOverview` hook 不包含 agent_runs，阶段 20 有两种方案：
-- **方案 A（保守）：** AgentRunsPage 内部通过 `invoke("list_agent_runs")` 和 `invoke("list_runtime_events")` 独立获取数据，用 `useState` + `useEffect` 管理。
-- **方案 B（统一）：** 扩展 `useDesktopHostOverview` hook 加入 agent_runs，在 App.tsx 统一获取后通过 props 传入。
-
-建议用方案 A（保守），不修改现有 hook 签名，AgentRunsPage 自管理数据加载。
 
 ## 六、文件变更清单
 
