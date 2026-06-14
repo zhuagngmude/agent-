@@ -183,9 +183,9 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 ### `model_calls`
 
-阶段：阶段 2 结构草案。当前不建表、不写入、不调用真实 provider。
+阶段：阶段 23 已完成 helper-only SQLite 迁移。`003_add_model_calls.sql` 已建立 18 字段审计表和 3 个索引；当前只建表和 helper 草案，`feature_disabled` 时不写入 `model_calls`，不写入 `runtime_events`，不调用真实 provider。
 
-模型调用记录表。核心字段：`id`, `project_id`, `purpose`, `provider`, `provider_adapter_id`, `model`, `status`, `request_source`, `request_hash`, `response_schema_version`, `token_usage`, `cost_estimate`, `duration_ms`, `error_category`, `redaction_applied`, `structured_summary`, `related_approval_id`, `related_agent_run_id`, `related_task_id`, `runtime_event_id`, `created_by`, `started_at`, `completed_at`, `failed_at`, `created_at`, `updated_at`。
+模型调用记录表。当前 SQLite 字段：`id`, `project_id`, `purpose`, `provider`, `model`, `status`, `request_hash`, `structured_summary`, `token_usage`, `cost_estimate`, `error_category`, `error_message`, `redaction_applied`, `duration_ms`, `related_approval_id`, `runtime_event_id`, `created_at`, `updated_at`。
 
 第一条允许进入设计的 `purpose` 只有：
 
@@ -246,26 +246,28 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 说明：
 
-- `model_calls` 已进入阶段 2 结构草案，但 SQLite 建表、Mock / SQLite 写入、真实 provider 调用和 token usage 独立事件表仍暂缓。
+- `model_calls` SQLite 审计表已由 migration 003 建立，但真实 provider 调用、`model_calls` 写入、`runtime_events` 写入和 token usage 独立事件表仍暂缓。
 - `api_keys` 仍暂缓；阶段 2 第一版只允许 server env 读取 API key，不在 SQLite、Mock runtime state、前端 storage 或日志中保存 key。
 
-## `model_calls` 写入草案
+## `model_calls` helper-only 当前状态
 
-- Mock 和 SQLite 需要共享同一份 `model_calls` 字段语义，只是存储后端不同。
+- 阶段 23 只建立 SQLite 审计表和 Rust helper 草案，不开放真实写入路径。
+- `build_model_call_draft()` 当前返回 `can_write=false`，仅用于后续阶段的结构约束和测试覆盖。
+- `request_project_plan_model_draft` 在 feature flag 关闭时返回 `feature_disabled`，并保持 `model_calls` 0 条、`runtime_events` 无新增。
 - `blocked` 可作为 feature flag / 校验直接拦截时的审计状态；`pending`、`running`、`succeeded`、`failed` 用于真实调用路径。
 - 写入入口只能接受后端固定的请求信封，不接受前端自由 prompt、headers、key 或 provider body。
 - `request_hash` 必须基于脱敏后的固定请求信封生成，不能反推出原始输入。
 - `structured_summary` 只保存结构化、脱敏、限长后的摘要；第一条链路只允许 project plan 摘要。
 - 每次状态变化都应当可选地写入 `runtime_events`，并通过 `runtime_event_id` 关联。
-- 如果走 SQLite，创建和更新 `model_calls` 必须和对应审计事件保持同一事务语义。
-- 如果走 Mock，runtime state 里的 `model_calls` 也必须保留同样字段约束，不得补存 raw prompt 或 raw provider payload。
+- 后续如果进入真实写入，创建和更新 `model_calls` 必须和对应审计事件保持同一事务语义。
+- 旧 Mock / Node helper 只作为语义参考，不再作为新架构主线扩展。
 
 ## 迁移顺序
 
 1. `001_initial_sqlite` — 第一版最小落库：`projects` + `agents` + `tasks` + `approvals`（当前阶段）。
 2. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
 3. 再补审计与执行层：`agent_runs`、`runtime_events`、`runner_jobs`、`runner_status`。
-4. 阶段 2 先只固定 `model_calls` 结构草案和 Mock / SQLite 写入草案；建表和真正写入必须等 Model Gateway 正式入口、脱敏、成本、错误分类和验证脚本都补齐后再做。
+4. 阶段 23 已通过 `003_add_model_calls.sql` 建立 `model_calls` SQLite 审计表；真正写入必须等阶段 24 之后的 Model Gateway 真实调用准入、脱敏、成本、错误分类和验证脚本都补齐后再做。
 5. 辅助表按需：`knowledge_updates`、`git_checkpoints`。
 
 ## 已定稿的几条规则

@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 23 “model_calls helper-only 迁移设计”已出，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。18 字段审计表、禁止存储清单、feature_disabled 不落盘策略、7 项测试计划和回滚方案均已定义。
+- 阶段 23 “model_calls helper-only 迁移”已收口，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。`003_add_model_calls.sql` 已建立 18 字段审计表和 3 个索引；Rust helper-only 草案已补齐，`feature_disabled` 不写 `model_calls`、不写 `runtime_events`，70 个 Rust 测试通过。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -21,7 +21,7 @@
 - 旧原型归档方案已确认：`apps/web/`、`services/api/`、`design/index.html` 等冻结为参考资产，不再作为正式主线扩展。
 - 真正可用应用的后续路线见 `dev-docs/应用真正可用落地计划.md`
 - 真实模型调用进入实现前必须先通过 `dev-docs/真实模型接入准入规格.md`
-- 阶段 2 当前已完成 `model_calls` 结构草案、`Model Gateway正式入口设计.md`、provider config resolver helper、redaction / response limiter helper、helper-only `model_calls` 写入 / 迁移草案和禁用态 route 草案；阶段 2 已收口，未建表、未写 `model_calls`、未导入 SDK、未读取或返回 raw key、未发 provider 请求。
+- 阶段 2 已收口；阶段 23 已在新 Tauri/Rust 架构中建立 `model_calls` SQLite 审计表。当前仍未写 `model_calls` 业务记录、未导入 SDK、未读取或返回 raw key、未发 provider 请求。
 - 阶段 3 已完成 `agent_runs` Mock / SQLite API、失败注入、runtime event 审计、Web UI 记录页和验证脚本；它仍然不触发真实 Agent、不调用 provider、不启用 Runner、不写项目文件。
 
 ## 先读顺序
@@ -62,7 +62,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 23 设计已出，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架、阶段 19 冻结模块解冻评估和阶段 20 Agent Run 记录视图只读迁移已确认；6 个页面已全部有实质内容。下一步评估后续阶段方向，但必须继续保持 Runner、真实模型和文件写入关闭。
+- 当前阶段 23 已收口，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架、阶段 19 冻结模块解冻评估、阶段 20 Agent Run 记录视图只读迁移和 model_calls helper-only 迁移均已确认；6 个页面已全部有实质内容。下一步优先评估最小可用完成路线，但必须继续保持 Runner、真实模型和文件写入关闭。
 
 ## 任务触发口径（简版）
 
@@ -102,7 +102,7 @@
 20. Agent Run 记录视图只读迁移：已完成。Migration 002 + Rust 只读 command + TS 类型 + AgentRunsPage 页面均已实现，41 个 Rust 测试通过。
 21. 真实模型接入新架构适配设计：已出，见 `dev-docs/阶段21-真实模型接入新架构适配设计.md`。
 22. Model Gateway Rust helper-only scaffold：已完成。`services/model_gateway/` 四模块已建，61 个 Rust 测试通过。
-23. model_calls helper-only 迁移设计：已出，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。
+23. model_calls helper-only 迁移：已收口。Migration 003 + Rust helper-only 草案已完成，70 个 Rust 测试通过；feature_disabled 不落盘，不接前端，不新增 command，不调用真实 provider。
 
 ## 候选技术栈口径
 

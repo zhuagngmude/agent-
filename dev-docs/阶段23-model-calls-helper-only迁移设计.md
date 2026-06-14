@@ -2,7 +2,9 @@
 
 日期：2026-06-15
 
-本文是阶段 23 的设计文档，定义 `model_calls` 审计表的建表策略、字段约束、helper-only 写入草案和验收方式。本阶段只做文档设计，不写实现代码。
+本文是阶段 23 的设计与收口文档，定义 `model_calls` 审计表的建表策略、字段约束、helper-only 写入草案和验收方式。
+
+收口状态（2026-06-15）：阶段 23 已实现并验收。已新增 `003_add_model_calls.sql`，接入 Rust migration runner，补齐 helper-only 草案和验收测试；`feature_disabled` 时不写 `model_calls`、不写 `runtime_events`，不调用真实 provider。
 
 ## 一、为什么现在需要建 model_calls
 
@@ -118,11 +120,11 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 |------|------|------|
 | `data/migrations/003_add_model_calls.sql` | 新增 | 建表 + 3 索引 |
 | `apps/desktop/src-tauri/src/db/mod.rs` | 修改 | 新增 `MODEL_CALLS_MIGRATION_SQL` 常量 + `run_model_calls_migration()` |
-| `apps/desktop/src-tauri/src/services/model_gateway/mod.rs` | 无需修改 | 阶段 22 已返回 `feature_disabled`，逻辑不变 |
+| `apps/desktop/src-tauri/src/services/model_gateway/mod.rs` | 修改 | 暴露 `model_calls` helper 模块；`create_project_plan_draft` 仍保持 `feature_disabled` 逻辑 |
 | `apps/desktop/src-tauri/src/services/model_gateway/model_calls.rs` | 新增 | `build_model_call_draft()` helper（`canWrite=false` 时返回草案，不落盘） |
 
 **不修改：**
-- `commands/model_gateway.rs` — 阶段 22 已定稿，继续返回 `feature_disabled`
+- `commands/model_gateway.rs` — 无功能变更，继续返回 `feature_disabled`
 - `lib.rs` — 不新增 command
 - 现有 4 张核心表
 - `packages/ui` — 不做前端接入
@@ -134,13 +136,16 @@ CREATE INDEX IF NOT EXISTS idx_model_calls_created_at ON model_calls(created_at)
 
 | 测试 | 说明 |
 |------|------|
-| `model_calls_table_exists_after_migration` | 验证 003 migration 后表存在 |
+| `initialize_creates_minimal_tables_and_seed_data_once` | 验证初始化后 `model_calls` 表可查询且初始 0 条 |
 | `model_calls_table_has_expected_columns` | 验证 18 个字段齐全 |
-| `model_calls_table_is_empty_after_migration` | 验证初始为空 |
 | `model_calls_indexes_exist` | 验证 3 个索引存在 |
-| `feature_disabled_does_not_write_model_calls` | 调用 `request_project_plan_model_draft` 后查询 `SELECT COUNT(*) FROM model_calls` 仍为 0 |
+| `feature_disabled_does_not_write_model_calls` | 调用 `create_project_plan_draft` 后返回 `feature_disabled`，且 `SELECT COUNT(*) FROM model_calls` 仍为 0 |
 | `feature_disabled_does_not_create_runtime_events` | 同上，`runtime_events` 表无新增 |
-| `build_model_call_draft_can_write_false` | helper 返回草案但 `canWrite=false`，确认不落盘 |
+| `draft_can_write_is_false` | helper 返回草案但 `can_write=false` |
+| `draft_does_not_contain_raw_secrets` | helper 结构不包含 raw key / raw prompt / raw response 字段 |
+| `draft_status_is_blocked_when_feature_disabled` | 禁用态草案状态为 `blocked`，错误分类为 `feature_disabled` |
+| `draft_has_all_expected_fields` | helper 草案字段齐全，默认 token / cost 为空 JSON |
+| `error_category_as_str_covers_all_13_variants` | 13 类错误分类均有固定字符串 |
 
 ### 5.2 回归验证
 
