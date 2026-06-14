@@ -254,7 +254,12 @@ struct SeedApproval {
 #[cfg(test)]
 mod tests {
     use super::initialize;
-    use crate::services::{agents::list_agents, approvals::list_approvals, tasks::list_tasks};
+    use crate::services::{
+    agents::list_agents,
+    approvals::list_approvals,
+    model_gateway::create_project_plan_draft,
+    tasks::list_tasks,
+};
     use rusqlite::Connection;
     use std::{
         fs,
@@ -320,6 +325,104 @@ mod tests {
         drop(state);
 
         let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn model_calls_table_has_expected_columns() {
+        let (state, test_dir) = test_db();
+        {
+            let connection = state.connection().expect("connection should be available");
+            let mut stmt = connection
+                .prepare("PRAGMA table_info('model_calls')")
+                .expect("should be able to query table_info");
+            let columns: Vec<String> = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .expect("should map columns")
+                .filter_map(|r| r.ok())
+                .collect();
+            let expected = vec![
+                "id", "project_id", "purpose", "provider", "model", "status",
+                "request_hash", "structured_summary", "token_usage", "cost_estimate",
+                "error_category", "error_message", "redaction_applied", "duration_ms",
+                "related_approval_id", "runtime_event_id", "created_at", "updated_at",
+            ];
+            for col in &expected {
+                assert!(columns.contains(&col.to_string()), "column {col} should exist");
+            }
+            assert_eq!(columns.len(), 18, "model_calls should have exactly 18 columns");
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn model_calls_indexes_exist() {
+        let (state, test_dir) = test_db();
+        {
+            let connection = state.connection().expect("connection should be available");
+            let mut stmt = connection
+                .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='model_calls'")
+                .expect("should be able to query sqlite_master");
+            let indexes: Vec<String> = stmt
+                .query_map([], |row| row.get(0))
+                .expect("should map indexes")
+                .filter_map(|r| r.ok())
+                .collect();
+            assert!(indexes.iter().any(|i| i.contains("project_id")), "should have project_id index");
+            assert!(indexes.iter().any(|i| i.contains("status")), "should have status index");
+            assert!(indexes.iter().any(|i| i.contains("created_at")), "should have created_at index");
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn feature_disabled_does_not_write_model_calls() {
+        let (state, test_dir) = test_db();
+        {
+            let connection = state.connection().expect("connection should be available");
+            let before = count_rows(&connection, "model_calls");
+
+            let _response = create_project_plan_draft(
+                "测试想法", &None, false, &None,
+            ).expect("should return feature_disabled response");
+
+            let after = count_rows(&connection, "model_calls");
+            assert_eq!(before, after, "feature_disabled 不应写入 model_calls");
+            assert_eq!(after, 0, "model_calls 仍应为空");
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn feature_disabled_does_not_create_runtime_events() {
+        let (state, test_dir) = test_db();
+        {
+            let connection = state.connection().expect("connection should be available");
+            let before = count_rows(&connection, "runtime_events");
+
+            let _response = create_project_plan_draft(
+                "测试想法", &None, false, &None,
+            ).expect("should return feature_disabled response");
+
+            let after = count_rows(&connection, "runtime_events");
+            assert_eq!(before, after, "feature_disabled 不应写入 runtime_events");
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    fn test_db() -> (crate::db::DbState, std::path::PathBuf) {
+        let test_dir = std::env::temp_dir().join(format!(
+            "agent-swarm-db-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time")
+                .as_nanos()
+        ));
+        let state = initialize(test_dir.clone()).expect("sqlite should initialize");
+        (state, test_dir)
     }
 
     fn count_rows(connection: &Connection, table: &str) -> i64 {

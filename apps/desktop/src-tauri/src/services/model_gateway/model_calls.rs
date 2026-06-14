@@ -78,6 +78,8 @@ pub struct ModelCallDraftFields {
 
 /// 构建 model_calls 写入草案。
 /// 当前阶段 canWrite 恒为 false，不落盘。
+/// error_message 不接收自由文本——只从 error_category 枚举取值，
+/// 确保 draft 中不出现 raw key、raw prompt、raw response 或 provider error 原文。
 #[allow(dead_code)]  // 预留给阶段 24
 pub fn build_model_call_draft(
     project_id: &str,
@@ -85,7 +87,6 @@ pub fn build_model_call_draft(
     provider: &str,
     model: &str,
     error_category: ModelCallErrorCategory,
-    error_message: Option<&str>,
 ) -> ModelCallDraft {
     let now = chrono_now();
     let id = format!(
@@ -106,7 +107,7 @@ pub fn build_model_call_draft(
             model: model.into(),
             status: "blocked".into(),
             error_category: Some(error_category.as_str().into()),
-            error_message: error_message.map(|s| s.into()),
+            error_message: Some(error_category.as_str().into()),
             redaction_applied: false,
             token_usage: "{}".into(),
             cost_estimate: "{}".into(),
@@ -121,11 +122,14 @@ pub fn build_model_call_draft(
     }
 }
 
+/// 固定时间戳，仅用于阶段 23 测试草案。
+/// 阶段 24 真实写入 model_calls 时必须替换为 chrono::Utc::now() 或等价实时时间源。
 fn chrono_now() -> String {
-    // 简化时间戳，测试中可用固定值
     "2026-06-15T00:00:00Z".into()
 }
 
+/// 固定 ID 后缀，仅用于阶段 23 测试草案。
+/// 阶段 24 真实写入必须替换为 uuid v4/v7 或等价唯一 ID 生成。
 fn uuid_suffix() -> String {
     "00000000".into()
 }
@@ -146,7 +150,6 @@ mod tests {
             "openai_compat",
             "gpt-5.4-mini",
             ModelCallErrorCategory::FeatureDisabled,
-            Some("真实调用未开启"),
         );
         assert_eq!(draft.can_write, false, "阶段 23 的 canWrite 应为 false");
         assert!(
@@ -163,7 +166,6 @@ mod tests {
             "openai_compat",
             "gpt-5.4-mini",
             ModelCallErrorCategory::MissingKey,
-            None,
         );
 
         let fields = draft.draft_fields.expect("draft_fields should be Some");
@@ -189,7 +191,6 @@ mod tests {
             "openai_compat",
             "gpt-5.4-mini",
             ModelCallErrorCategory::FeatureDisabled,
-            None,
         );
 
         let fields = draft.draft_fields.expect("draft_fields should be Some");
@@ -205,7 +206,6 @@ mod tests {
             "openai_compat",
             "gpt-5.4-mini",
             ModelCallErrorCategory::Unknown,
-            None,
         );
 
         let f = draft.draft_fields.expect("draft_fields should be Some");
