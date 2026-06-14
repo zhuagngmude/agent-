@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 14 “Tauri 桌面写入交互验收”已收口。前端共享 UI 已接入写入命令，补充了浏览器预览降级和 refresh 刷新机制，见 `docs/tauri-desktop-write-interaction-acceptance.md`。下一步进入旧原型页面迁移清单、独立页面拆分和长期分层确认。
+- 阶段 14 “Tauri 桌面写入交互验收”已收口。阶段 15 “旧原型页面迁移清单”已完成，见 `dev-docs/旧原型页面迁移清单.md`。下一步进入独立页面拆分和侧边栏导航扩展。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
@@ -38,6 +38,7 @@
 10. `dev-docs/真实模型接入准入规格.md`
 11. `dev-docs/Model Gateway正式入口设计.md`
 12. `dev-docs/旧原型归档方案.md`
+13. `dev-docs/旧原型页面迁移清单.md`
 
 ## 维护原则
 
@@ -87,6 +88,7 @@
 12. 写入 commands 正式验收：已完成，见 `docs/write-commands-acceptance.md`。
 13. 前端共享 UI 写入接入：已完成，见 `docs/frontend-write-commands-design.md`。
 14. Tauri 桌面写入交互验收：已完成，见 `docs/tauri-desktop-write-interaction-acceptance.md`。
+15. 旧原型页面迁移清单：已完成，见 `dev-docs/旧原型页面迁移清单.md`。
 
 ## 候选技术栈口径
 
