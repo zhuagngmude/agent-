@@ -20,7 +20,10 @@ pub fn run() {
             commands::tasks::create_task,
             commands::tasks::update_task_status,
             commands::approvals::list_approvals,
-            commands::approvals::create_approval
+            commands::approvals::create_approval,
+            commands::approvals::approve_approval,
+            commands::approvals::reject_approval,
+            commands::approvals::patch_only_approval
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

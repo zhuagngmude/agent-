@@ -40,6 +40,23 @@ pub struct CreateApprovalResponse {
     pub approval: ApprovalSummary,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ApprovalIdInput {
+    pub id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RejectApprovalInput {
+    pub id: String,
+    #[serde(default)]
+    pub reject_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApprovalTransitionResponse {
+    pub approval: ApprovalSummary,
+}
+
 pub fn list_approvals(connection: &Connection) -> Result<Vec<ApprovalSummary>, String> {
     let mut statement = connection
         .prepare(
@@ -145,6 +162,28 @@ pub fn create_approval(
     Ok(CreateApprovalResponse { approval })
 }
 
+pub fn approve_approval(
+    connection: &mut Connection,
+    input: ApprovalIdInput,
+) -> Result<ApprovalTransitionResponse, String> {
+    transition_approval(connection, input.id, "approved", None)
+}
+
+pub fn reject_approval(
+    connection: &mut Connection,
+    input: RejectApprovalInput,
+) -> Result<ApprovalTransitionResponse, String> {
+    let reject_reason = normalize_optional_text(input.reject_reason, 2000, "reject_reason")?;
+    transition_approval(connection, input.id, "rejected", reject_reason)
+}
+
+pub fn patch_only_approval(
+    connection: &mut Connection,
+    input: ApprovalIdInput,
+) -> Result<ApprovalTransitionResponse, String> {
+    transition_approval(connection, input.id, "patch_only", None)
+}
+
 fn parse_string_list(value: &str) -> Vec<String> {
     serde_json::from_str(value).unwrap_or_default()
 }
@@ -197,6 +236,82 @@ fn get_approval_by_id(
         .optional()
         .map_err(|error| format!("database_error: read approval failed: {error}"))?
         .ok_or_else(|| "not_found: approval not found".to_string())
+}
+
+fn transition_approval(
+    connection: &mut Connection,
+    approval_id: String,
+    next_status: &str,
+    reject_reason: Option<String>,
+) -> Result<ApprovalTransitionResponse, String> {
+    let project_id = get_current_project_id(connection)?;
+    let approval_id = normalize_required_text(approval_id, 1, 200, "id")?;
+    let current_approval = get_approval_by_id(connection, &approval_id)?;
+
+    if current_approval.project_id != project_id {
+        return Err("not_found: approval not found".to_string());
+    }
+
+    ensure_approval_transition_allowed(&current_approval.status)?;
+
+    let now = current_timestamp();
+    let tx = connection.transaction().map_err(|error| {
+        format!("database_error: start update approval transaction failed: {error}")
+    })?;
+
+    let changed = match next_status {
+        "approved" => tx
+            .execute(
+                "UPDATE approvals
+                 SET status = ?1, approved_at = ?2, updated_at = ?2
+                 WHERE id = ?3 AND project_id = ?4",
+                params![
+                    next_status,
+                    now.as_str(),
+                    approval_id.as_str(),
+                    project_id.as_str()
+                ],
+            )
+            .map_err(|error| format!("database_error: approve approval failed: {error}"))?,
+        "rejected" => tx
+            .execute(
+                "UPDATE approvals
+                 SET status = ?1, reject_reason = ?2, rejected_at = ?3, updated_at = ?3
+                 WHERE id = ?4 AND project_id = ?5",
+                params![
+                    next_status,
+                    reject_reason.as_deref(),
+                    now.as_str(),
+                    approval_id.as_str(),
+                    project_id.as_str()
+                ],
+            )
+            .map_err(|error| format!("database_error: reject approval failed: {error}"))?,
+        "patch_only" => tx
+            .execute(
+                "UPDATE approvals
+                 SET status = ?1, updated_at = ?2
+                 WHERE id = ?3 AND project_id = ?4",
+                params![
+                    next_status,
+                    now.as_str(),
+                    approval_id.as_str(),
+                    project_id.as_str()
+                ],
+            )
+            .map_err(|error| format!("database_error: patch-only approval failed: {error}"))?,
+        _ => return Err("invalid_input: approval status is not allowed".to_string()),
+    };
+
+    if changed != 1 {
+        return Err("not_found: approval not found".to_string());
+    }
+
+    tx.commit()
+        .map_err(|error| format!("database_error: commit update approval failed: {error}"))?;
+
+    let approval = get_approval_by_id(connection, &approval_id)?;
+    Ok(ApprovalTransitionResponse { approval })
 }
 
 fn normalize_required_text(
@@ -325,6 +440,16 @@ fn ensure_task_belongs_to_project(
     }
 }
 
+fn ensure_approval_transition_allowed(current: &str) -> Result<(), String> {
+    if current == "pending" {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid_transition: approval status cannot change from {current}"
+        ))
+    }
+}
+
 fn generate_approval_id() -> String {
     format!("approval_{}", timestamp_nanos())
 }
@@ -342,7 +467,10 @@ fn timestamp_nanos() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::{create_approval, parse_string_list, CreateApprovalInput};
+    use super::{
+        approve_approval, create_approval, parse_string_list, patch_only_approval, reject_approval,
+        ApprovalIdInput, CreateApprovalInput, RejectApprovalInput,
+    };
     use rusqlite::{params, Connection};
 
     const INITIAL_MIGRATION_SQL: &str =
@@ -478,6 +606,164 @@ mod tests {
         assert!(error.contains("not_found"));
     }
 
+    #[test]
+    fn approve_approval_marks_pending_approval_as_approved_without_runner_side_effects() {
+        let mut connection = setup_connection();
+        insert_approval(&connection, "approval_pending", "pending", "runner");
+
+        let response = approve_approval(
+            &mut connection,
+            ApprovalIdInput {
+                id: "approval_pending".to_string(),
+            },
+        )
+        .expect("pending approval should be approved");
+
+        assert_eq!(response.approval.status, "approved");
+        assert!(response.approval.approved_at.is_some());
+        assert!(response.approval.rejected_at.is_none());
+        assert_eq!(response.approval.target_service, "runner");
+    }
+
+    #[test]
+    fn approve_approval_rejects_terminal_approvals() {
+        let mut connection = setup_connection();
+
+        for status in ["approved", "rejected", "patch_only"] {
+            let approval_id = format!("approval_{status}");
+            insert_approval(&connection, &approval_id, status, "approval");
+
+            let error = approve_approval(&mut connection, ApprovalIdInput { id: approval_id })
+                .expect_err("terminal approval should not change");
+
+            assert!(error.contains("invalid_transition"));
+        }
+    }
+
+    #[test]
+    fn approve_approval_rejects_unknown_approval() {
+        let mut connection = setup_connection();
+
+        let error = approve_approval(
+            &mut connection,
+            ApprovalIdInput {
+                id: "missing_approval".to_string(),
+            },
+        )
+        .expect_err("unknown approval should fail");
+
+        assert!(error.contains("not_found"));
+    }
+
+    #[test]
+    fn reject_approval_marks_pending_approval_as_rejected() {
+        let mut connection = setup_connection();
+        insert_approval(&connection, "approval_pending", "pending", "approval");
+
+        let response = reject_approval(
+            &mut connection,
+            RejectApprovalInput {
+                id: "approval_pending".to_string(),
+                reject_reason: Some("  Not safe yet  ".to_string()),
+            },
+        )
+        .expect("pending approval should be rejected");
+
+        assert_eq!(response.approval.status, "rejected");
+        assert_eq!(
+            response.approval.reject_reason.as_deref(),
+            Some("Not safe yet")
+        );
+        assert!(response.approval.rejected_at.is_some());
+        assert!(response.approval.approved_at.is_none());
+    }
+
+    #[test]
+    fn reject_approval_rejects_too_long_reason() {
+        let mut connection = setup_connection();
+        insert_approval(&connection, "approval_pending", "pending", "approval");
+
+        let error = reject_approval(
+            &mut connection,
+            RejectApprovalInput {
+                id: "approval_pending".to_string(),
+                reject_reason: Some("a".repeat(2001)),
+            },
+        )
+        .expect_err("long reject reason should fail");
+
+        assert!(error.contains("invalid_input"));
+    }
+
+    #[test]
+    fn reject_approval_rejects_terminal_approvals() {
+        let mut connection = setup_connection();
+
+        for status in ["approved", "rejected", "patch_only"] {
+            let approval_id = format!("approval_reject_{status}");
+            insert_approval(&connection, &approval_id, status, "approval");
+
+            let error = reject_approval(
+                &mut connection,
+                RejectApprovalInput {
+                    id: approval_id,
+                    reject_reason: None,
+                },
+            )
+            .expect_err("terminal approval should not change");
+
+            assert!(error.contains("invalid_transition"));
+        }
+    }
+
+    #[test]
+    fn patch_only_approval_marks_pending_approval_as_patch_only_without_file_side_effects() {
+        let mut connection = setup_connection();
+        insert_approval(&connection, "approval_pending", "pending", "approval");
+
+        let response = patch_only_approval(
+            &mut connection,
+            ApprovalIdInput {
+                id: "approval_pending".to_string(),
+            },
+        )
+        .expect("pending approval should become patch_only");
+
+        assert_eq!(response.approval.status, "patch_only");
+        assert!(response.approval.approved_at.is_none());
+        assert!(response.approval.rejected_at.is_none());
+    }
+
+    #[test]
+    fn patch_only_approval_rejects_terminal_approvals() {
+        let mut connection = setup_connection();
+
+        for status in ["approved", "rejected", "patch_only"] {
+            let approval_id = format!("approval_patch_{status}");
+            insert_approval(&connection, &approval_id, status, "approval");
+
+            let error = patch_only_approval(&mut connection, ApprovalIdInput { id: approval_id })
+                .expect_err("terminal approval should not change");
+
+            assert!(error.contains("invalid_transition"));
+        }
+    }
+
+    #[test]
+    fn patch_only_approval_rejects_unknown_approval() {
+        let mut connection = setup_connection();
+
+        let error = patch_only_approval(
+            &mut connection,
+            ApprovalIdInput {
+                id: "missing_approval".to_string(),
+            },
+        )
+        .expect_err("unknown approval should fail");
+
+        assert!(error.contains("not_found"));
+    }
+
     fn valid_input() -> CreateApprovalInput {
         CreateApprovalInput {
             task_id: Some("task_existing".to_string()),
@@ -552,5 +838,38 @@ mod tests {
             .expect("task should insert");
 
         connection
+    }
+
+    fn insert_approval(
+        connection: &Connection,
+        approval_id: &str,
+        status: &str,
+        target_service: &str,
+    ) {
+        connection
+            .execute(
+                "INSERT INTO approvals (
+                    id, project_id, task_id, request_agent_id, target_service, operation_types,
+                    status, risk_level, reason, reject_reason, approved_at, rejected_at,
+                    created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                params![
+                    approval_id,
+                    "project_agent_swarm",
+                    Option::<String>::None,
+                    "agent_architect",
+                    target_service,
+                    r#"["approval_approve"]"#,
+                    status,
+                    "medium",
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    "1",
+                    "1"
+                ],
+            )
+            .expect("approval should insert");
     }
 }
