@@ -4,7 +4,7 @@
 
 ## 当前项目状态
 
-- 阶段 19 “冻结模块解冻评估”文档已出，待修后收口，见 `dev-docs/阶段19-冻结模块解冻评估.md`。7个冻结模块已分级：Agent Run 建议只读迁移，Runner/真实模型/Git 继续冻结。下一阶段建议做 Agent Run 记录视图只读迁移。
+- 阶段 19 “冻结模块解冻评估”已收口，见 `dev-docs/阶段19-冻结模块解冻评估.md`。7个冻结模块已分级：Agent Run 建议只读迁移，Runner/真实模型/Git 继续冻结。下一阶段建议做 Agent Run 记录视图只读迁移。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
 - 已完成闭环：项目计划审批 -> Agent 自动分工 -> 只读 Runner request queue -> execution request 生命周期 -> runtime events 审计 -> Agent Run 本地记录链
 - 当前旧模式：Mock / SQLite / 本地 Web App。旧前端和旧 API 是 MVP 验证原型，不作为后续正式工程架构继续扩展。
