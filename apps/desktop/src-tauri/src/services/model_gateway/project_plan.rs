@@ -21,6 +21,22 @@ pub fn validate_input(idea: &str, constraints: &Option<String>) -> Result<(), St
     Ok(())
 }
 
+/// 验证二次确认（阶段 25.1：feature flag 开启后强制要求）
+/// second_confirm 必须为 true，confirm_text 必须等于 "我确认发起真实模型调用"
+pub fn validate_second_confirm(
+    second_confirm: bool,
+    confirm_text: &Option<String>,
+) -> Result<(), String> {
+    if !second_confirm {
+        return Err("必须勾选二次确认".into());
+    }
+    let text = confirm_text.as_deref().unwrap_or("");
+    if text != "我确认发起真实模型调用" {
+        return Err("确认文本不正确".into());
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // 测试
 // ---------------------------------------------------------------------------
@@ -55,6 +71,32 @@ mod tests {
     #[test]
     fn validate_accepts_valid_input() {
         let result = validate_input("valid idea", &Some("some constraints".into()));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn second_confirm_rejects_false() {
+        let result = validate_second_confirm(false, &None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("二次确认"));
+    }
+
+    #[test]
+    fn second_confirm_rejects_wrong_text() {
+        let result = validate_second_confirm(true, &Some("随便写的".into()));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("确认文本不正确"));
+    }
+
+    #[test]
+    fn second_confirm_rejects_empty_text() {
+        let result = validate_second_confirm(true, &None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn second_confirm_accepts_correct_input() {
+        let result = validate_second_confirm(true, &Some("我确认发起真实模型调用".into()));
         assert!(result.is_ok());
     }
 }

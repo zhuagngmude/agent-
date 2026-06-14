@@ -29,7 +29,7 @@ pub fn resolve_provider_config() -> ProviderConfig {
 }
 
 /// 纯函数版：可注入 key/base_url 用于测试，不会污染全局环境变量
-fn resolve(key: Option<&str>, base_url: Option<&str>) -> ProviderConfig {
+pub(crate) fn resolve(key: Option<&str>, base_url: Option<&str>) -> ProviderConfig {
     let status = match (key, base_url) {
         (None, _) => ProviderConfigStatus::MissingKey,
         (_, None) => ProviderConfigStatus::MissingBaseUrl,

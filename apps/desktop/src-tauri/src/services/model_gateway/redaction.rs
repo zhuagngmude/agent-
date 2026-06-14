@@ -45,8 +45,23 @@ pub fn check_forbidden_value_patterns(text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 脱敏函数（阶段 22 helper-only，后续真实模型阶段使用）
-#[allow(dead_code)]
+/// 截断摘要到指定最大长度（字节边界对齐）
+pub fn truncate_summary(text: &str, max_len: usize) -> String {
+    if text.len() <= max_len {
+        text.to_string()
+    } else {
+        // 在 max_len 处截断，向后找到合法的 char 边界
+        let mut end = max_len;
+        while end > 0 && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut result = text[..end].to_string();
+        result.push('…');
+        result
+    }
+}
+
+/// 脱敏函数（阶段 22 helper-only，阶段 25.1 用于返回前脱敏）
 pub fn redact_secrets(text: &str) -> String {
     let mut result = text.to_string();
     let lower = text.to_lowercase();
@@ -134,6 +149,32 @@ mod tests {
     fn allows_short_sk_prefix_without_enough_chars() {
         let result = check_forbidden_value_patterns("sk-short");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn truncate_within_limit_returns_unchanged() {
+        let text = "短文本";
+        let result = truncate_summary(text, 200);
+        assert_eq!(result, "短文本");
+    }
+
+    #[test]
+    fn truncate_exceeds_limit_adds_ellipsis() {
+        let text = "a".repeat(100);
+        let result = truncate_summary(&text, 50);
+        // "…" (U+2026) 为 3 字节 UTF-8 字符，50 个 "a" + "…" = 53 字节
+        assert!(result.len() <= 53);
+        assert!(result.ends_with('…'));
+        // 不应包含完整原文
+        assert!(!result.contains(&"a".repeat(100)));
+    }
+
+    #[test]
+    fn truncate_respects_char_boundary() {
+        let text = "你好世界".repeat(50); // 200 字节
+        let result = truncate_summary(&text, 15);
+        // 不应 panic，即使截断点落在多字节字符中间
+        assert!(result.ends_with('…'));
     }
 
     #[test]
