@@ -4,6 +4,7 @@
 
 ## 当前项目状态
 
+- 阶段 25 “真实模型最小可用接入设计”已完成，见 `dev-docs/阶段25-真实模型最小可用接入设计.md`。下一步只允许讨论并实现人工触发的 `project_plan_generation` 真实模型预览；真实 Runner 仍然后置，不执行命令、不写文件、不改 Git。
 - 阶段 24 “project_plan / Workflow 最小闭环迁移”已完成，见 `dev-docs/阶段24-project-plan-workflow最小闭环迁移设计.md` 和 `docs/project-plan-workflow-acceptance.md`。旧 MVP-0.3 的项目计划审批、5 个任务拆分和 5 条只读 Runner request 队列已迁入新 Tauri/Rust 架构；不调用真实模型、不启用真实 Runner、不写用户项目文件。
 - 阶段 23 “model_calls helper-only 迁移”已收口，见 `dev-docs/阶段23-model-calls-helper-only迁移设计.md`。`003_add_model_calls.sql` 已建立 18 字段审计表和 3 个索引；Rust helper-only 草案已补齐，`feature_disabled` 不写 `model_calls`、不写 `runtime_events`，70 个 Rust 测试通过。
 - 当前阶段：MVP-0.4 已验收，阶段 2 真实模型调用准入设计已收口，阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程
@@ -47,6 +48,7 @@
 18. `dev-docs/阶段21-真实模型接入新架构适配设计.md`
 19. `dev-docs/阶段23-model-calls-helper-only迁移设计.md`
 20. `dev-docs/阶段24-project-plan-workflow最小闭环迁移设计.md`
+21. `dev-docs/阶段25-真实模型最小可用接入设计.md`
 
 ## 维护原则
 
@@ -64,7 +66,7 @@
 - 改当前约束或交接状态就更新 `dev-docs/新窗口交接说明.md`。
 - 改真实模型调用相关设计时，必须同步 `dev-docs/真实模型接入准入规格.md`，并保持 `verify-model-gateway.ps1` 与 `verify-real-model-admission.ps1` 通过。
 - 当前阶段 2 和阶段 3 已收口；后续不直接进入旧路线的阶段 4，而是先完成重新立项讨论。不要把真实 provider 调用和 Runner 执行混进当前主线。
-- 当前阶段 24 已完成，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入安全边界裁剪文档、写入 commands 设计、Rust 实现、正式验收、前端共享 UI 写入接入、Tauri 桌面写入交互验收、旧原型归档方案、旧原型页面迁移清单、阶段 16 独立页面拆分、阶段 17 长期分层边界设计、阶段 18 共享类型与规则骨架、阶段 19 冻结模块解冻评估、阶段 20 Agent Run 记录视图只读迁移、model_calls helper-only 迁移和 project_plan / Workflow 最小闭环迁移均已确认；7 个页面已全部有实质内容。下一步做本地最小可用验收和桌面打包前检查，但必须继续保持 Runner、真实模型和用户项目文件写入关闭。
+- 当前阶段 25 设计已完成，技术栈、目录架构、共享 UI 方案、Tauri/Rust 桌面宿主、SQLite 只读 commands、写入 commands、阶段 20 Agent Run 记录视图只读迁移、model_calls helper-only 迁移和 project_plan / Workflow 最小闭环迁移均已确认；7 个页面已全部有实质内容。下一步若进入实现，只能做人触发真实模型草案预览；必须继续保持 Runner、Git 执行和用户项目文件写入关闭。
 
 ## 任务触发口径（简版）
 
@@ -106,6 +108,7 @@
 22. Model Gateway Rust helper-only scaffold：已完成。`services/model_gateway/` 四模块已建，61 个 Rust 测试通过。
 23. model_calls helper-only 迁移：已收口。Migration 003 + Rust helper-only 草案已完成，70 个 Rust 测试通过；feature_disabled 不落盘，不接前端，不新增 command，不调用真实 provider。
 24. project_plan / Workflow 最小闭环迁移：已完成。Migration 004、Rust commands、ProjectPlanPage 和验收测试已落地；不启用真实模型或 Runner。
+25. 真实模型最小可用接入：设计已完成。实现前必须先批准 Rust HTTP 客户端依赖；第一版只允许人工二次确认触发 `project_plan_generation` 并展示脱敏摘要，不落库、不创建任务、不启用 Runner。
 
 ## 候选技术栈口径
 
