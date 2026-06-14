@@ -12,16 +12,12 @@ use crate::services::model_gateway::redaction::check_forbidden_value_patterns;
 // 输入输出类型
 // ---------------------------------------------------------------------------
 
-/// 当前项目计划草案状态
 #[derive(Serialize, PartialEq, Debug)]
+#[allow(dead_code)]  // InputRejected/DraftReady 预留给阶段 24
 pub enum DraftStatus {
-    /// Feature flag 关闭，不发起调用
     FeatureDisabled,
-    /// Provider 配置不完整（缺 key / base URL 无效等）
     ProviderConfigError,
-    /// 输入包含禁止的字段值（密钥格式字符串等）
     InputRejected,
-    /// 真实调用成功，草案就绪（阶段 24 前不返回此状态）
     DraftReady,
 }
 
@@ -54,7 +50,18 @@ pub fn create_project_plan_draft(
     second_confirm: bool,
     confirm_text: &Option<String>,
 ) -> Result<ProjectPlanModelDraftResponse, String> {
-    // 1. 检查 feature flag
+    // 1. 先做输入基础校验和安全检查（不依赖 feature flag）
+    validate_input(idea, constraints)?;
+    check_forbidden_value_patterns(idea)?;
+    if let Some(c) = constraints {
+        check_forbidden_value_patterns(c)?;
+    }
+
+    // 2. 预留二次确认字段（阶段 24 前不强制校验）
+    let _ = second_confirm;
+    let _ = confirm_text;
+
+    // 3. 检查 feature flag
     let flag = std::env::var("AGENT_SWARM_ENABLE_REAL_MODEL_PROJECT_PLAN")
         .unwrap_or_else(|_| "false".into());
 
@@ -65,16 +72,6 @@ pub fn create_project_plan_draft(
             summary: None,
             warnings: vec![],
         });
-    }
-
-    // 2. 检查二次确认（阶段 24 前暂不强校验，但预留字段需存在）
-    let _ = second_confirm;
-    let _ = confirm_text;
-
-    // 3. 验证输入中的禁止值模式
-    check_forbidden_value_patterns(idea)?;
-    if let Some(c) = constraints {
-        check_forbidden_value_patterns(c)?;
     }
 
     // 4. 解析 provider 配置
@@ -94,10 +91,9 @@ pub fn create_project_plan_draft(
         });
     }
 
-    // 5. 验证输入字段
-    validate_input(idea, constraints)?;
+    // 5. 阶段 22 到此为止——不发起网络请求，不写 SQLite
+    let _ = config; // 使用 config 消掉未读字段 warning
 
-    // 6. 阶段 22 到此为止——不发起网络请求，不写 SQLite
     Ok(ProjectPlanModelDraftResponse {
         status: DraftStatus::FeatureDisabled.to_string(),
         error_category: Some("feature_disabled".into()),
