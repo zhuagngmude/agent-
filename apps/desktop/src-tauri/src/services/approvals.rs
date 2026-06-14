@@ -158,7 +158,7 @@ pub fn create_approval(
     tx.commit()
         .map_err(|error| format!("database_error: commit create approval failed: {error}"))?;
 
-    let approval = get_approval_by_id(connection, &id)?;
+    let approval = get_approval_by_id(connection, &project_id, &id)?;
     Ok(CreateApprovalResponse { approval })
 }
 
@@ -202,6 +202,7 @@ fn get_current_project_id(connection: &Connection) -> Result<String, String> {
 
 fn get_approval_by_id(
     connection: &Connection,
+    project_id: &str,
     approval_id: &str,
 ) -> Result<ApprovalSummary, String> {
     connection
@@ -210,8 +211,8 @@ fn get_approval_by_id(
                 operation_types, status, risk_level, reason, reject_reason, approved_at,
                 rejected_at, created_at, updated_at
              FROM approvals
-             WHERE id = ?1",
-            [approval_id],
+             WHERE id = ?1 AND project_id = ?2",
+            params![approval_id, project_id],
             |row| {
                 let operation_types_json: String = row.get(5)?;
 
@@ -246,11 +247,7 @@ fn transition_approval(
 ) -> Result<ApprovalTransitionResponse, String> {
     let project_id = get_current_project_id(connection)?;
     let approval_id = normalize_required_text(approval_id, 1, 200, "id")?;
-    let current_approval = get_approval_by_id(connection, &approval_id)?;
-
-    if current_approval.project_id != project_id {
-        return Err("not_found: approval not found".to_string());
-    }
+    let current_approval = get_approval_by_id(connection, &project_id, &approval_id)?;
 
     if next_status == "approved" && current_approval.target_service == "project_plan" {
         return Err(
@@ -316,7 +313,7 @@ fn transition_approval(
     tx.commit()
         .map_err(|error| format!("database_error: commit update approval failed: {error}"))?;
 
-    let approval = get_approval_by_id(connection, &approval_id)?;
+    let approval = get_approval_by_id(connection, &project_id, &approval_id)?;
     Ok(ApprovalTransitionResponse { approval })
 }
 

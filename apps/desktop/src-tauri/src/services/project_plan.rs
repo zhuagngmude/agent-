@@ -188,8 +188,8 @@ pub fn create_project_plan_draft(
     let approval_id = format!("approval_{draft_id}");
     let now = current_timestamp();
 
-    if let Some(draft) = get_draft_by_id(connection, &draft_id)? {
-        let approval = get_approval_by_id(connection, &draft.approval_id)?
+    if let Some(draft) = get_draft_by_id(connection, &project_id, &draft_id)? {
+        let approval = get_approval_by_id(connection, &project_id, &draft.approval_id)?
             .ok_or_else(|| "not_found: project plan approval not found".to_string())?;
         let planned_tasks = build_planned_tasks(&draft);
         let planned_runner_requests =
@@ -252,9 +252,9 @@ pub fn create_project_plan_draft(
     tx.commit()
         .map_err(|error| format!("database_error: commit project plan draft failed: {error}"))?;
 
-    let draft = get_draft_by_id(connection, &draft_id)?
+    let draft = get_draft_by_id(connection, &project_id, &draft_id)?
         .ok_or_else(|| "not_found: project plan draft not found".to_string())?;
-    let approval = get_approval_by_id(connection, &approval_id)?
+    let approval = get_approval_by_id(connection, &project_id, &approval_id)?
         .ok_or_else(|| "not_found: project plan approval not found".to_string())?;
     let planned_tasks = build_planned_tasks(&draft);
     let planned_runner_requests = build_runner_request_previews(&draft, &planned_tasks, &now);
@@ -276,20 +276,14 @@ pub fn approve_project_plan(
     let approval_id = normalize_required_text(input.approval_id, 1, 200, "approval_id")?;
     ensure_second_confirm(input.second_confirm, input.confirm_text)?;
 
-    let approval = get_approval_by_id(connection, &approval_id)?
+    let approval = get_approval_by_id(connection, &project_id, &approval_id)?
         .ok_or_else(|| "not_found: approval not found".to_string())?;
-    if approval.project_id != project_id {
-        return Err("not_found: approval not found".to_string());
-    }
     if approval.target_service != "project_plan" {
         return Err("invalid_input: approval is not a project_plan approval".to_string());
     }
 
-    let draft = get_draft_by_approval_id(connection, &approval_id)?
+    let draft = get_draft_by_approval_id(connection, &project_id, &approval_id)?
         .ok_or_else(|| "not_found: project plan draft not found".to_string())?;
-    if draft.project_id != project_id {
-        return Err("not_found: project plan draft not found".to_string());
-    }
 
     let planned_tasks = build_planned_tasks(&draft);
     let planned_runner_requests =
@@ -301,7 +295,7 @@ pub fn approve_project_plan(
         .collect();
 
     if draft.status == "instantiated" {
-        let approval = get_approval_by_id(connection, &approval_id)?
+        let approval = get_approval_by_id(connection, &project_id, &approval_id)?
             .ok_or_else(|| "not_found: approval not found".to_string())?;
         return Ok(ApproveProjectPlanResponse {
             approval,
@@ -414,9 +408,9 @@ pub fn approve_project_plan(
     tx.commit()
         .map_err(|error| format!("database_error: commit approve project plan failed: {error}"))?;
 
-    let approval = get_approval_by_id(connection, &approval_id)?
+    let approval = get_approval_by_id(connection, &project_id, &approval_id)?
         .ok_or_else(|| "not_found: approval not found".to_string())?;
-    let draft = get_draft_by_approval_id(connection, &approval_id)?
+    let draft = get_draft_by_approval_id(connection, &project_id, &approval_id)?
         .ok_or_else(|| "not_found: project plan draft not found".to_string())?;
 
     Ok(ApproveProjectPlanResponse {
@@ -472,6 +466,7 @@ pub fn list_runner_requests(connection: &Connection) -> Result<Vec<RunnerRequest
 
 fn get_draft_by_id(
     connection: &Connection,
+    project_id: &str,
     draft_id: &str,
 ) -> Result<Option<ProjectPlanDraftSummary>, String> {
     connection
@@ -479,8 +474,8 @@ fn get_draft_by_id(
             "SELECT id, project_id, approval_id, idea, constraints, summary, status,
                 generated_by, requested_by, created_at, updated_at
              FROM project_plan_drafts
-             WHERE id = ?1",
-            [draft_id],
+             WHERE id = ?1 AND project_id = ?2",
+            params![draft_id, project_id],
             map_draft_row,
         )
         .optional()
@@ -489,6 +484,7 @@ fn get_draft_by_id(
 
 fn get_draft_by_approval_id(
     connection: &Connection,
+    project_id: &str,
     approval_id: &str,
 ) -> Result<Option<ProjectPlanDraftSummary>, String> {
     connection
@@ -496,8 +492,8 @@ fn get_draft_by_approval_id(
             "SELECT id, project_id, approval_id, idea, constraints, summary, status,
                 generated_by, requested_by, created_at, updated_at
              FROM project_plan_drafts
-             WHERE approval_id = ?1",
-            [approval_id],
+             WHERE approval_id = ?1 AND project_id = ?2",
+            params![approval_id, project_id],
             map_draft_row,
         )
         .optional()
@@ -506,6 +502,7 @@ fn get_draft_by_approval_id(
 
 fn get_approval_by_id(
     connection: &Connection,
+    project_id: &str,
     approval_id: &str,
 ) -> Result<Option<ApprovalSummary>, String> {
     connection
@@ -514,8 +511,8 @@ fn get_approval_by_id(
                 operation_types, status, risk_level, reason, reject_reason, approved_at,
                 rejected_at, created_at, updated_at
              FROM approvals
-             WHERE id = ?1",
-            [approval_id],
+             WHERE id = ?1 AND project_id = ?2",
+            params![approval_id, project_id],
             |row| {
                 let operation_types_json: String = row.get(5)?;
                 Ok(ApprovalSummary {
@@ -1079,6 +1076,69 @@ mod tests {
         ));
         let state = db::initialize(test_dir.clone()).expect("sqlite should initialize");
         (state, test_dir)
+    }
+
+    #[test]
+    fn cross_project_draft_not_found_from_another_project() {
+        let (state, test_dir) = test_db();
+        {
+            let mut connection = state.connection().expect("connection should be available");
+
+            // 在当前项目中创建一个 draft
+            let draft = create_project_plan_draft(&mut connection, valid_draft_input())
+                .expect("draft should be created");
+
+            // 记住当前项目 ID，然后插入另一个 project+审批+草案
+            let pid = super::current_project_id(&connection).expect("current project id");
+
+            connection
+                .execute(
+                    "INSERT INTO projects (id, name, status, phase, created_at, updated_at)
+                     VALUES ('other_project', 'Other', 'planning', 'init', '2099-01-01', '2099-01-01')",
+                    [],
+                )
+                .expect("other project insert should succeed");
+            connection
+                .execute(
+                    "INSERT INTO approvals (
+                        id, project_id, task_id, request_agent_id, target_service, operation_types,
+                        status, risk_level, reason, created_at, updated_at
+                    ) VALUES (
+                        'approval_other', 'other_project', NULL, 'agent_architect', 'project_plan',
+                        '[]', 'pending', 'medium', 'test', '2025-01-01', '2025-01-01'
+                    )",
+                    [],
+                )
+                .expect("other project approval insert should succeed");
+            connection
+                .execute(
+                    "INSERT INTO project_plan_drafts (
+                        id, project_id, approval_id, idea, summary, status,
+                        generated_by, requested_by, created_at, updated_at
+                    ) VALUES (
+                        'project_plan_other_draft', 'other_project', 'approval_other',
+                        'other idea', 'other summary', 'draft',
+                        'local_deterministic_template', 'test', '2025-01-01', '2025-01-01'
+                    )",
+                    [],
+                )
+                .expect("other project draft insert should succeed");
+
+            // 用当前 project_id 查另一个 project 的 draft —— 应返回 None
+            let other_draft = super::get_draft_by_id(&connection, &pid, "project_plan_other_draft")
+                .expect("query should succeed");
+            assert!(
+                other_draft.is_none(),
+                "draft from another project should not be found"
+            );
+
+            // 自己的 draft 仍然可以用 project_id 查到
+            let own_draft = super::get_draft_by_id(&connection, &pid, &draft.draft.id)
+                .expect("query should succeed");
+            assert!(own_draft.is_some(), "own draft should still be found");
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
     }
 
     fn count_rows(connection: &Connection, table: &str) -> i64 {
