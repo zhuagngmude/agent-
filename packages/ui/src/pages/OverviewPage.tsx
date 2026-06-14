@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Button, Card, Col, message, Popconfirm, Row, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, App as AntdApp, Button, Card, Col, Popconfirm, Row, Space, Statistic, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
 import { CreateTaskModal } from "../components/CreateTaskModal";
@@ -148,9 +148,11 @@ const statusTransitions: Record<string, Array<{ status: TaskStatus; label: strin
 // 错误处理
 // ---------------------------------------------------------------------------
 
-function showError(error: unknown): void {
+type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];
+
+function showError(messageApi: MessageApi, error: unknown): void {
   const text = error instanceof Error ? error.message : String(error);
-  message.error(text);
+  messageApi.error(text);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,14 +160,16 @@ function showError(error: unknown): void {
 // ---------------------------------------------------------------------------
 
 export function OverviewPage() {
+  const { message } = AntdApp.useApp();
   const desktopHost = useDesktopHostOverview();
   const isLoading = desktopHost.status === "loading";
   const data = desktopHost.status === "loading" ? null : desktopHost;
   const taskRows = data ? toTaskRows(data.tasks, data.agents) : [];
   const agentRows = data ? toAgentRows(data.agents) : [];
   const approvalRows = data ? toApprovalRows(data.approvals) : [];
+  const pendingApprovalCount = approvalRows.filter((row) => row.status === "pending").length;
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const showWriteUI = isTauriHost();
+  const showWriteUI = isTauriHost() && desktopHost.status === "connected";
 
   const handleStatusChange = useCallback(
     async (taskId: string, newStatus: TaskStatus) => {
@@ -174,10 +178,10 @@ export function OverviewPage() {
         message.success("任务状态已更新");
         desktopHost.refresh();
       } catch (error) {
-        showError(error);
+        showError(message, error);
       }
     },
-    [desktopHost.refresh],
+    [desktopHost.refresh, message],
   );
 
   const handleApprove = useCallback(
@@ -187,10 +191,10 @@ export function OverviewPage() {
         message.success("审批已通过");
         desktopHost.refresh();
       } catch (error) {
-        showError(error);
+        showError(message, error);
       }
     },
-    [desktopHost.refresh],
+    [desktopHost.refresh, message],
   );
 
   const handleReject = useCallback(
@@ -200,10 +204,10 @@ export function OverviewPage() {
         message.success("审批已拒绝");
         desktopHost.refresh();
       } catch (error) {
-        showError(error);
+        showError(message, error);
       }
     },
-    [desktopHost.refresh],
+    [desktopHost.refresh, message],
   );
 
   const handlePatchOnly = useCallback(
@@ -213,10 +217,10 @@ export function OverviewPage() {
         message.success("已标记为仅补丁");
         desktopHost.refresh();
       } catch (error) {
-        showError(error);
+        showError(message, error);
       }
     },
-    [desktopHost.refresh],
+    [desktopHost.refresh, message],
   );
 
   // 动态操作列（需要访问组件内的 handler）
@@ -301,7 +305,7 @@ export function OverviewPage() {
         </Col>
         <Col xs={24} md={8}>
           <Card>
-            <Statistic title="待审" value={approvalRows.length} loading={isLoading} />
+            <Statistic title="待审" value={pendingApprovalCount} loading={isLoading} />
           </Card>
         </Col>
       </Row>

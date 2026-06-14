@@ -1,6 +1,8 @@
-import { Form, Input, Modal, Radio, Select, message } from "antd";
+import { App as AntdApp, Form, Input, Modal, Radio, Select } from "antd";
 import type { AgentSummary, CreateTaskInput } from "../utils/desktopHost";
 import { createTask, isTauriHost } from "../utils/desktopHost";
+
+type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];
 
 type CreateTaskModalProps = {
   open: boolean;
@@ -10,6 +12,7 @@ type CreateTaskModalProps = {
 };
 
 export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTaskModalProps) {
+  const { message } = AntdApp.useApp();
   const [form] = Form.useForm<CreateTaskInput>();
 
   const handleSubmit = async () => {
@@ -26,7 +29,7 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
       message.success("任务已创建");
       onCreated();
     } catch (error) {
-      showSubmitError(error);
+      showSubmitError(message, error);
     }
   };
 
@@ -105,14 +108,14 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
   );
 }
 
-function showSubmitError(error: unknown): void {
+function showSubmitError(messageApi: MessageApi, error: unknown): void {
   if (isFormValidationError(error)) {
     return;
   }
 
   const text = error instanceof Error ? error.message : String(error);
   if (text) {
-    message.error(text);
+    messageApi.error(text);
   }
 }
 

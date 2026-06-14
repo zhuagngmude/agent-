@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ConfigProvider } from "antd";
+import { App as AntdApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 
 import { App } from "./app/App";
@@ -16,7 +16,9 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <React.StrictMode>
     <ConfigProvider locale={zhCN} theme={uiTheme}>
-      <App />
+      <AntdApp>
+        <App />
+      </AntdApp>
     </ConfigProvider>
   </React.StrictMode>,
 );
