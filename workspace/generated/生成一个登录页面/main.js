@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const rememberCheckbox = document.getElementById('remember');
   const loginBtn = document.getElementById('loginBtn');
 
-  // 检查是否有记住的用户名
+  // 检查是否有保存的凭据
   const savedUsername = localStorage.getItem('rememberedUsername');
   if (savedUsername) {
     usernameInput.value = savedUsername;
@@ -23,30 +23,36 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    // 模拟登录验证
-    if (username === 'admin' && password === '123456') {
-      // 记住我功能
-      if (rememberCheckbox.checked) {
-        localStorage.setItem('rememberedUsername', username);
+    // 模拟登录请求
+    loginBtn.textContent = '登录中...';
+    loginBtn.disabled = true;
+
+    setTimeout(function() {
+      // 模拟验证
+      if (username === 'admin' && password === '123456') {
+        // 记住我功能
+        if (rememberCheckbox.checked) {
+          localStorage.setItem('rememberedUsername', username);
+        } else {
+          localStorage.removeItem('rememberedUsername');
+        }
+
+        alert('登录成功！欢迎回来，' + username);
+        // 在实际应用中，这里会跳转到主页
+        // window.location.href = '/dashboard';
       } else {
-        localStorage.removeItem('rememberedUsername');
+        alert('用户名或密码错误，请重试');
       }
 
-      loginBtn.textContent = '登录中...';
-      loginBtn.disabled = true;
-
-      setTimeout(function() {
-        alert('登录成功！欢迎回来，' + username);
-        loginBtn.textContent = '登录';
-        loginBtn.disabled = false;
-        // 实际项目中会跳转到首页
-        // window.location.href = '/dashboard';
-      }, 1000);
-    } else {
-      alert('用户名或密码错误（提示：admin / 123456）');
-    }
+      loginBtn.textContent = '登录';
+      loginBtn.disabled = false;
+    }, 1000);
   });
 
-  // 输入框自动聚焦
-  usernameInput.focus();
+  // 回车键提交
+  passwordInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      loginForm.dispatchEvent(new Event('submit'));
+    }
+  });
 });
