@@ -2,137 +2,140 @@
 
 ## 1. 本地命令定义
 
-### 1.1 命令列表
+### 1.1 用户相关命令
 
-| 命令 | 描述 | 参数 |
+| 命令 | 参数 | 描述 |
 |------|------|------|
-| `init` | 初始化项目 | `project_name` |
-| `start` | 启动开发服务器 | `port` (默认3000) |
-| `build` | 构建生产版本 | `output_dir` (默认dist) |
-| `deploy` | 部署到服务器 | `target`, `env` |
-| `test` | 运行测试 | `suite` (可选) |
-| `status` | 查看项目状态 | 无 |
+| `user:register` | `username`, `password`, `email` | 注册新用户 |
+| `user:login` | `username`, `password` | 用户登录 |
+| `user:logout` | - | 用户登出 |
+| `user:get-profile` | `userId` | 获取用户信息 |
+| `user:update-profile` | `userId`, `fields` | 更新用户信息 |
 
-### 1.2 命令执行流程
+### 1.2 会话相关命令
+
+| 命令 | 参数 | 描述 |
+|------|------|------|
+| `session:create` | `userId` | 创建新会话 |
+| `session:validate` | `sessionId` | 验证会话有效性 |
+| `session:destroy` | `sessionId` | 销毁会话 |
+
+## 2. 状态流转图
+
+### 2.1 用户状态流转
 
 ```
-用户输入命令 → 命令解析器 → 参数校验 → 执行逻辑 → 状态更新 → 返回结果
+[未注册] --user:register--> [已注册/未登录]
+[已注册/未登录] --user:login--> [已登录]
+[已登录] --user:logout--> [已注册/未登录]
+[已登录] --session:expire--> [已注册/未登录]
 ```
 
-## 2. 状态流转
-
-### 2.1 项目状态机
+### 2.2 会话状态流转
 
 ```
-[未初始化] → init → [已初始化]
-[已初始化] → start → [运行中]
-[运行中] → stop → [已停止]
-[已初始化] → build → [构建中]
-[构建中] → complete → [已构建]
-[已构建] → deploy → [部署中]
-[部署中] → success → [已部署]
-[部署中] → fail → [部署失败]
+[无会话] --session:create--> [活跃会话]
+[活跃会话] --session:validate(成功)--> [活跃会话]
+[活跃会话] --session:validate(失败)--> [过期会话]
+[活跃会话] --session:destroy--> [无会话]
+[过期会话] --session:destroy--> [无会话]
 ```
-
-### 2.2 状态转换规则
-
-- 每个状态转换必须经过命令触发
-- 转换前校验前置条件
-- 转换后更新持久化存储
-- 记录转换时间戳
 
 ## 3. SQLite 持久化边界
 
 ### 3.1 数据库表结构
 
 ```sql
--- 项目表
-CREATE TABLE projects (
+-- 用户表
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'uninitialized',
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 命令历史表
-CREATE TABLE command_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL,
-    command TEXT NOT NULL,
-    params TEXT,
-    status TEXT NOT NULL,
-    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+-- 会话表
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- 状态变更日志表
-CREATE TABLE status_log (
+-- 登录日志表
+CREATE TABLE IF NOT EXISTS login_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL,
-    from_status TEXT,
-    to_status TEXT NOT NULL,
-    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+    user_id INTEGER,
+    username TEXT,
+    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    success BOOLEAN NOT NULL,
+    ip_address TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 ```
 
-### 3.2 数据访问层接口
+### 3.2 持久化操作边界
+
+| 操作 | 读取表 | 写入表 | 说明 |
+|------|--------|--------|------|
+| 用户注册 | - | users | 插入新用户记录 |
+| 用户登录 | users, sessions | sessions, login_logs | 验证用户，创建会话，记录日志 |
+| 用户登出 | sessions | sessions | 标记会话为无效 |
+| 会话验证 | sessions | - | 检查会话是否存在且未过期 |
+| 获取用户信息 | users | - | 查询用户数据 |
+
+### 3.3 数据访问层接口
 
 ```python
-class ProjectRepository:
-    def create_project(name: str) -> Project
-    def get_project(id: int) -> Project
-    def update_status(id: int, status: str) -> None
-    def list_projects() -> List[Project]
+# 用户数据访问
+class UserRepository:
+    def create_user(username, password_hash, email) -> User
+    def get_user_by_id(user_id) -> User | None
+    def get_user_by_username(username) -> User | None
+    def update_user(user_id, fields) -> bool
 
-class CommandHistoryRepository:
-    def log_command(project_id: int, command: str, params: dict, status: str) -> None
-    def get_history(project_id: int) -> List[CommandHistory]
+# 会话数据访问
+class SessionRepository:
+    def create_session(user_id, expires_at) -> Session
+    def get_session(session_id) -> Session | None
+    def deactivate_session(session_id) -> bool
+    def clean_expired_sessions() -> int
 
-class StatusLogRepository:
-    def log_status_change(project_id: int, from_status: str, to_status: str) -> None
-    def get_status_log(project_id: int) -> List[StatusLog]
+# 日志数据访问
+class LoginLogRepository:
+    def create_log(user_id, username, success, ip_address) -> LoginLog
+    def get_logs_by_user(user_id, limit) -> List[LoginLog]
 ```
 
-## 4. 边界定义
+## 4. 状态管理边界
 
-### 4.1 当前实现范围（最小执行记录）
+### 4.1 内存状态
 
-- 命令解析与参数校验
-- 状态机核心逻辑
-- SQLite 内存数据库操作
-- 日志记录
+```python
+# 当前活跃会话缓存（可选，用于性能优化）
+active_sessions_cache: Dict[str, Session] = {}
 
-### 4.2 后续开放范围
-
-- 真实文件写入
-- 系统命令执行
-- Git 集成
-- 网络部署
-
-### 4.3 接口契约
-
-```
-输入: JSON格式的命令请求
-输出: JSON格式的执行结果
-错误: 标准错误码 + 错误消息
+# 登录失败计数（用于防暴力破解）
+login_attempts: Dict[str, int] = {}
 ```
 
-## 5. 示例执行记录
+### 4.2 状态一致性规则
 
-```json
-{
-  "command": "init",
-  "params": {"project_name": "my-ui-app"},
-  "status_flow": [
-    {"from": null, "to": "uninitialized"},
-    {"from": "uninitialized", "to": "initialized"}
-  ],
-  "result": {
-    "success": true,
-    "project_id": 1,
-    "message": "Project my-ui-app initialized"
-  }
-}
-```
+1. 所有用户数据以 SQLite 为准
+2. 会话缓存仅在读取时使用，写入时同步更新数据库
+3. 登录失败计数在成功登录或达到阈值后重置
+4. 定期清理过期会话（可通过定时任务或懒清理）
+
+## 5. 错误处理边界
+
+| 错误场景 | 错误码 | 处理方式 |
+|----------|--------|----------|
+| 用户名已存在 | USER_EXISTS | 返回注册失败 |
+| 用户不存在 | USER_NOT_FOUND | 返回登录失败 |
+| 密码错误 | INVALID_PASSWORD | 增加失败计数，返回登录失败 |
+| 会话已过期 | SESSION_EXPIRED | 返回需要重新登录 |
+| 数据库错误 | DB_ERROR | 记录日志，返回系统错误 |
