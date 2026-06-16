@@ -46,17 +46,27 @@ pub(crate) fn resolve(key: Option<&str>, base_url: Option<&str>) -> ProviderConf
 }
 
 fn is_valid_base_url(url: &str) -> bool {
+    // 白名单：只允许 api.cheng.pink（无 path 或 /v1）
+    // 见 dev-docs/Model Gateway正式入口设计.md 第 217 行
     let lower = url.to_lowercase();
-    if !lower.starts_with("https://") {
+    let Some(stripped) = lower.strip_prefix("https://") else {
+        return false;
+    };
+    // 拒绝 userinfo、query、fragment
+    if stripped.contains('@') || stripped.contains('?') || stripped.contains('#') {
         return false;
     }
-    if lower.contains("localhost") || lower.contains("127.0.0.1") {
+    // 只允许 api.cheng.pink 域名
+    let host_and_path: Vec<&str> = stripped.splitn(2, '/').collect();
+    if host_and_path[0] != "api.cheng.pink" {
         return false;
     }
-    if lower.contains("192.168.") || lower.contains("10.") || lower.contains("172.16.") {
-        return false;
-    }
-    true
+    // path 只允许空、/、/v1、/v1/
+    let path = host_and_path
+        .get(1)
+        .map(|p| p.trim_end_matches('/'))
+        .unwrap_or("");
+    path.is_empty() || path == "v1"
 }
 
 // ---------------------------------------------------------------------------
@@ -92,14 +102,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_private_ip_base_url() {
-        let config = resolve(Some("sk-test"), Some("https://192.168.1.1/api"));
-        assert_eq!(config.status, ProviderConfigStatus::InvalidBaseUrl);
-    }
-
-    #[test]
-    fn accepts_valid_https_base_url() {
-        let config = resolve(Some("sk-test"), Some("https://api.openai.com"));
+    fn accepts_whitelisted_no_path() {
+        let config = resolve(Some("sk-test"), Some("https://api.cheng.pink"));
         assert_eq!(config.status, ProviderConfigStatus::Configured);
         assert_eq!(config.default_model, "gpt-5.4-mini");
         assert!(config.allowed_models.contains(&"gpt-5.4-mini".into()));
@@ -109,8 +113,44 @@ mod tests {
     }
 
     #[test]
+    fn accepts_whitelisted_trailing_slash() {
+        let config = resolve(Some("sk-test"), Some("https://api.cheng.pink/"));
+        assert_eq!(config.status, ProviderConfigStatus::Configured);
+    }
+
+    #[test]
+    fn accepts_whitelisted_v1() {
+        let config = resolve(Some("sk-test"), Some("https://api.cheng.pink/v1"));
+        assert_eq!(config.status, ProviderConfigStatus::Configured);
+    }
+
+    #[test]
+    fn accepts_whitelisted_v1_trailing_slash() {
+        let config = resolve(Some("sk-test"), Some("https://api.cheng.pink/v1/"));
+        assert_eq!(config.status, ProviderConfigStatus::Configured);
+    }
+
+    #[test]
+    fn rejects_missing_https_scheme() {
+        let config = resolve(Some("sk-test"), Some("api.cheng.pink"));
+        assert_eq!(config.status, ProviderConfigStatus::InvalidBaseUrl);
+    }
+
+    #[test]
+    fn rejects_non_whitelisted_domain() {
+        let config = resolve(Some("sk-test"), Some("https://api.openai.com"));
+        assert_eq!(config.status, ProviderConfigStatus::InvalidBaseUrl);
+    }
+
+    #[test]
+    fn rejects_non_v1_path() {
+        let config = resolve(Some("sk-test"), Some("https://api.cheng.pink/anything"));
+        assert_eq!(config.status, ProviderConfigStatus::InvalidBaseUrl);
+    }
+
+    #[test]
     fn does_not_expose_key_value() {
-        let config = resolve(Some("sk-secret-abc123"), Some("https://api.openai.com"));
+        let config = resolve(Some("sk-secret-abc123"), Some("https://api.cheng.pink/v1"));
         assert_eq!(config.status, ProviderConfigStatus::Configured);
         // ProviderConfig 不包含 key 字段，调用方拿不到 raw key
     }

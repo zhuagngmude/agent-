@@ -1,6 +1,8 @@
 import { App as AntdApp, Form, Input, Modal, Radio, Select } from "antd";
 import type { AgentSummary, CreateTaskInput } from "@agent-swarm/shared";
 import { createTask, isTauriHost } from "../utils/desktopHost";
+import { agentNameLabel } from "../utils/labels";
+import { userErrorLabel } from "../utils/userError";
 
 type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];
 
@@ -85,13 +87,13 @@ export function CreateTaskModal({ open, agents, onClose, onCreated }: CreateTask
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item name="assigned_agent_id" label="指派 Agent">
+        <Form.Item name="assigned_agent_id" label="指派智能体">
           <Select
             allowClear
-            placeholder="选择 Agent（选填）"
+            placeholder="选择智能体（选填）"
             options={agents.map((agent) => ({
               value: agent.id,
-              label: agent.name,
+              label: agentNameLabel(agent.name),
             }))}
           />
         </Form.Item>
@@ -113,10 +115,7 @@ function showSubmitError(messageApi: MessageApi, error: unknown): void {
     return;
   }
 
-  const text = error instanceof Error ? error.message : String(error);
-  if (text) {
-    messageApi.error(text);
-  }
+  messageApi.error(userErrorLabel(error, "创建任务失败，请稍后重试"));
 }
 
 function isFormValidationError(error: unknown): boolean {

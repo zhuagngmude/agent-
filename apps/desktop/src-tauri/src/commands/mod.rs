@@ -1,7 +1,16 @@
 pub mod agent_runs;
 pub mod agents;
 pub mod approvals;
+pub mod auto_swarm;
+pub mod idea_guidance;
+pub mod model_catalog;
 pub mod model_gateway;
+pub mod project_intake;
 pub mod project_plan;
 pub mod projects;
+pub mod runner_dry_run;
+pub mod runner_execution_gate;
+pub mod runner_execution_lock;
+pub mod runner_minimal_run;
+pub mod runner_preflight;
 pub mod tasks;

@@ -156,11 +156,12 @@ Agent Run 记录链。核心字段：`id`, `project_id`, `chain_id`, `root_run_i
 
 阶段：阶段 24 已完成，migration 004 已实现。
 
-项目计划草案表。核心字段：`id`, `project_id`, `approval_id`, `idea`, `constraints`, `summary`, `status`, `generated_by`, `requested_by`, `created_at`, `updated_at`。
+项目计划草案表。核心字段：`id`, `project_id`, `approval_id`, `idea`, `constraints`, `summary`, `status`, `generated_by`, `requested_by`, `model_call_id`（阶段 26 新增，可为 NULL），`created_at`, `updated_at`。
 
 关键约束：
-- 只保存本地确定性模板草案，不保存真实模型 raw prompt 或 raw response。
-- `generated_by` 第一版固定为 `local_deterministic_template`。
+- 只保存本地确定性模板草案或真实模型脱敏草案，不保存真实模型 raw prompt 或 raw response。
+- `generated_by` 为 `local_deterministic_template`（本地）或 `real_model_preview`（真实模型）。
+- `model_call_id` 关联 `model_calls` 审计记录，只存 ID 不存模型原文。本地确定性草案时为 NULL。
 - 创建草案时只写 `project_plan_drafts` 和 pending `project_plan` approval，不创建任务或 Runner request。
 - 审批通过后状态进入 `instantiated`，且同一 approval 不能重复实例化。
 
@@ -198,7 +199,7 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 ### `model_calls`
 
-阶段：阶段 23 已完成 helper-only SQLite 迁移。`003_add_model_calls.sql` 已建立 18 字段审计表和 3 个索引；当前只建表和 helper 草案，`feature_disabled` 时不写入 `model_calls`，不写入 `runtime_events`，不调用真实 provider。
+阶段：阶段 23 已完成 helper-only SQLite 迁移。`003_add_model_calls.sql` 已建立 18 字段审计表和 3 个索引；阶段 25.3 已实现真实调用审计落库：成功/失败进入 provider 阶段的调用写入脱敏 `model_calls`。
 
 模型调用记录表。当前 SQLite 字段：`id`, `project_id`, `purpose`, `provider`, `model`, `status`, `request_hash`, `structured_summary`, `token_usage`, `cost_estimate`, `error_category`, `error_message`, `redaction_applied`, `duration_ms`, `related_approval_id`, `runtime_event_id`, `created_at`, `updated_at`。
 
@@ -224,7 +225,7 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 - `token_usage` 只能保存 provider 返回且已安全解析后的粗粒度 JSON，例如 `prompt_tokens`、`completion_tokens`、`total_tokens`。
 - `cost_estimate` 只能保存本地估算值和币种，不保存账单凭据。
 - `structured_summary` 只能保存结构化、脱敏、限长后的业务摘要；第一条链路只允许保存 project plan 摘要。
-- `error_category` 必须使用粗粒度分类，例如 `feature_disabled`、`missing_key`、`invalid_request`、`unsupported_provider`、`unsupported_model`、`timeout`、`provider_unavailable`、`network_error`、`response_body_limit`、`redaction_failed`、`unknown`。
+- `error_category` 必须使用粗粒度分类，例如 `feature_disabled`、`missing_key`、`invalid_request`、`unsupported_provider`、`unsupported_model`、`timeout`、`provider_unavailable`、`network_error`、`response_too_large`、`redaction_failed`、`unknown`。`audit_write_failed` 为接口响应专用，不入库（审计写入失败意味着记录未成功写入）。
 - `runtime_event_id` 可关联模型调用状态变化审计，但 runtime event 也只能保存脱敏前后状态。
 
 禁止保存或返回：
@@ -250,6 +251,78 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 本地 Runner 连接状态的只读展示。核心字段：`id`, `project_id`, `connected`, `runner_id`, `version`, `workspace_path`, `permissions`, `last_heartbeat_at`, `created_at`, `updated_at`。
 
+### `model_catalog`（阶段 35）
+
+受控模型目录表。核心字段：`id`, `project_id`, `provider`, `model_id`, `display_name`, `purpose`, `enabled`, `is_builtin`, `created_at`, `updated_at`。
+
+唯一索引：`(project_id, provider, model_id, purpose)`。
+
+约束：
+- 第一版 `provider` 固定 `openai_compat`，`purpose` 固定 `project_plan_generation`。
+- 前端只能从 `enabled=true` 的记录中选择模型。
+- 模型名必须是后端校验后的合法格式。
+- 不存储 raw key、base URL、prompt 或 provider error。
+
+### `auto_mode_sessions`（阶段 36 草案，未落库）
+
+全自动模式会话表。草案字段：
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 会话 ID |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| mode | TEXT | NOT NULL | `manual` 或 `full_auto` |
+| status | TEXT | NOT NULL | `enabled` / `paused` / `stopping` / `stopped` / `failed` |
+| controller_agent_id | TEXT | NOT NULL | 总控智能体 ID |
+| started_by | TEXT | NOT NULL | 启动者 |
+| stop_requested_by | TEXT | — | 停止请求者 |
+| stop_reason | TEXT | — | 停止原因 |
+| policy_version | TEXT | NOT NULL | 策略版本号 |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| updated_at | TEXT | NOT NULL | ISO 时间 |
+
+### `auto_authorization_records`（阶段 36 草案，未落库）
+
+自动授权记录表。草案字段：
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 记录 ID |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| auto_mode_session_id | TEXT | NOT NULL | 关联的 auto_mode_session |
+| granted_by_agent_id | TEXT | NOT NULL | 授权方（总控智能体） |
+| granted_to_agent_id | TEXT | NOT NULL | 被授权方（角色智能体） |
+| permission_level | TEXT | NOT NULL | 权限级别：L0 / L1 / L2 / L3 / L4 |
+| permission_scope | TEXT | NOT NULL | 授权范围描述 |
+| reason_summary | TEXT | NOT NULL | 授权原因脱敏摘要 |
+| status | TEXT | NOT NULL | `active` / `revoked` / `expired` / `denied` |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+| revoked_at | TEXT | — | 撤销时间 |
+
+关键约束：
+- `permission_level = L4` 在阶段 36 不得自动生成，必须人工确认。
+- `reason_summary` 必须脱敏，不得包含 raw prompt、raw key 或文件完整内容。
+
+### `controller_decisions`（阶段 36 草案，未落库）
+
+总控智能体决策记录表。草案字段：
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | TEXT | PK | 决策 ID |
+| project_id | TEXT | NOT NULL | 所属项目 |
+| auto_mode_session_id | TEXT | NOT NULL | 关联的 auto_mode_session |
+| decision_type | TEXT | NOT NULL | 决策类型：workflow_select / agent_assign / model_select / skill_bind / permission_grant / stop / rollback |
+| input_summary | TEXT | NOT NULL | 输入脱敏摘要 |
+| output_summary | TEXT | NOT NULL | 输出脱敏摘要 |
+| risk_level | TEXT | NOT NULL | low / medium / high |
+| status | TEXT | NOT NULL | 决策状态 |
+| created_at | TEXT | NOT NULL | ISO 时间 |
+
+关键约束：
+- `input_summary` 和 `output_summary` 必须是脱敏摘要，不保存 raw prompt、raw response 或 raw provider error。
+- 真实模型调用细节仍以 `model_calls` 为准，本表只记录决策级别的摘要。
+
 ## 暂缓设计的表
 
 - `users` / `teams` / `memberships`
@@ -261,21 +334,19 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 说明：
 
-- `model_calls` SQLite 审计表已由 migration 003 建立，但真实 provider 调用、`model_calls` 写入、`runtime_events` 写入和 token usage 独立事件表仍暂缓。
+- `model_calls` SQLite 审计表已由 migration 003 建立，阶段 25.3 已实现安全审计落库（成功/失败调用写入脱敏记录），`runtime_events` 和 token usage 独立事件表仍暂缓。
 - `api_keys` 仍暂缓；阶段 2 第一版只允许 server env 读取 API key，不在 SQLite、Mock runtime state、前端 storage 或日志中保存 key。
 
 ## `model_calls` helper-only 当前状态
 
-- 阶段 23 只建立 SQLite 审计表和 Rust helper 草案，不开放真实写入路径。
-- `build_model_call_draft()` 当前返回 `can_write=false`，仅用于后续阶段的结构约束和测试覆盖。
-- `request_project_plan_model_draft` 在 feature flag 关闭时返回 `feature_disabled`，并保持 `model_calls` 0 条、`runtime_events` 无新增。
-- `blocked` 可作为 feature flag / 校验直接拦截时的审计状态；`pending`、`running`、`succeeded`、`failed` 用于真实调用路径。
-- 写入入口只能接受后端固定的请求信封，不接受前端自由 prompt、headers、key 或 provider body。
-- `request_hash` 必须基于脱敏后的固定请求信封生成，不能反推出原始输入。
-- `structured_summary` 只保存结构化、脱敏、限长后的摘要；第一条链路只允许 project plan 摘要。
-- 每次状态变化都应当可选地写入 `runtime_events`，并通过 `runtime_event_id` 关联。
-- 后续如果进入真实写入，创建和更新 `model_calls` 必须和对应审计事件保持同一事务语义。
-- 旧 Mock / Node helper 只作为语义参考，不再作为新架构主线扩展。
+- 阶段 23 建立 SQLite 审计表和 Rust helper 草案。
+- 阶段 25.3 已开放真实写入路径：`insert_safe_model_call()` 写入脱敏 model_calls 记录。
+- `request_project_plan_model_draft` 在 feature flag 关闭时返回 `feature_disabled`，不写入 `model_calls`。
+- 写入入口只接受后端固定的请求信封，不接受前端自由 prompt、headers、key 或 provider body。
+- `request_hash` 基于安全归一化摘要生成（purpose/provider/model/idea长度/constraints是否存在）。
+- `structured_summary` 只保存 redact_secrets + truncate_summary 后的摘要。
+- 仍不写 `runtime_events`（25.3 不碰 runtime_events）。
+- 仍禁止 raw key / raw base URL / raw prompt / raw provider response。
 
 ## 迁移顺序
 
@@ -283,8 +354,16 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 2. `002_add_agent_runs` — Agent Run 记录链 + `runtime_events`。
 3. `003_add_model_calls` — `model_calls` helper-only 审计表。
 4. `004_add_project_plan_workflow` — `project_plan_drafts` + `runner_requests`，用于迁移旧 MVP-0.3 的项目计划审批闭环（阶段 24 已完成）。
-5. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
-6. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
+5. `005_add_project_plan_model_audit_link` — `project_plan_drafts.model_call_id` 列 + 索引，关联 `model_calls` 安全审计记录（阶段 26 已完成）。
+6. `006_add_project_plan_task_templates` — 可配置任务角色模板表，内置 9 个角色（阶段 28 已完成）。
+7. `007_add_runner_preflight_reviews` — Runner 执行前审查闸门表（阶段 30 已完成）。
+8. `008_add_runner_execution_gates` — Runner 执行许可 gate 表（阶段 31 已完成）。
+9. `009_add_runner_dry_runs` — Runner dry-run 预演表（阶段 32 已完成）。
+10. `010_add_runner_execution_locks` — Runner 执行范围锁表（阶段 33 已完成）。
+11. `011_add_runner_minimal_runs` — 最小真实 Runner 执行表（阶段 34 已完成）。
+12. `012_add_model_catalog` — 受控模型目录表（阶段 35 已完成）。
+13. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
+14. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
 
 ## 已定稿的几条规则
 

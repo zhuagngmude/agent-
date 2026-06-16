@@ -5,6 +5,8 @@ import type { ColumnsType } from "antd/es/table";
 import { isProjectPlanApprovalTarget } from "@agent-swarm/agent-core";
 import type { ApprovalSummary } from "@agent-swarm/shared";
 import { approveApproval, patchOnlyApproval, rejectApproval } from "../utils/desktopHost";
+import { statusLabel, riskLabel, riskColor, targetServiceLabel, operationTypeLabel, approvalStatusColor } from "../utils/labels";
+import { userErrorLabel } from "../utils/userError";
 
 // ---------------------------------------------------------------------------
 // 行数据类型
@@ -27,17 +29,17 @@ const approvalColumns: ColumnsType<ApprovalRow> = [
   {
     title: "目标服务",
     dataIndex: "service",
-    render: (service: string) => <Tag>{service}</Tag>,
+    render: (service: string) => <Tag>{targetServiceLabel(service)}</Tag>,
   },
   {
     title: "风险",
     dataIndex: "risk",
-    render: (risk: string) => <Tag color={risk === "high" ? "red" : "orange"}>{risk}</Tag>,
+    render: (risk: string) => <Tag color={riskColor(risk)}>{riskLabel(risk)}</Tag>,
   },
   {
     title: "状态",
     dataIndex: "status",
-    render: (status: string) => <Tag color={status === "pending" ? "processing" : "default"}>{status}</Tag>,
+    render: (status: string) => <Tag color={approvalStatusColor(status)}>{statusLabel(status)}</Tag>,
   },
   {
     title: "操作类型",
@@ -45,7 +47,7 @@ const approvalColumns: ColumnsType<ApprovalRow> = [
     render: (operations: string[]) => (
       <Space size={4} wrap>
         {operations.map((operation) => (
-          <Tag key={operation}>{operation}</Tag>
+          <Tag key={operation}>{operationTypeLabel(operation)}</Tag>
         ))}
       </Space>
     ),
@@ -59,8 +61,7 @@ const approvalColumns: ColumnsType<ApprovalRow> = [
 type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];
 
 function showError(messageApi: MessageApi, error: unknown): void {
-  const text = error instanceof Error ? error.message : String(error);
-  messageApi.error(text);
+  messageApi.error(userErrorLabel(error, "审批操作失败，请稍后重试"));
 }
 
 // ---------------------------------------------------------------------------

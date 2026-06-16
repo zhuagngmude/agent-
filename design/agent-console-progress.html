@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent蜂群 - 对话式主控台原型</title>
+  <style>
+    :root {
+      --bg: #eff2f4;
+      --shell: #15191d;
+      --shell-2: #20262c;
+      --panel: #ffffff;
+      --panel-soft: #f7f8f9;
+      --line: #d9dee3;
+      --line-strong: #b8c1c9;
+      --text: #172027;
+      --muted: #6d7680;
+      --muted-2: #98a2ad;
+      --teal: #22a699;
+      --teal-soft: #dff6f2;
+      --green: #26a269;
+      --green-soft: #e4f5ec;
+      --amber: #c77700;
+      --amber-soft: #fff2d9;
+      --red: #cf3d32;
+      --red-soft: #fde7e5;
+      --blue: #3c78d8;
+      --blue-soft: #e7f0ff;
+      --violet: #5f5aa2;
+      --shadow: 0 1px 2px rgba(12, 18, 24, .08), 0 14px 32px rgba(12, 18, 24, .08);
+      --radius: 8px;
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(21, 25, 29, .04) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(21, 25, 29, .04) 1px, transparent 1px),
+        var(--bg);
+      background-size: 28px 28px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .console {
+      display: grid;
+      grid-template-columns: 278px minmax(580px, 1fr) 356px;
+      min-height: 100vh;
+    }
+
+    .agent-rail {
+      background: linear-gradient(180deg, var(--shell), var(--shell-2));
+      color: #e8edf1;
+      border-right: 1px solid rgba(0, 0, 0, .35);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .brand {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 4px;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      color: #11181d;
+      background: #d5fff7;
+      font-weight: 800;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .12);
+    }
+
+    .brand-title {
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+
+    .brand-subtitle {
+      color: #9faab4;
+      font-size: 12px;
+    }
+
+    .rail-section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #9faab4;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 2px 4px;
+    }
+
+    .agent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .agent-card {
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .055);
+      padding: 10px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+    }
+
+    .agent-card.is-active {
+      border-color: rgba(34, 166, 153, .65);
+      background: rgba(34, 166, 153, .13);
+    }
+
+    .agent-head {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #0e171b;
+      font-weight: 900;
+      border: 1px solid rgba(255, 255, 255, .35);
+      box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .14);
+    }
+
+    .avatar.teal { background: #68e4d7; }
+    .avatar.green { background: #9de36e; }
+    .avatar.blue { background: #7bb5ff; }
+    .avatar.amber { background: #ffd166; }
+    .avatar.red { background: #ff8a80; }
+    .avatar.violet { background: #b8a8ff; }
+
+    .agent-name {
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .agent-role {
+      color: #aeb8c1;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .agent-state {
+      min-width: 46px;
+      text-align: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      color: #101820;
+      background: #d7dde3;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .agent-state.run { background: #bff0e8; color: #0f5e55; }
+    .agent-state.wait { background: #ffe1a8; color: #7a4700; }
+    .agent-state.block { background: #ffc6c2; color: #8f2018; }
+
+    .agent-task {
+      color: #d8e0e6;
+      font-size: 12px;
+      margin: 9px 0 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress-row {
+      display: grid;
+      grid-template-columns: 1fr 34px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .13);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--teal);
+    }
+
+    .progress-fill.green { background: var(--green); }
+    .progress-fill.blue { background: var(--blue); }
+    .progress-fill.amber { background: var(--amber); }
+    .progress-fill.red { background: var(--red); }
+    .progress-fill.violet { background: #8d84ff; }
+
+    .progress-value {
+      color: #b9c3cc;
+      font-size: 12px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rail-footer {
+      margin-top: auto;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, .16);
+      padding: 12px;
+    }
+
+    .rail-footer strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .rail-footer span {
+      color: #aeb8c1;
+      font-size: 12px;
+    }
+
+    .chat-main {
+      display: grid;
+      grid-template-rows: 64px 1fr 104px;
+      min-width: 0;
+      background: rgba(255, 255, 255, .38);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(12px);
+    }
+
+    .project-name {
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .project-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn,
+    .command-btn {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: var(--radius);
+      color: var(--text);
+      cursor: pointer;
+      height: 34px;
+    }
+
+    .icon-btn {
+      width: 34px;
+      display: grid;
+      place-items: center;
+    }
+
+    .command-btn {
+      padding: 0 12px;
+      font-weight: 700;
+    }
+
+    .command-btn.primary {
+      color: #fff;
+      border-color: #182027;
+      background: #182027;
+    }
+
+    .chat-feed {
+      overflow: auto;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 760px);
+      gap: 10px;
+      align-items: start;
+    }
+
+    .message.user {
+      grid-template-columns: minmax(0, 760px) 36px;
+      justify-content: end;
+    }
+
+    .bubble {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 12px 14px;
+      box-shadow: 0 1px 2px rgba(12, 18, 24, .05);
+    }
+
+    .message.user .bubble {
+      background: #182027;
+      border-color: #182027;
+      color: #fff;
+    }
+
+    .bubble-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .message.user .bubble-head {
+      color: #c7d0d8;
+    }
+
+    .bubble-title {
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .message.user .bubble-title {
+      color: #fff;
+    }
+
+    .artifact {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .artifact-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: #f7f8f9;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .artifact-title {
+      font-weight: 850;
+    }
+
+    .artifact-body {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .info-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .info-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      font-weight: 750;
+    }
+
+    .stage-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .stage {
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .stage.done {
+      border-color: #bfe4d1;
+      color: #17633f;
+      background: var(--green-soft);
+    }
+
+    .stage.active {
+      border-color: #f0cc85;
+      color: #7a4700;
+      background: var(--amber-soft);
+    }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 14px 22px;
+      background: rgba(255, 255, 255, .88);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .composer input {
+      width: 100%;
+      height: 50px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 0 14px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .inspector {
+      border-left: 1px solid var(--line);
+      background: #f6f7f8;
+      padding: 14px;
+      overflow: auto;
+    }
+
+    .inspector-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 46px;
+    }
+
+    .inspector-title {
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .tab.active {
+      color: #0f5e55;
+      border-color: #a7ded5;
+      background: var(--teal-soft);
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      font-weight: 850;
+      margin-bottom: 10px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid #eef1f3;
+      font-size: 13px;
+    }
+
+    .kv:first-of-type {
+      border-top: 0;
+    }
+
+    .kv span:first-child {
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge.green { color: #17633f; border-color: #bfe4d1; background: var(--green-soft); }
+    .badge.teal { color: #0f5e55; border-color: #a7ded5; background: var(--teal-soft); }
+    .badge.amber { color: #7a4700; border-color: #f0cc85; background: var(--amber-soft); }
+    .badge.red { color: #8f2018; border-color: #efb0ab; background: var(--red-soft); }
+    .badge.blue { color: #285aa0; border-color: #bfd3f7; background: var(--blue-soft); }
+
+    .gate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .gate {
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+    }
+
+    .gate-index {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e9edf1;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .gate.done .gate-index {
+      background: var(--green-soft);
+      color: #17633f;
+    }
+
+    .gate.active .gate-index {
+      background: var(--amber-soft);
+      color: #7a4700;
+    }
+
+    .activity {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .activity-item {
+      display: grid;
+      grid-template-columns: 8px 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+      margin-top: 5px;
+    }
+
+    @media (max-width: 1280px) {
+      body {
+        min-width: 980px;
+      }
+
+      .console {
+        grid-template-columns: 270px minmax(0, 1fr);
+      }
+
+      .inspector {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="console">
+    <aside class="agent-rail">
+      <div class="brand">
+        <div class="brand-mark">蜂</div>
+        <div>
+          <div class="brand-title">agent蜂群</div>
+          <div class="brand-subtitle">本地 Agent 指挥室</div>
+        </div>
+      </div>
+
+      <div class="rail-section-title">
+        <span>Agent 队列</span>
+        <span>6/6</span>
+      </div>
+
+      <div class="agent-list">
+        <article class="agent-card is-active">
+          <div class="agent-head">
+            <div class="avatar teal">总</div>
+            <div>
+              <div class="agent-name">总控智能体</div>
+              <div class="agent-role">调度 / 汇总</div>
+            </div>
+            <div class="agent-state run">工作中</div>
+          </div>
+          <div class="agent-task">正在汇总下一步执行建议</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill" style="width: 82%;"></div></div>
+            <div class="progress-value">82%</div>
+          </div>
+        </article>
+
+        <article class="agent-card">
+          <div class="agent-head">
+            <div class="avatar green">产</div>
+            <div>
+              <div class="agent-name">产品规划官</div>
+              <div class="agent-role">想法引导 / 种子</div>
+            </div>
+            <div class="agent-state run">工作中</div>
+          </div>
+          <div class="agent-task">正在整理项目种子草案</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill green" style="width: 68%;"></div></div>
+            <div class="progress-value">68%</div>
+          </div>
+        </article>
+
+        <article class="agent-card">
+          <div class="agent-head">
+            <div class="avatar blue">架</div>
+            <div>
+              <div class="agent-name">架构设计官</div>
+              <div class="agent-role">模块 / 边界</div>
+            </div>
+            <div class="agent-state wait">审核中</div>
+          </div>
+          <div class="agent-task">等待确认 Runner 安全边界</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill blue" style="width: 45%;"></div></div>
+            <div class="progress-value">45%</div>
+          </div>
+        </article>
+
+        <article class="agent-card">
+          <div class="agent-head">
+            <div class="avatar amber">前</div>
+            <div>
+              <div class="agent-name">前端实现官</div>
+              <div class="agent-role">UI / 交互</div>
+            </div>
+            <div class="agent-state run">工作中</div>
+          </div>
+          <div class="agent-task">正在生成主控台布局</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill amber" style="width: 72%;"></div></div>
+            <div class="progress-value">72%</div>
+          </div>
+        </article>
+
+        <article class="agent-card">
+          <div class="agent-head">
+            <div class="avatar red">安</div>
+            <div>
+              <div class="agent-name">安全审查官</div>
+              <div class="agent-role">权限 / 审计</div>
+            </div>
+            <div class="agent-state block">阻塞</div>
+          </div>
+          <div class="agent-task">发现一个需要二次确认的执行请求</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill red" style="width: 38%;"></div></div>
+            <div class="progress-value">38%</div>
+          </div>
+        </article>
+
+        <article class="agent-card">
+          <div class="agent-head">
+            <div class="avatar violet">测</div>
+            <div>
+              <div class="agent-name">测试验收官</div>
+              <div class="agent-role">验证 / 回归</div>
+            </div>
+            <div class="agent-state">空闲</div>
+          </div>
+          <div class="agent-task">等待实现产物进入验收</div>
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill violet" style="width: 6%;"></div></div>
+            <div class="progress-value">6%</div>
+          </div>
+        </article>
+      </div>
+
+      <div class="rail-footer">
+        <strong>当前模式：人工确认</strong>
+        <span>阶段 34 仅允许临时沙箱路径、固定 Git 只读命令和人工二次确认。</span>
+      </div>
+    </aside>
+
+    <main class="chat-main">
+      <header class="topbar">
+        <div>
+          <div class="project-name">agent蜂群 MVP 主控台</div>
+          <div class="project-meta">本地 SQLite · Model Gateway · Runner 安全闸门</div>
+        </div>
+        <div class="top-actions">
+          <span class="badge green">桌面模式</span>
+          <span class="badge amber">1 个审批</span>
+          <button class="icon-btn" title="通知">铃</button>
+          <button class="icon-btn" title="设置">设</button>
+          <button class="command-btn primary">新建任务</button>
+        </div>
+      </header>
+
+      <section class="chat-feed">
+        <div class="message">
+          <div class="avatar teal">总</div>
+          <div class="bubble">
+            <div class="bubble-head">
+              <span class="bubble-title">总控智能体</span>
+              <span>刚刚</span>
+            </div>
+            <div>我已把当前目标拆成三个并行方向：想法引导、主控台 UI、Runner 安全可视化。前端实现官正在处理主控台布局，安全审查官发现一个执行前确认点。</div>
+          </div>
+        </div>
+
+        <div class="message user">
+          <div class="bubble">
+            <div class="bubble-head">
+              <span class="bubble-title">你</span>
+              <span>刚刚</span>
+            </div>
+            <div>以后每个角色都像这样显示工作进度条。</div>
+          </div>
+          <div class="avatar amber">我</div>
+        </div>
+
+        <div class="message">
+          <div class="avatar amber">前</div>
+          <div class="bubble">
+            <div class="bubble-head">
+              <span class="bubble-title">前端实现官</span>
+              <span>进行中 · 72%</span>
+            </div>
+            <div>已生成 Agent 队列面板：每个角色都有状态、当前任务、进度条和阻塞态。下一步可以接入真实 AgentRun 状态。</div>
+          </div>
+        </div>
+
+        <div class="artifact">
+          <div class="artifact-head">
+            <div class="artifact-title">项目种子草案</div>
+            <span class="badge teal">可继续细化</span>
+          </div>
+          <div class="artifact-body">
+            <div class="info-item">
+              <div class="info-label">产品形态</div>
+              <div class="info-value">本地 Agent 蜂群指挥室</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">主交互</div>
+              <div class="info-value">对话驱动任务推进</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">核心模块</div>
+              <div class="info-value">Agent 队列、对话流、右侧安全状态</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">当前限制</div>
+              <div class="info-value">真实 Runner 仍需人工二次确认</div>
+            </div>
+          </div>
+          <div class="stage-strip">
+            <div class="stage done">想法</div>
+            <div class="stage done">种子</div>
+            <div class="stage active">计划</div>
+            <div class="stage">审批</div>
+            <div class="stage">执行</div>
+          </div>
+        </div>
+
+        <div class="message">
+          <div class="avatar red">安</div>
+          <div class="bubble">
+            <div class="bubble-head">
+              <span class="bubble-title">安全审查官</span>
+              <span>阻塞 · 38%</span>
+            </div>
+            <div>阶段 34 最小 Runner 需要展示沙箱路径、固定只读命令和确认文本。当前建议先生成预演结果，不进入真实执行。</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer">
+        <input value="让产品规划官继续细化项目种子，并让前端实现官更新主控台原型" aria-label="主控台输入">
+        <div class="quick-actions">
+          <button class="command-btn">扩展想法</button>
+          <button class="command-btn">生成计划</button>
+          <button class="command-btn primary">发送</button>
+        </div>
+      </footer>
+    </main>
+
+    <aside class="inspector">
+      <div class="inspector-head">
+        <div class="inspector-title">项目上下文</div>
+        <span class="badge amber">阶段 37</span>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active">种子</button>
+        <button class="tab">阶段</button>
+        <button class="tab">权限</button>
+        <button class="tab">执行</button>
+      </div>
+
+      <section class="panel">
+        <div class="panel-title">项目种子</div>
+        <div class="kv"><span>目标</span><strong>智能体对话式主控台</strong></div>
+        <div class="kv"><span>用户</span><strong>本地项目负责人</strong></div>
+        <div class="kv"><span>MVP</span><strong>对话、角色进度、审批闸门</strong></div>
+        <div class="kv"><span>不做</span><strong>自由命令、自动提交 Git</strong></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">安全闸门</div>
+        <div class="gate-list">
+          <div class="gate done">
+            <div class="gate-index">1</div>
+            <div>Preflight 审查</div>
+            <span class="badge green">完成</span>
+          </div>
+          <div class="gate done">
+            <div class="gate-index">2</div>
+            <div>执行许可</div>
+            <span class="badge green">完成</span>
+          </div>
+          <div class="gate active">
+            <div class="gate-index">3</div>
+            <div>只读预演</div>
+            <span class="badge amber">当前</span>
+          </div>
+          <div class="gate">
+            <div class="gate-index">4</div>
+            <div>范围锁定</div>
+            <span class="badge">等待</span>
+          </div>
+          <div class="gate">
+            <div class="gate-index">5</div>
+            <div>最小执行</div>
+            <span class="badge red">高风险</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">权限边界</div>
+        <div class="kv"><span>模型</span><strong>仅 Model Gateway</strong></div>
+        <div class="kv"><span>Runner</span><strong>沙箱路径 + 固定只读命令</strong></div>
+        <div class="kv"><span>Git</span><strong>只读状态，不自动提交</strong></div>
+        <div class="kv"><span>网络</span><strong>默认不开放</strong></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">活动记录</div>
+        <div class="activity">
+          <div class="activity-item"><span class="activity-dot"></span><span>前端实现官更新 Agent 队列面板</span></div>
+          <div class="activity-item"><span class="activity-dot"></span><span>安全审查官标记执行前确认点</span></div>
+          <div class="activity-item"><span class="activity-dot"></span><span>产品规划官生成项目种子草案</span></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</body>
+</html>

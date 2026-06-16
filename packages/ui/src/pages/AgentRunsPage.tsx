@@ -6,6 +6,8 @@ import { Activity } from "lucide-react";
 
 import type { AgentRunSummary, RuntimeEventSummary } from "@agent-swarm/shared";
 import { isTauriHost } from "../utils/desktopHost";
+import { roleLabel, statusLabel, agentNameLabel } from "../utils/labels";
+import { userErrorLabel } from "../utils/userError";
 
 // ---------------------------------------------------------------------------
 // 行数据类型
@@ -72,7 +74,7 @@ export function AgentRunsPage() {
         if (!cancelled) {
           setRuns([]);
           setEvents([]);
-          setError(err instanceof Error ? err.message : String(err));
+          setError(userErrorLabel(err, "读取运行记录失败，请稍后重试"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -93,7 +95,7 @@ export function AgentRunsPage() {
   const chainColumns: ColumnsType<ChainRow> = [
     { title: "链名称", dataIndex: "chain_label" },
     { title: "请求人", dataIndex: "requested_by" },
-    { title: "Agent 数", dataIndex: "run_count" },
+    { title: "智能体数", dataIndex: "run_count" },
     {
       title: "状态",
       key: "status",
@@ -113,13 +115,13 @@ export function AgentRunsPage() {
 
   const runColumns: ColumnsType<RunRow> = [
     { title: "序号", dataIndex: "sequence", width: 60 },
-    { title: "角色", dataIndex: "role" },
-    { title: "Agent", dataIndex: "agent_name" },
+    { title: "角色", dataIndex: "role", render: (r: string) => roleLabel(r) },
+    { title: "智能体", dataIndex: "agent_name", render: (name: string) => agentNameLabel(name) },
     { title: "模型", dataIndex: "model" },
     {
       title: "状态",
       dataIndex: "status",
-      render: (status: string) => statusTag(status),
+      render: (s: string) => statusTag(s),
     },
     {
       title: "输入摘要",
@@ -149,7 +151,7 @@ export function AgentRunsPage() {
           运行记录
         </Typography.Title>
         <Typography.Text type="secondary">
-          Agent Run 链记录与运行时审计事件（只读）
+          智能体运行链记录与运行时审计事件（只读）
         </Typography.Text>
       </div>
 
@@ -157,7 +159,7 @@ export function AgentRunsPage() {
         <Alert
           type="error"
           showIcon
-          message="读取运行记录失败"
+          title="读取运行记录失败"
           description={error}
           closable
         />

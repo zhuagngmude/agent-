@@ -5,12 +5,43 @@ export type { ProjectSummary } from "./types/project";
 export type {
   ApproveProjectPlanInput,
   ApproveProjectPlanResponse,
+  AutoGenerateProjectPlanTasksInput,
+  AutoRunSwarmIdeaInput,
+  AutoRunSwarmIdeaResponse,
+  AutoRunSwarmTaskResult,
   CreateProjectPlanDraftInput,
   CreateProjectPlanDraftResponse,
+  DeleteProjectPlanDraftInput,
+  DeleteProjectPlanDraftResponse,
+  CreateRunnerExecutionGateInput,
+  CreateRunnerExecutionGateResponse,
+  CreateRunnerPreflightReviewInput,
+  CreateRunnerPreflightReviewResponse,
   PlannedTaskSummary,
+  RevokeRunnerExecutionGateInput,
+  RevokeRunnerExecutionGateResponse,
+  CreateRunnerDryRunInput, CreateRunnerDryRunResponse,
+  CreateRunnerExecutionLockInput, CreateRunnerExecutionLockResponse,
+  CreateRunnerMinimalRunInput, CreateRunnerMinimalRunResponse,
+  RunnerCommandResultSummary, RunnerMinimalRunSummary,
+  RunnerExecutionLockSummary,
+  RevokeRunnerExecutionLockInput, RevokeRunnerExecutionLockResponse,
+  PlannedFileChangeSummary, RunnerDryRunSummary,
+  RevokeRunnerDryRunInput, RevokeRunnerDryRunResponse,
+  RunnerExecutionGateSummary,
   ProjectPlanDraftSummary,
+  ProjectPlanModelDraftInput,
+  ProjectPlanModelDraftResponse,
+  ProjectPlanExecutionPreview,
+  ProjectPlanTaskInstanceSummary,
+  ProjectPlanTaskTemplateSummary,
+  RunnerPreflightReviewSummary,
+  SaveProjectPlanModelDraftInput,
+  UpdateProjectPlanTaskTemplateInput,
   ProjectPlanSideEffects,
   RunnerRequestSummary,
+  ModelCatalogEntry,
+  UpdateModelEnabledInput,
 } from "./types/project-plan";
 export type {
   CreateTaskInput,
@@ -18,6 +49,25 @@ export type {
   TaskSummary,
   UpdateTaskStatusInput,
 } from "./types/task";
+
+export type {
+  CreateIdeaGuidanceQuestionsInput,
+  CreateIdeaGuidanceQuestionsResponse,
+  GenerateProjectSeedInput,
+  GenerateProjectSeedResponse,
+  IdeaGuidanceQuestion,
+  IdeaGuidanceSession,
+  ProjectSeed,
+  SaveGuidanceAnswersInput,
+} from "./types/idea-guidance";
+
+export type {
+  ClassifyProjectIntakeInput,
+  ClassifyProjectIntakeResponse,
+  ProjectIntakeSession,
+  ProjectIntakeSideEffects,
+  ProjectType,
+} from "./types/project-intake";
 
 export type { AgentRunStatus, AgentRunSummary, RuntimeEventSummary } from "./types/agent-run";
 

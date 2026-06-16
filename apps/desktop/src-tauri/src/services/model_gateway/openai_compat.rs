@@ -15,6 +15,8 @@ use std::io::Read;
 pub struct ModelRequest {
     pub system_prompt: String,
     pub user_message: String,
+    /// 模型名——来自后端 model_catalog 校验后的 model_id，不来自前端自由文本。
+    pub model_id: String,
 }
 
 /// 模型响应（只返回 assistant message content，不含 raw response）
@@ -29,7 +31,7 @@ pub enum ProviderError {
     Timeout,
     NetworkError,
     ProviderError,
-    ResponseTooLarge,
+    ResponseTooLarge, // 与阶段 21 错误分类 response_too_large 对齐
     InvalidResponse,
 }
 
@@ -73,12 +75,17 @@ impl ModelProvider for OpenAiCompatProvider {
         timeout_secs: u64,
         max_response_bytes: u64,
     ) -> Result<ModelResponse, ProviderError> {
-        // 构造 OpenAI-compatible chat completions 请求 URL
-        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+        // 构造 URL：base_url 统一补 /v1，再拼 /chat/completions
+        let base = self.base_url.trim_end_matches('/');
+        let url = if base.ends_with("/v1") {
+            format!("{base}/chat/completions")
+        } else {
+            format!("{base}/v1/chat/completions")
+        };
 
-        // 固定请求体：provider=openai_compat, model=gpt-5.4-mini, stream=false
+        // 固定请求体：provider=openai_compat, model 来自后端受控目录
         let body = serde_json::json!({
-            "model": "gpt-5.4-mini",
+            "model": request.model_id,
             "messages": [
                 {"role": "system", "content": request.system_prompt},
                 {"role": "user", "content": request.user_message}
@@ -127,19 +134,33 @@ impl ModelProvider for OpenAiCompatProvider {
         let body_text =
             String::from_utf8(body_bytes).map_err(|_| ProviderError::InvalidResponse)?;
 
-        // 只解析 assistant message content，不返回 raw response
-        let parsed: serde_json::Value =
-            serde_json::from_str(&body_text).map_err(|_| ProviderError::InvalidResponse)?;
-
-        let content = parsed["choices"]
-            .as_array()
-            .and_then(|choices| choices.first())
-            .and_then(|choice| choice["message"]["content"].as_str())
-            .unwrap_or("")
-            .to_string();
+        let content = parse_chat_completion_content(&body_text)?;
 
         Ok(ModelResponse { content })
     }
+}
+
+// ---------------------------------------------------------------------------
+// 纯函数：从 OpenAI-compatible JSON 响应中解析 assistant content
+// 可供测试直接调用，不依赖网络或 ureq
+// ---------------------------------------------------------------------------
+
+pub fn parse_chat_completion_content(body_text: &str) -> Result<String, ProviderError> {
+    let parsed: serde_json::Value =
+        serde_json::from_str(body_text).map_err(|_| ProviderError::InvalidResponse)?;
+
+    let content = parsed["choices"]
+        .as_array()
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice["message"]["content"].as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if content.trim().is_empty() {
+        return Err(ProviderError::InvalidResponse);
+    }
+
+    Ok(content)
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +216,7 @@ mod tests {
         let req = ModelRequest {
             system_prompt: "sys".into(),
             user_message: "user".into(),
+            model_id: "gpt-5.4-mini".into(),
         };
         let result = fake.send(&req, 10, 1024).unwrap();
         assert_eq!(result.content, "测试摘要");
@@ -209,6 +231,7 @@ mod tests {
         let req = ModelRequest {
             system_prompt: "sys".into(),
             user_message: "user".into(),
+            model_id: "gpt-5.4-mini".into(),
         };
         let result = fake.send(&req, 10, 1024);
         assert!(result.is_err());
@@ -227,6 +250,7 @@ mod tests {
         let req = ModelRequest {
             system_prompt: "sys".into(),
             user_message: "user".into(),
+            model_id: "gpt-5.4-mini".into(),
         };
         let result = fake.send(&req, 10, 1024);
         assert!(result.is_err());
@@ -240,12 +264,74 @@ mod tests {
     // OpenAiCompatProvider from_env 验证
     // -------------------------------------------------------
 
+    /// 验证 InvalidResponse 作为 ProviderError 能被正确匹配
     #[test]
-    fn openai_compat_from_env_requires_both_vars() {
-        // 确保测试环境没有设置这些变量
-        // from_env 在两个变量都缺失时应返回 Err
-        let result = OpenAiCompatProvider::from_env();
-        // 本地测试环境通常不设置这些 env，因此预期失败
+    fn fake_provider_returns_invalid_response() {
+        let fake = FakeModelProvider {
+            content: None,
+            error: Some(ProviderError::InvalidResponse),
+        };
+        let req = ModelRequest {
+            system_prompt: "sys".into(),
+            user_message: "user".into(),
+            model_id: "gpt-5.4-mini".into(),
+        };
+        let result = fake.send(&req, 10, 1024);
         assert!(result.is_err());
+        match result.unwrap_err() {
+            ProviderError::InvalidResponse => {}
+            other => panic!("expected InvalidResponse, got {:?}", other),
+        }
+    }
+
+    // -------------------------------------------------------
+    // parse_chat_completion_content 纯函数测试
+    // -------------------------------------------------------
+
+    #[test]
+    fn parse_empty_choices_array_returns_invalid_response() {
+        let result = parse_chat_completion_content(r#"{"choices":[]}"#);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ProviderError::InvalidResponse => {}
+            other => panic!("expected InvalidResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_empty_content_string_returns_invalid_response() {
+        let result = parse_chat_completion_content(r#"{"choices":[{"message":{"content":""}}]}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_whitespace_only_content_returns_invalid_response() {
+        let result = parse_chat_completion_content(r#"{"choices":[{"message":{"content":"  "}}]}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_non_json_returns_invalid_response() {
+        let result = parse_chat_completion_content("not json at all");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ProviderError::InvalidResponse => {}
+            other => panic!("expected InvalidResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_valid_content_returns_ok() {
+        let result = parse_chat_completion_content(
+            r#"{"choices":[{"message":{"content":"项目计划摘要..."}}]}"#,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "项目计划摘要...");
+    }
+
+    #[test]
+    fn openai_compat_from_env_does_not_panic() {
+        // 只验证不 panic。返回值依赖本机 env，不硬断言成功/失败。
+        let _ = OpenAiCompatProvider::from_env();
     }
 }

@@ -62,41 +62,95 @@ pub fn truncate_summary(text: &str, max_len: usize) -> String {
 }
 
 /// 脱敏函数（阶段 22 helper-only，阶段 25.1 用于返回前脱敏）
+/// 顺序处理每种模式，每步操作在累积结果上做匹配和替换，
+/// 避免多种模式交织时 reset 原文或跨模式索引错位。
 pub fn redact_secrets(text: &str) -> String {
     let mut result = text.to_string();
-    let lower = text.to_lowercase();
 
-    // sk- 密钥脱敏
-    if let Some(pos) = lower.find("sk-") {
-        let after = &text[pos + 3..];
+    // 1. sk- 密钥脱敏（在累积结果上操作）
+    result = redact_sk_keys(&result);
+
+    // 2. Authorization: Bearer 脱敏
+    result = redact_auth_bearer(&result);
+
+    // 3. api_key= / token= / password= 脱敏
+    result = redact_key_value_patterns(&result);
+
+    result
+}
+
+fn redact_sk_keys(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let mut result = text.to_string();
+    let mut offset: isize = 0;
+
+    let mut search_start = 0usize;
+    while let Some(pos) = lower[search_start..].find("sk-") {
+        let abs_pos = search_start + pos;
+        let after = &text[abs_pos + 3..];
         let alnum_count = after
             .chars()
             .take_while(|c| c.is_ascii_alphanumeric())
             .count();
         if alnum_count >= 20 {
-            let start = pos;
-            let end = pos + 3 + alnum_count;
-            result.replace_range(start..end, "[REDACTED_SECRET]");
+            let start = (abs_pos as isize + offset) as usize;
+            let end = (abs_pos as isize + offset + 3 + alnum_count as isize) as usize;
+            let replacement = "[REDACTED_SECRET]";
+            let old_len = end - start;
+            result.replace_range(start..end, replacement);
+            offset += replacement.len() as isize - old_len as isize;
+        }
+        search_start = abs_pos + 3;
+    }
+    result
+}
+
+fn redact_auth_bearer(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+
+    for segment in text.split_inclusive('\n') {
+        let (line, newline) = segment
+            .strip_suffix('\n')
+            .map_or((segment, ""), |line| (line, "\n"));
+        let lower = line.to_lowercase();
+        if lower.contains("authorization:") && lower.contains("bearer") {
+            result.push_str("Authorization: Bearer [REDACTED_SECRET]");
+            result.push_str(newline);
+        } else {
+            result.push_str(segment);
         }
     }
 
-    // Authorization: Bearer 脱敏
-    if lower.contains("authorization:") && lower.contains("bearer") {
-        result = text.to_string(); // 简化：完整替换行
-        let start = lower.find("authorization:").unwrap_or(0);
-        result.replace_range(start..text.len(), "Authorization: Bearer [REDACTED_SECRET]");
-    }
+    result
+}
 
-    // api_key= / token= / password= 脱敏
+fn redact_key_value_patterns(text: &str) -> String {
+    let mut result = text.to_string();
+
     for pattern in &["api_key=", "token=", "password="] {
-        if lower.contains(pattern) {
-            result = result.replace(
-                &result[lower.find(pattern).unwrap_or(0)..],
-                &format!("{pattern}[REDACTED_SECRET]"),
-            );
+        // 每处理一种 pattern，基于当前 result 重新计算 lower 和偏移。
+        // 避免跨 pattern 的 offset 污染后续 pattern 的索引。
+        let lower = result.to_lowercase();
+        let mut offset: isize = 0;
+        let mut search_start = 0usize;
+        while let Some(pos) = lower[search_start..].find(pattern) {
+            let abs_pos = search_start + pos;
+            let value_start = abs_pos + pattern.len();
+            let value_end = lower[value_start..]
+                .find(|c: char| c.is_whitespace())
+                .map(|n| value_start + n)
+                .unwrap_or(lower.len());
+            if value_end > value_start {
+                let start = (abs_pos as isize + offset) as usize;
+                let end = (value_end as isize + offset) as usize;
+                let replacement = format!("{pattern}[REDACTED_SECRET]");
+                let old_len = end - start;
+                result.replace_range(start..end, &replacement);
+                offset += replacement.len() as isize - old_len as isize;
+            }
+            search_start = abs_pos + pattern.len();
         }
     }
-
     result
 }
 
@@ -183,5 +237,68 @@ mod tests {
         let output = redact_secrets(input);
         assert!(!output.contains("sk-abcdefghijklmnopqrstuvwxyz123456"));
         assert!(output.contains("[REDACTED_SECRET]"));
+    }
+
+    #[test]
+    fn redaction_handles_multiple_patterns_without_leaking() {
+        // 模型输出可能同时包含多种敏感模式
+        let input = concat!(
+            "key: sk-abcdefghijklmnopqrstuvwxyz123456\n",
+            "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.xxx\n",
+            "api_key=mysecret\n"
+        );
+        let output = redact_secrets(input);
+        // 三种敏感内容都不应出现在输出中
+        assert!(!output.contains("sk-abcdefghijklmnopqrstuvwxyz123456"));
+        assert!(!output.contains("Bearer eyJhbGciOiJIUzI1NiJ9.xxx"));
+        assert!(!output.contains("mysecret"));
+        // 但 REDACTED_SECRET 应该出现（至少三次脱敏）
+        let redacted_count = output.matches("[REDACTED_SECRET]").count();
+        assert!(redacted_count >= 2, "应至少脱敏 sk 和 auth bearer 两种");
+    }
+
+    #[test]
+    fn redaction_password_before_api_key() {
+        let input = "password=hunter2 api_key=mysecret";
+        let output = redact_secrets(input);
+        assert!(!output.contains("hunter2"));
+        assert!(!output.contains("mysecret"));
+    }
+
+    #[test]
+    fn redaction_api_key_before_password() {
+        let input = "api_key=mysecret password=hunter2";
+        let output = redact_secrets(input);
+        assert!(!output.contains("mysecret"));
+        assert!(!output.contains("hunter2"));
+    }
+
+    #[test]
+    fn redaction_multiple_tokens_interleaved() {
+        let input = "token=abc token=def token=ghi";
+        let output = redact_secrets(input);
+        assert!(!output.contains("abc"));
+        assert!(!output.contains("def"));
+        assert!(!output.contains("ghi"));
+    }
+
+    #[test]
+    fn redaction_handles_multiple_authorization_lines() {
+        let input = concat!(
+            "Authorization: Bearer first-token-12345\n",
+            "Authorization: Bearer second-token-67890\n"
+        );
+        let output = redact_secrets(input);
+        assert!(!output.contains("first-token-12345"));
+        assert!(!output.contains("second-token-67890"));
+        assert_eq!(output.matches("[REDACTED_SECRET]").count(), 2);
+    }
+
+    #[test]
+    fn redaction_handles_token_and_password_together() {
+        let input = "token=abc123.def456\npassword=hunter2";
+        let output = redact_secrets(input);
+        assert!(!output.contains("abc123.def456"));
+        assert!(!output.contains("hunter2"));
     }
 }

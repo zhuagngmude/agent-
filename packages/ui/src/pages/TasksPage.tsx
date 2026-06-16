@@ -7,6 +7,8 @@ import type { AgentSummary, TaskStatus, TaskSummary } from "@agent-swarm/shared"
 import { CreateTaskModal } from "../components/CreateTaskModal";
 import { StatusBadge } from "../components/StatusBadge";
 import { updateTaskStatus } from "../utils/desktopHost";
+import { priorityLabel, priorityColor, agentNameLabel } from "../utils/labels";
+import { userErrorLabel } from "../utils/userError";
 
 // ---------------------------------------------------------------------------
 // 行数据类型
@@ -45,14 +47,14 @@ const transitionMeta: Record<string, { label: string; danger?: boolean }> = {
 const taskColumns: ColumnsType<TaskRow> = [
   { title: "任务", dataIndex: "title" },
   {
-    title: "负责 Agent",
+    title: "负责智能体",
     dataIndex: "owner",
-    render: (owner: string) => <Tag>{owner}</Tag>,
+    render: (owner: string) => <Tag>{agentNameLabel(owner)}</Tag>,
   },
   {
     title: "优先级",
     dataIndex: "priority",
-    render: (priority: string) => <Tag color={priority === "high" ? "red" : "default"}>{priority}</Tag>,
+    render: (priority: string) => <Tag color={priorityColor(priority)}>{priorityLabel(priority)}</Tag>,
   },
   {
     title: "状态",
@@ -68,8 +70,7 @@ const taskColumns: ColumnsType<TaskRow> = [
 type MessageApi = ReturnType<typeof AntdApp.useApp>["message"];
 
 function showError(messageApi: MessageApi, error: unknown): void {
-  const text = error instanceof Error ? error.message : String(error);
-  messageApi.error(text);
+  messageApi.error(userErrorLabel(error));
 }
 
 // ---------------------------------------------------------------------------

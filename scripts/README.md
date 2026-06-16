@@ -6,6 +6,7 @@ Local startup and verification entrypoints for `agent-swarm`.
 
 - `start-dev.ps1`: start the Mock API and open the web app.
 - `start-local.ps1`: start the SQLite trial API and local static web app.
+- `start-desktop-real-model.ps1`: start the Tauri desktop app with the stage 25 real-model project-plan preview enabled.
 - `status-local.ps1`: inspect API, web, SQLite, and pid status.
 - `stop-local.ps1`: stop the local trial and clean pid files.
 
@@ -15,8 +16,8 @@ Local startup and verification entrypoints for `agent-swarm`.
 - `verify-mock-flows.ps1`: isolated Mock flow checks on `8789`.
 - `verify-sqlite-flows.ps1`: isolated SQLite flow checks on `8788`.
 - `verify-local-ui.ps1`: browser smoke for the running local trial on `8787/5175`, including the Agent Run record page.
-- `verify-model-gateway.ps1`: disabled Model Gateway and relay boundary checks.
-- `verify-real-model-admission.ps1`: disabled project-plan model request admission checks, provider config resolver checks, redaction / safe-record checks, model_calls write-draft helper checks, and isolated disabled route checks; no provider calls.
+- `verify-model-gateway.ps1`: Model Gateway admission and relay boundary checks; validates gateway logic without making real provider calls.
+- `verify-real-model-admission.ps1`: project-plan model request admission checks, provider config resolver checks, redaction / safe-record checks, model_calls write-draft helper checks, and isolated route checks; validates admission gates without making real provider calls. Real model calls go through the Tauri desktop app under phase 25/35 Model Gateway controls.
 - `verify-agent-permissions.ps1`
 - `verify-agent-config-fields.ps1`
 - `verify-agent-config-dry-run.ps1`
@@ -40,6 +41,6 @@ Tauri/Rust write commands are accepted through Rust checks instead of a PowerShe
 
 ## Notes
 
-- Verification scripts must not call real model providers, execute Runner, modify Git, or touch protected local state.
+- Verification scripts must not call real model providers directly, execute Runner outside the phase 34 sandbox boundaries, modify Git, or touch protected local state. Real model calls and Runner execution are available through the Tauri desktop app under phase 25/35 model gateway + phase 34 runner gate chain controls.
 - `verify-real-model-admission.ps1` uses isolated port `8791` and a temp runtime state file under `%TEMP%`.
 - See [docs/demo-checklist.md](../docs/demo-checklist.md) for the human demo path.

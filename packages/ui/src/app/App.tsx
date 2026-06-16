@@ -10,6 +10,7 @@ import { OverviewPage } from "../pages/OverviewPage";
 import { ProjectPlanPage } from "../pages/ProjectPlanPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { TasksPage } from "../pages/TasksPage";
+import { WorkflowPage } from "../pages/WorkflowPage";
 import { useDesktopHostOverview } from "../utils/desktopHost";
 
 export function App() {
@@ -26,7 +27,9 @@ export function App() {
 
     switch (activePage) {
       case "overview":
-        return <OverviewPage {...data} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} />;
+        return <OverviewPage {...data} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} onNavigate={setActivePage} onRefresh={refresh} />;
+      case "workflow":
+        return <WorkflowPage project={data.project} agents={data.agents} tasks={data.tasks} approvals={data.approvals} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} onNavigate={setActivePage} onRefresh={refresh} />;
       case "projectPlan":
         return <ProjectPlanPage approvals={data.approvals} refreshOverview={refresh} canWrite={canWrite} />;
       case "tasks":

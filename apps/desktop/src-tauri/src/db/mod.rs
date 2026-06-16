@@ -16,6 +16,28 @@ const MODEL_CALLS_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/003_add_model_calls.sql");
 const PROJECT_PLAN_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/004_add_project_plan_workflow.sql");
+const PROJECT_PLAN_MODEL_AUDIT_LINK_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/005_add_project_plan_model_audit_link.sql");
+const TASK_TEMPLATES_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/006_add_project_plan_task_templates.sql");
+const RUNNER_PREFLIGHT_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/007_add_runner_preflight_reviews.sql");
+const RUNNER_EXECUTION_GATES_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/008_add_runner_execution_gates.sql");
+const RUNNER_DRY_RUNS_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/009_add_runner_dry_runs.sql");
+const RUNNER_EXECUTION_LOCKS_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/010_add_runner_execution_locks.sql");
+const RUNNER_MINIMAL_RUNS_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/011_add_runner_minimal_runs.sql");
+const MODEL_CATALOG_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/012_add_model_catalog.sql");
+const IDEA_GUIDANCE_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/013_add_idea_guidance.sql");
+const PROJECT_INTAKE_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/014_add_project_intake.sql");
+const AUTO_RUNNER_LOCKS_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/015_enable_auto_runner_execution_locks.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -44,7 +66,20 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     run_agent_run_migration(&connection)?;
     run_model_calls_migration(&connection)?;
     run_project_plan_migration(&connection)?;
+    run_project_plan_model_audit_link_migration(&connection)?;
+    run_task_templates_migration(&connection)?;
+    run_runner_preflight_migration(&connection)?;
+    run_runner_execution_gates_migration(&connection)?;
+    run_runner_dry_runs_migration(&connection)?;
+    run_runner_execution_locks_migration(&connection)?;
+    run_runner_minimal_runs_migration(&connection)?;
+    run_model_catalog_migration(&connection)?;
+    run_idea_guidance_migration(&connection)?;
+    run_project_intake_migration(&connection)?;
+    run_auto_runner_locks_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
+    seed_builtin_task_templates(&connection)?;
+    seed_builtin_models(&connection)?;
 
     Ok(DbState {
         connection: Mutex::new(connection),
@@ -69,6 +104,241 @@ fn run_model_calls_migration(connection: &Connection) -> InitResult<()> {
 fn run_project_plan_migration(connection: &Connection) -> InitResult<()> {
     connection.execute_batch(PROJECT_PLAN_MIGRATION_SQL)?;
     Ok(())
+}
+
+fn run_project_plan_model_audit_link_migration(connection: &Connection) -> InitResult<()> {
+    // SQLite 不支持 IF NOT EXISTS 的 ALTER TABLE，需要用 PRAGMA 先检查列是否存在
+    let mut stmt = connection.prepare("PRAGMA table_info('project_plan_drafts')")?;
+    let has_model_call_id = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| format!("database_error: pragma table_info failed: {e}"))?
+        .filter_map(|r| r.ok())
+        .any(|col| col == "model_call_id");
+
+    if !has_model_call_id {
+        connection
+            .execute_batch("ALTER TABLE project_plan_drafts ADD COLUMN model_call_id TEXT;")?;
+    }
+
+    connection.execute_batch(PROJECT_PLAN_MODEL_AUDIT_LINK_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_task_templates_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(TASK_TEMPLATES_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_runner_preflight_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RUNNER_PREFLIGHT_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_runner_execution_gates_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RUNNER_EXECUTION_GATES_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_runner_dry_runs_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RUNNER_DRY_RUNS_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_runner_execution_locks_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RUNNER_EXECUTION_LOCKS_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_runner_minimal_runs_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RUNNER_MINIMAL_RUNS_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_model_catalog_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(MODEL_CATALOG_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_idea_guidance_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(IDEA_GUIDANCE_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_project_intake_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(PROJECT_INTAKE_MIGRATION_SQL)?;
+    Ok(())
+}
+
+fn run_auto_runner_locks_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(AUTO_RUNNER_LOCKS_MIGRATION_SQL)?;
+    Ok(())
+}
+
+pub(crate) fn seed_builtin_task_templates(connection: &Connection) -> InitResult<()> {
+    seed_builtin_task_templates_inner(connection)
+}
+
+pub(crate) fn seed_builtin_models(connection: &Connection) -> InitResult<()> {
+    crate::services::model_catalog::seed_builtin_models(connection)
+        .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)) as Box<dyn Error>)
+}
+
+fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> {
+    let project_id: String = connection
+        .query_row("SELECT id FROM projects LIMIT 1", [], |row| row.get(0))
+        .unwrap_or_else(|_| "project_agent_swarm".into());
+    let now = "2025-01-01T00:00:00Z";
+
+    let builtins: &[BuiltinTemplate] = &[
+        BuiltinTemplate {
+            role: "frontend",
+            agent_id: "agent_frontend",
+            title: "前端交互切片",
+            description: "把审批后的项目计划整理为第一版可用 UI 流程和状态展示。",
+            priority: "high",
+            risk_level: "medium",
+            affected_file: "virtual/frontend-plan.md",
+            operation_type: "frontend_plan",
+            enabled: true,
+            sort_order: 0,
+        },
+        BuiltinTemplate {
+            role: "backend",
+            agent_id: "agent_backend",
+            title: "后端状态切片",
+            description: "整理本地命令、状态流转和 SQLite 持久化边界。",
+            priority: "high",
+            risk_level: "medium",
+            affected_file: "virtual/backend-plan.md",
+            operation_type: "backend_plan",
+            enabled: true,
+            sort_order: 1,
+        },
+        BuiltinTemplate {
+            role: "qa",
+            agent_id: "agent_qa",
+            title: "验收检查切片",
+            description: "整理验收步骤、禁止路径和无副作用检查。",
+            priority: "medium",
+            risk_level: "low",
+            affected_file: "virtual/qa-plan.md",
+            operation_type: "qa_plan",
+            enabled: true,
+            sort_order: 2,
+        },
+        BuiltinTemplate {
+            role: "docs",
+            agent_id: "agent_docs",
+            title: "文档交接切片",
+            description: "整理用户文档、AI 维护文档和阶段交接说明。",
+            priority: "medium",
+            risk_level: "low",
+            affected_file: "virtual/docs-plan.md",
+            operation_type: "docs_plan",
+            enabled: true,
+            sort_order: 3,
+        },
+        BuiltinTemplate {
+            role: "reviewer",
+            agent_id: "agent_reviewer",
+            title: "风险审查切片",
+            description: "审查任务、只读 Runner request 和阶段边界是否一致。",
+            priority: "high",
+            risk_level: "medium",
+            affected_file: "virtual/review-plan.md",
+            operation_type: "review_plan",
+            enabled: true,
+            sort_order: 4,
+        },
+        BuiltinTemplate {
+            role: "security",
+            agent_id: "agent_reviewer",
+            title: "安全审查切片",
+            description: "审查安全边界、敏感数据路径和保护路径合规。",
+            priority: "high",
+            risk_level: "high",
+            affected_file: "virtual/security-plan.md",
+            operation_type: "security_review_plan",
+            enabled: false,
+            sort_order: 5,
+        },
+        BuiltinTemplate {
+            role: "devops",
+            agent_id: "agent_backend",
+            title: "DevOps 切片",
+            description: "整理本地运行、脚本和验证命令。",
+            priority: "medium",
+            risk_level: "medium",
+            affected_file: "virtual/devops-plan.md",
+            operation_type: "devops_plan",
+            enabled: false,
+            sort_order: 6,
+        },
+        BuiltinTemplate {
+            role: "ux",
+            agent_id: "agent_frontend",
+            title: "UX 设计切片",
+            description: "整理用户交互流程和界面状态。",
+            priority: "medium",
+            risk_level: "low",
+            affected_file: "virtual/ux-plan.md",
+            operation_type: "ux_plan",
+            enabled: false,
+            sort_order: 7,
+        },
+        BuiltinTemplate {
+            role: "data",
+            agent_id: "agent_backend",
+            title: "数据建模切片",
+            description: "整理数据模型、迁移策略和查询边界。",
+            priority: "medium",
+            risk_level: "medium",
+            affected_file: "virtual/data-plan.md",
+            operation_type: "data_plan",
+            enabled: false,
+            sort_order: 8,
+        },
+    ];
+
+    for t in builtins {
+        // INSERT OR IGNORE: 已存在不重复插入，已存在不覆盖用户修改的 enabled 状态
+        connection.execute(
+            "INSERT OR IGNORE INTO project_plan_task_templates (
+                id, project_id, role, agent_id, title, description,
+                priority, risk_level, affected_file, operation_type,
+                enabled, sort_order, is_builtin, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, ?13)",
+            rusqlite::params![
+                format!("template_{}_{}", project_id, t.role),
+                project_id.as_str(),
+                t.role,
+                t.agent_id,
+                t.title,
+                t.description,
+                t.priority,
+                t.risk_level,
+                t.affected_file,
+                t.operation_type,
+                t.enabled as i64,
+                t.sort_order,
+                now,
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+struct BuiltinTemplate {
+    role: &'static str,
+    agent_id: &'static str,
+    title: &'static str,
+    description: &'static str,
+    priority: &'static str,
+    risk_level: &'static str,
+    affected_file: &'static str,
+    operation_type: &'static str,
+    enabled: bool,
+    sort_order: i64,
 }
 
 fn seed_initial_data_if_needed(connection: &mut Connection) -> InitResult<()> {
