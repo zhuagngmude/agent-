@@ -2,7 +2,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{approvals::ApprovalSummary, projects::get_current_project};
+use super::{approvals::ApprovalSummary, model_catalog, projects::get_current_project};
 
 const ARCHITECT_AGENT_ID: &str = "agent_architect";
 const GENERATED_BY: &str = "local_deterministic_template";
@@ -593,7 +593,7 @@ fn generate_smart_tasks_with_ai(
     draft: &ProjectPlanDraftSummary,
 ) -> Result<Vec<PlannedTaskSummary>, String> {
     // 1. 调用 AI 模型生成任务清单
-    let tasks_json = call_ai_to_generate_tasks(draft)?;
+    let tasks_json = call_ai_to_generate_tasks(connection, draft)?;
 
     // 2. 解析 AI 返回的任务清单（JSON 格式）
     let ai_tasks: Vec<AiGeneratedTask> =
@@ -673,7 +673,10 @@ fn parse_template_affected_files(value: &str) -> Result<Vec<String>, String> {
 }
 
 /// 调用 AI 模型生成任务清单
-fn call_ai_to_generate_tasks(draft: &ProjectPlanDraftSummary) -> Result<String, String> {
+fn call_ai_to_generate_tasks(
+    connection: &Connection,
+    draft: &ProjectPlanDraftSummary,
+) -> Result<String, String> {
     // 从环境变量构造 provider
     let provider = crate::services::model_gateway::openai_compat::OpenAiCompatProvider::from_env()
         .map_err(|e| format!("AI provider 初始化失败: {}", e))?;
@@ -716,10 +719,7 @@ JSON 格式：
     let request = crate::services::model_gateway::openai_compat::ModelRequest {
         system_prompt,
         user_message,
-        model_id: std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "deepseek-chat".to_string()),
+        model_id: runtime_model_id(connection)?,
     };
 
     // 调用 AI（需要 Box<dyn ModelProvider> 来调用 send 方法）
@@ -730,6 +730,17 @@ JSON 格式：
         .map_err(|e| format!("AI 调用失败: {:?}", e))?;
 
     Ok(response.content)
+}
+
+fn runtime_model_id(connection: &Connection) -> Result<String, String> {
+    if let Some(model_id) = std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    {
+        return Ok(model_id);
+    }
+
+    model_catalog::get_default_model_id(connection).or_else(|_| Ok("deepseek-chat".to_string()))
 }
 
 #[derive(Clone, Copy)]

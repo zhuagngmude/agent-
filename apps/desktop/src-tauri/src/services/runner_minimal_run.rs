@@ -1035,7 +1035,7 @@ fn call_ai_model_for_task(
     let request = ModelRequest {
         system_prompt,
         user_message,
-        model_id: runtime_model_id(),
+        model_id: runtime_model_id(connection)?,
     };
 
     // 4. 调用 AI 模型（默认 45 秒超时、最多重试 2 次，均可用环境变量覆盖）
@@ -1087,11 +1087,17 @@ fn env_u64(name: &str, default: u64, min: u64, max: u64) -> u64 {
         .unwrap_or(default)
 }
 
-fn runtime_model_id() -> String {
-    std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+fn runtime_model_id(connection: &Connection) -> Result<String, String> {
+    if let Some(model_id) = std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
         .ok()
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "deepseek-chat".to_string())
+    {
+        return Ok(model_id);
+    }
+
+    super::model_catalog::get_default_runner_model_id(connection)
+        .or_else(|_| super::model_catalog::get_default_model_id(connection))
+        .or_else(|_| Ok("deepseek-chat".to_string()))
 }
 
 /// 从数据库读取任务详情
@@ -1482,6 +1488,32 @@ mod tests {
         assert!(p.to_string_lossy().ends_with("frontend-plan.md"));
         assert!(map_virtual_to_generated(&base, "apps/main.rs").is_err());
         assert!(map_virtual_to_generated(&base, "virtual/../secret").is_err());
+    }
+
+    #[test]
+    fn runtime_model_prefers_settings_env_then_catalog_default() {
+        let previous = std::env::var("AGENT_SWARM_RUNNER_MODEL_ID").ok();
+        let (s, d) = td();
+        let c = s.connection().unwrap();
+
+        std::env::set_var("AGENT_SWARM_RUNNER_MODEL_ID", "deepseek-chat");
+        assert_eq!(runtime_model_id(&c).expect("env model"), "deepseek-chat");
+
+        std::env::remove_var("AGENT_SWARM_RUNNER_MODEL_ID");
+        assert_eq!(runtime_model_id(&c).expect("catalog model"), "gpt-5.4-mini");
+
+        drop(c);
+        drop(s);
+        let _ = fs::remove_dir_all(d);
+        restore_env("AGENT_SWARM_RUNNER_MODEL_ID", previous);
+    }
+
+    fn restore_env(name: &str, value: Option<String>) {
+        if let Some(value) = value {
+            std::env::set_var(name, value);
+        } else {
+            std::env::remove_var(name);
+        }
     }
 
     #[test]

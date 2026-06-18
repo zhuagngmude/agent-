@@ -260,6 +260,12 @@ pub fn get_default_model_id_for_purpose(
     Ok(model_id)
 }
 
+/// Runner 最小执行链使用的默认模型。第一优先级仍是系统设置写入的
+/// AGENT_SWARM_RUNNER_MODEL_ID；这里提供受控目录 fallback。
+pub fn get_default_runner_model_id(connection: &Connection) -> Result<String, String> {
+    get_default_model_id(connection)
+}
+
 // ---------------------------------------------------------------------------
 // Seed 内置模型
 // ---------------------------------------------------------------------------
