@@ -66,6 +66,11 @@ export type AutoGenerateProjectPlanTasksInput = CreateProjectPlanDraftInput;
 
 export type AutoRunSwarmIdeaInput = CreateProjectPlanDraftInput;
 
+export type ContinueSwarmTasksInput = {
+  task_ids: string[];
+  requested_by?: string | null;
+};
+
 export type ApproveProjectPlanInput = {
   approval_id: string;
   second_confirm: boolean;
@@ -196,6 +201,12 @@ export type AutoRunSwarmTaskResult = {
 export type AutoRunSwarmIdeaResponse = {
   plan: ApproveProjectPlanResponse;
   task_results: AutoRunSwarmTaskResult[];
+  status: string;
+};
+
+export type ContinueSwarmTasksResponse = {
+  task_results: AutoRunSwarmTaskResult[];
+  skipped_task_ids: string[];
   status: string;
 };
 
@@ -336,4 +347,23 @@ export type UpdateModelEnabledInput = {
   enabled: boolean;
   second_confirm: boolean;
   confirm_text: string;
+};
+
+export type RuntimeModelProviderStatus = {
+  has_api_key: boolean;
+  api_key_hint?: string | null;
+  base_url?: string | null;
+  model_id: string;
+};
+
+export type UpdateRuntimeModelProviderInput = {
+  api_key: string;
+  base_url: string;
+  model_id: string;
+};
+
+export type TestRuntimeModelProviderResponse = {
+  ok: boolean;
+  status: string;
+  message: string;
 };

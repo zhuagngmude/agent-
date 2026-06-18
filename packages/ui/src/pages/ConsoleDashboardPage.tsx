@@ -1,47 +1,35 @@
 /**
- * ConsoleDashboardPage — Agent 蜂群对话式主控台。
+ * ConsoleDashboardPage — Agent 蜂群画布式主控台。
  *
- * ## 阶段状态
- * 本组件是"前端 UI 主控台与蜂群工作流迁移计划"第一版的主控台实现，
- * 从 design/agent-console-progress.html 设计原型（纯 HTML/CSS 视觉稿）
- * 转化为 React + TypeScript + Ant Design + CSS Variables 的生产组件。
- *
- * - design/agent-console-progress.html：设计阶段的高保真视觉原型（静态 HTML）。
- * - ConsoleDashboardPage.tsx（本文件）：生产代码，接入真实 overview 数据。
- *
- * ## 布局
- * 左侧 Agent 进度卡 → 中间对话式主控区 → 右侧安全仪表
- * 顶部薄态势栏（不抢占对话区注意力）
- *
- * ## 安全约束
- * 本阶段不接入写入按钮、不创建任务、不触发 Runner、不绕过审批链。
+ * 主页保持只读态势展示和原有“全自动执行”入口，只把主工作区改成
+ * 蓝图画布视觉：点阵背景、节点、连线、工具条和小地图。
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { MouseEvent, PointerEvent, WheelEvent } from "react";
 import {
   AlertTriangle,
-  ArrowRight,
   Bot,
-  CheckCircle2,
-  Clock3,
   FileText,
-  LockKeyhole,
+  Maximize2,
   MessageSquareText,
-  ShieldCheck,
+  Minus,
+  Plus,
+  RefreshCw,
   Sparkles,
+  Trash2,
+  Workflow,
 } from "lucide-react";
 
 import type {
   AgentSummary,
   ApprovalSummary,
-  ClassifyProjectIntakeResponse,
   ProjectSummary,
   TaskSummary,
   TaskStatus,
 } from "@agent-swarm/shared";
 import type { PageKey } from "../routes/mainNavItems";
-import type { IdeaGuidanceHandoff } from "../components/IdeaGuidancePanel";
-import { roleLabel, statusLabel, agentNameLabel } from "../utils/labels";
+import { statusLabel } from "../utils/labels";
 import { autoGenerateProjectPlanTasks, autoRunSwarmIdea, classifyProjectIntake, isTauriHost } from "../utils/desktopHost";
 import { userErrorLabel } from "../utils/userError";
 
@@ -65,13 +53,111 @@ type AgentProgress = {
   tone: "blue" | "green" | "amber" | "red" | "slate";
 };
 
-type ControllerAssignment = {
-  title: string;
-  owner: string;
-  description: string;
+type BlueprintModuleKind = "start" | "agent" | "manager" | "slot" | "condition" | "summary";
+
+type BlueprintMenuState = {
+  x: number;
+  y: number;
+  worldX: number;
+  worldY: number;
 };
 
-const IDEA_GUIDANCE_HANDOFF_KEY = "agent_swarm_idea_guidance_handoff";
+type BlueprintCustomModule = {
+  id: string;
+  kind: BlueprintModuleKind;
+  title: string;
+  subtitle: string;
+  x: number;
+  y: number;
+};
+
+type BlueprintPortSide = "left" | "right";
+
+type BlueprintConnection = {
+  id: string;
+  fromId: string;
+  toId: string;
+};
+
+type BlueprintSelectedPort = {
+  moduleId: string;
+  side: BlueprintPortSide;
+};
+
+type BlueprintDragState = {
+  id: string;
+  pointerId: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+type BlueprintViewportState = {
+  x: number;
+  y: number;
+  scale: number;
+};
+
+type BlueprintPanState = {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startX: number;
+  startY: number;
+};
+
+type ControllerChatMessage = {
+  id: string;
+  role: "user" | "controller";
+  text: string;
+};
+
+const BLUEPRINT_MODULE_OPTIONS: Array<{
+  kind: BlueprintModuleKind;
+  title: string;
+  subtitle: string;
+}> = [
+  { kind: "start", title: "开始", subtitle: "用户输入需求" },
+  { kind: "agent", title: "智能体", subtitle: "执行具体模块任务" },
+  { kind: "manager", title: "管理器", subtitle: "拆分和派发一组任务" },
+  { kind: "slot", title: "槽位", subtitle: "承载并行工作分支" },
+  { kind: "condition", title: "条件", subtitle: "按判断结果分流" },
+  { kind: "summary", title: "汇总", subtitle: "收敛输出和结论" },
+];
+
+const BASIC_WORKFLOW_TEMPLATE = [
+  BLUEPRINT_MODULE_OPTIONS[0],
+  BLUEPRINT_MODULE_OPTIONS[2],
+  BLUEPRINT_MODULE_OPTIONS[1],
+  BLUEPRINT_MODULE_OPTIONS[3],
+  BLUEPRINT_MODULE_OPTIONS[4],
+  BLUEPRINT_MODULE_OPTIONS[5],
+];
+
+const DEFAULT_WORKFLOW_MODULES: BlueprintCustomModule[] = BASIC_WORKFLOW_TEMPLATE.map((option, index) => ({
+  id: `default-${option.kind}`,
+  kind: option.kind,
+  title: option.title,
+  subtitle: option.subtitle,
+  x: 520 + (index % 2) * 240,
+  y: 150 + Math.floor(index / 2) * 130,
+}));
+
+const DEFAULT_WORKFLOW_CONNECTIONS: BlueprintConnection[] = DEFAULT_WORKFLOW_MODULES.slice(0, -1).map((module, index) => ({
+  id: `default-connection-${index}`,
+  fromId: module.id,
+  toId: DEFAULT_WORKFLOW_MODULES[index + 1].id,
+}));
+
+const BLUEPRINT_WORLD_WIDTH = 1180;
+const BLUEPRINT_WORLD_HEIGHT = 680;
+const BLUEPRINT_NODE_WIDTH = 190;
+const BLUEPRINT_NODE_HEIGHT = 88;
+const BLUEPRINT_MIN_SCALE = 0.62;
+const BLUEPRINT_MAX_SCALE = 1.7;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 function getTaskProgress(status: TaskStatus): number {
   switch (status) {
@@ -139,27 +225,6 @@ function getAgentProgress(agent: AgentSummary, tasks: TaskSummary[]): AgentProgr
   return { agent, task: activeTask, progress, state: "queued", stateLabel: "排队中", tone: "slate" };
 }
 
-function getAgentInitials(name: string): string {
-  const cleanedName = name.replace(/^示例\s*Agent[:：]?/, "").trim();
-  return cleanedName.slice(0, 2) || "AI";
-}
-
-function getRoleLabel(role: string): string {
-  return roleLabel(role);
-}
-
-function getSafetyLabel(connectionStatus: ConsoleDashboardPageProps["connectionStatus"]): string {
-  if (connectionStatus === "connected") {
-    return "锁定";
-  }
-
-  if (connectionStatus === "error") {
-    return "降级";
-  }
-
-  return "只读";
-}
-
 function getConnectionLabel(connectionStatus: ConsoleDashboardPageProps["connectionStatus"]): string {
   switch (connectionStatus) {
     case "connected":
@@ -191,169 +256,66 @@ function getMissionText(project: ProjectSummary, tasks: TaskSummary[], pendingAp
   return `${project.name} 等待你发起下一步`;
 }
 
-function getGuidanceText(tasks: TaskSummary[], pendingApprovalCount: number): string {
-  if (pendingApprovalCount > 0) {
-    return "建议先处理审批闸门，确认后再让智能体继续推进。";
+function getBlueprintModuleIcon(kind: BlueprintModuleKind) {
+  switch (kind) {
+    case "start":
+      return <Sparkles size={14} aria-hidden="true" />;
+    case "agent":
+      return <Bot size={14} aria-hidden="true" />;
+    case "manager":
+      return <Workflow size={14} aria-hidden="true" />;
+    case "slot":
+      return <FileText size={14} aria-hidden="true" />;
+    case "condition":
+      return <AlertTriangle size={14} aria-hidden="true" />;
+    case "summary":
+      return <MessageSquareText size={14} aria-hidden="true" />;
   }
-
-  const blockedTask = tasks.find((task) => task.status === "blocked" || task.status === "failed");
-  if (blockedTask) {
-    return `发现阻塞任务：${blockedTask.title}。建议先复盘原因，再决定恢复、改派或取消。`;
-  }
-
-  const runningTask = tasks.find((task) => task.status === "running" || task.status === "waiting_user");
-  if (runningTask) {
-    return `当前重点是 ${runningTask.title}。我会优先展示相关智能体、审批和安全状态。`;
-  }
-
-  if (tasks.length > 0) {
-    return "当前没有正在执行的任务，可以从排队任务中选择一个继续推进。";
-  }
-
-  return "当前还没有真实任务。你可以先进入项目计划或蜂群工作流，把想法拆成任务。";
 }
 
-function getControllerAssignments(
-  projectType?: ClassifyProjectIntakeResponse["session"]["project_type"],
-): ControllerAssignment[] {
-  if (projectType === "software_product") {
-    return [
-      { title: "需求澄清", owner: "产品智能体", description: "把目标用户、核心问题和第一版范围问清楚。" },
-      { title: "界面方案", owner: "前端智能体", description: "整理主界面、交互路径和可点击原型方向。" },
-      { title: "实现拆解", owner: "后端智能体", description: "拆分数据、接口、桌面宿主和安全边界。" },
-      { title: "验收检查", owner: "审查智能体", description: "检查范围、风险、测试和文档是否闭环。" },
-    ];
-  }
-
-  if (projectType === "ai_automation") {
-    return [
-      { title: "流程建模", owner: "计划智能体", description: "明确输入、输出、触发条件和失败处理。" },
-      { title: "模型选择", owner: "模型智能体", description: "从受控模型目录选择适合每个角色的模型。" },
-      { title: "权限评估", owner: "安全智能体", description: "标出哪些动作能自动做，哪些必须确认。" },
-      { title: "预演方案", owner: "执行智能体", description: "先生成只读预演，不直接执行真实动作。" },
-    ];
-  }
-
-  if (projectType === "content_creation") {
-    return [
-      { title: "定位澄清", owner: "内容策划智能体", description: "确认受众、主题、风格和产出节奏。" },
-      { title: "选题拆解", owner: "文档智能体", description: "生成栏目、脚本、素材清单和第一批选题。" },
-      { title: "质量审查", owner: "审查智能体", description: "检查表达、风险词和是否偏离目标。" },
-      { title: "发布准备", owner: "执行智能体", description: "只整理清单，不自动发布或上传。" },
-    ];
-  }
-
-  if (projectType === "business_plan") {
-    return [
-      { title: "商业假设", owner: "产品智能体", description: "提炼客户、痛点、价值主张和 MVP 假设。" },
-      { title: "竞品复盘", owner: "研究智能体", description: "整理替代方案、差异点和验证路径。" },
-      { title: "落地路线", owner: "计划智能体", description: "拆出一周、两周、一个月的推进计划。" },
-      { title: "风险审查", owner: "审查智能体", description: "检查成本、权限、数据和执行边界。" },
-    ];
-  }
-
-  return [
-    { title: "目标识别", owner: "总控智能体", description: "先判断你是在做产品、自动化、内容、方案还是通用目标。" },
-    { title: "关键追问", owner: "想法引导智能体", description: "把模糊想法变成可执行的问题清单。" },
-    { title: "任务分派", owner: "计划智能体", description: "根据类型把事情分给对应角色智能体。" },
-    { title: "安全闸门", owner: "审查智能体", description: "所有执行、写文件和改 Git 都必须走受控链路。" },
-  ];
-}
-
-function classifyPreview(idea: string): ClassifyProjectIntakeResponse {
-  const normalized = idea.trim().split(/\s+/).join(" ");
-  const lower = normalized.toLowerCase();
-  const has = (words: string[]) => words.some((word) => lower.includes(word));
-
-  let label = "通用目标";
-  let projectType: ClassifyProjectIntakeResponse["session"]["project_type"] = "general_goal";
-  let reason = "当前想法还比较开放，暂时无法稳定归入具体项目类型。";
-  let confidence = 45;
-  let questions = [
-    "你最终想得到一个工具、内容、方案，还是一个长期系统？",
-    "这个想法主要服务你自己，还是服务其他用户？",
-    "你最想先解决的一个具体问题是什么？",
-    "有什么明确不能做、不能碰或不想投入的边界？",
-    "如果一周内看到第一版，你希望它长什么样？",
-  ];
-
-  if (has(["网站", "网页", "app", "应用", "软件", "系统", "小程序", "桌面端", "页面", "功能"])) {
-    label = "软件产品";
-    projectType = "software_product";
-    confidence = 76;
-    reason = "你的想法里出现了网站、应用、系统、页面或功能等软件产品信号。";
-    questions = [
-      "目标用户是谁？他们现在最痛的地方是什么？",
-      "第一版必须解决哪一个核心问题？",
-      "你希望它运行在桌面端、网页、移动端，还是多端？",
-      "第一版必须有哪 3 个功能？哪些明确不做？",
-      "你希望多久看到可用的第一版？",
-    ];
-  } else if (has(["ai", "智能体", "自动", "自动化", "脚本", "批量", "工作流", "爬虫", "整理"])) {
-    label = "AI 自动化";
-    projectType = "ai_automation";
-    confidence = 76;
-    reason = "你的想法里出现了自动、脚本、批量、工作流或智能体等自动化信号。";
-    questions = [
-      "这个自动化的输入是什么？",
-      "你希望最终输出什么结果？",
-      "它应该由什么事件触发？",
-      "哪些动作有风险，必须人工确认？",
-      "第一版只跑在本机，还是需要和外部服务连接？",
-    ];
-  } else if (has(["视频", "短视频", "小说", "文案", "课程", "账号", "脚本", "选题", "内容"])) {
-    label = "内容创作";
-    projectType = "content_creation";
-    confidence = 76;
-    reason = "你的想法里出现了视频、小说、文案、课程、账号或选题等内容创作信号。";
-    questions = [
-      "内容面向谁？他们为什么会关注？",
-      "你要做什么主题或系列？",
-      "内容形式是文章、短视频、课程、小说，还是混合？",
-      "你想要什么风格？",
-      "第一周要产出哪些具体内容？",
-    ];
-  } else if (has(["商业", "创业", "产品", "方案", "用户", "客户", "竞品", "市场", "盈利", "mvp", "立项"])) {
-    label = "商业方案";
-    projectType = "business_plan";
-    confidence = 76;
-    reason = "你的想法里出现了创业、产品、用户、竞品、商业模式或 MVP 等商业方案信号。";
-    questions = [
-      "目标客户是谁？他们愿意为什么付费？",
-      "你解决的痛点是否足够高频或高价值？",
-      "现有竞品或替代方案是什么？",
-      "第一版 MVP 如何验证需求？",
-      "你能投入多少时间、预算和资源？",
-    ];
-  }
-
-  const now = new Date().toISOString();
+function getModulePortPosition(module: BlueprintCustomModule, side: BlueprintPortSide) {
   return {
-    session: {
-      id: `preview_${Date.now()}`,
-      project_id: "browser_preview",
-      raw_idea: idea,
-      normalized_idea: normalized,
-      project_type: projectType,
-      project_type_label: label,
-      confidence,
-      reason,
-      recommended_questions: questions,
-      recommended_next_step: "总控先完成澄清和分流，再把任务分配给对应智能体。",
-      status: "classified",
-      created_by: "browser_preview",
-      created_at: now,
-      updated_at: now,
-    },
-    side_effects: {
-      calls_real_model: false,
-      creates_tasks: false,
-      creates_approvals: false,
-      executes_runner: false,
-      writes_project_files: false,
-      modifies_git: false,
-    },
+    x: module.x + (side === "left" ? -12 : BLUEPRINT_NODE_WIDTH - 12),
+    y: module.y + 32,
   };
+}
+
+function getConnectionPath(from: BlueprintCustomModule, to: BlueprintCustomModule): string {
+  const start = getModulePortPosition(from, "right");
+  const end = getModulePortPosition(to, "left");
+  const distance = Math.max(80, Math.abs(end.x - start.x) * 0.55);
+  return `M ${start.x} ${start.y} C ${start.x + distance} ${start.y}, ${end.x - distance} ${end.y}, ${end.x} ${end.y}`;
+}
+
+function getControllerReply(idea: string): string {
+  const text = idea.trim();
+  const normalized = text.toLowerCase();
+
+  if (/连线|链接|连接|线|端口/.test(text)) {
+    return "连线表示模块之间的流转关系。点一个模块右侧端口，再点另一个模块左侧端口，就能把两个模块连起来；以后它会表示任务、数据或审批结果从前一个模块交给后一个模块。";
+  }
+
+  if (/拖|移动|拖动|画布|缩放|放大|缩小/.test(text)) {
+    return "画布空白处按住左键可以拖动画布，鼠标滚轮可以放大缩小。模块本身也能直接拖动，缩放后端口和连线会跟着一起移动。";
+  }
+
+  if (/模块|节点|开始|管理器|智能体|槽位|条件|汇总/.test(text)) {
+    return "基础工作流由六个模块组成：开始负责接收需求，管理器负责拆分任务，智能体负责执行，槽位负责承载分支，条件负责判断走向，汇总负责收敛结果。你可以右键画布添加模块，也可以点左侧基础工作流快速添加。";
+  }
+
+  if (/执行|runner|审批|确认|安全/.test(normalized)) {
+    return "真正执行代码、写文件、调用外部模型时，必须先经过审批和 Runner 安全链路。当前主控台还是前端预览版，只会改画布，不会直接执行危险动作。";
+  }
+
+  if (/添加|生成|创建|流程|工作流/.test(text)) {
+    return "我可以先帮你生成一条最小工作流：开始 -> 管理器 -> 智能体 -> 槽位 -> 条件 -> 汇总。当前是前端预览，会把模块和连线放到画布上，后面再接真实总控 Agent。";
+  }
+
+  if (/怎么|如何|为什么|是什么|啥|不懂|不会/.test(text)) {
+    return "你可以直接问我这些模块、连线、执行器、模型网关、审批、Runner 是什么意思。我会先用简单话解释；如果你要做东西，我再把它变成画布上的工作流。";
+  }
+
+  return "我先按总控理解：你是在描述一个目标或问题。现在我可以先帮你解释概念，或者把它拆成基础工作流模块。后面接入模型网关后，这里会变成真正的总控 Agent 对话。";
 }
 
 export function ConsoleDashboardPage({
@@ -367,84 +329,382 @@ export function ConsoleDashboardPage({
   onRefresh,
 }: ConsoleDashboardPageProps) {
   const agentProgress = agents.map((agent) => getAgentProgress(agent, tasks));
-  const activeAgents = agentProgress.filter((item) => item.state === "running" || item.state === "waiting").length;
   const pendingApprovalCount = approvals.filter((approval) => approval.status === "pending").length;
-  const runningTaskCount = tasks.filter((task) => task.status === "running" || task.status === "waiting_user").length;
-  const doneTaskCount = tasks.filter((task) => task.status === "completed").length;
-  const totalProgress = tasks.length > 0 ? Math.round((doneTaskCount / tasks.length) * 100) : 0;
-  const latestTask = tasks.find((task) => task.status === "running") ?? tasks[0] ?? null;
   const missionText = getMissionText(project, tasks, pendingApprovalCount);
-  const guidanceText = getGuidanceText(tasks, pendingApprovalCount);
   const connectionLabel = getConnectionLabel(connectionStatus);
   const [intakeIdea, setIntakeIdea] = useState("");
-  const [intakeResult, setIntakeResult] = useState<ClassifyProjectIntakeResponse | null>(null);
   const [intakeError, setIntakeError] = useState<string | null>(null);
-  const [intakeLoading, setIntakeLoading] = useState(false);
-  const controllerAssignments = getControllerAssignments(intakeResult?.session.project_type);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [controllerMessages, setControllerMessages] = useState<ControllerChatMessage[]>([
+    {
+      id: "controller-welcome",
+      role: "controller",
+      text: "你可以问我模块、连线、执行器怎么用，也可以让我生成一条基础工作流。",
+    },
+  ]);
+  const [blueprintMenu, setBlueprintMenu] = useState<BlueprintMenuState | null>(null);
+  const [customModules, setCustomModules] = useState<BlueprintCustomModule[]>(() => DEFAULT_WORKFLOW_MODULES);
+  const [customConnections, setCustomConnections] = useState<BlueprintConnection[]>(() => DEFAULT_WORKFLOW_CONNECTIONS);
+  const [selectedPort, setSelectedPort] = useState<BlueprintSelectedPort | null>(null);
+  const [draggingModuleId, setDraggingModuleId] = useState<string | null>(null);
+  const [blueprintViewport, setBlueprintViewport] = useState<BlueprintViewportState>({ x: 0, y: 0, scale: 1 });
+  const [isPanningBlueprint, setIsPanningBlueprint] = useState(false);
+  const canvasRef = useRef<HTMLElement | null>(null);
+  const activeDragRef = useRef<BlueprintDragState | null>(null);
+  const panRef = useRef<BlueprintPanState | null>(null);
   const notice =
     connectionStatus === "error"
       ? (message ?? "桌面宿主连接失败，当前展示只读示例数据。")
-      : connectionStatus === "browser"
-        ? "当前是浏览器预览模式，页面展示示例数据；打开桌面端后会读取真实项目、任务、智能体和审批。"
-        : null;
+      : null;
 
-  const handleClassifyIntake = async () => {
+  const handleAutoRunIntake = async () => {
     const idea = intakeIdea.trim();
     if (!idea) {
       setIntakeError("先写一句你想做什么。");
       return;
     }
+    if (!isTauriHost()) {
+      setIntakeError("当前是浏览器预览模式。请打开桌面端后让蜂群全自动执行。");
+      return;
+    }
 
+    setAutoRunning(true);
     setIntakeError(null);
-    setIntakeLoading(true);
+    let projectType: string | null = null;
+    let questions: string[] = [];
     try {
-      if (isTauriHost()) {
-        const input = {
-          idea,
-          constraints: "全自动生成角色任务、执行单，并自动推进到最小执行记录；后续再逐步开放真实写文件、命令和 Git。",
-          requested_by: "swarm_auto",
-        };
-        try {
-          await autoRunSwarmIdea(input);
-        } catch (autoError) {
-          const autoMessage = String(autoError);
-          if (!autoMessage.includes("auto_run_swarm_idea") && !autoMessage.includes("Command")) {
-            throw autoError;
-          }
-          await autoGenerateProjectPlanTasks(input);
-        }
-        setIntakeIdea("");
-        onRefresh?.();
-        onNavigate("workflow");
-        return;
-      }
+      const classification = await classifyProjectIntake({ idea });
+      projectType = classification.session.project_type_label;
+      questions = classification.session.recommended_questions ?? [];
+    } catch {
+      projectType = null;
+      questions = [];
+    }
 
-      const result = isTauriHost()
-        ? await classifyProjectIntake({ idea })
-        : classifyPreview(idea);
-      setIntakeResult(result);
+    const constraints = [
+      projectType ? `项目类型：${projectType}` : null,
+      questions.length > 0 ? `总控澄清重点：${questions.join("；")}` : null,
+      "全自动生成角色任务、执行单，并自动推进到最小执行记录。",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      const input = {
+        idea,
+        constraints,
+        requested_by: "swarm_auto",
+      };
+      let createdTaskCount = 0;
+      try {
+        const result = await autoRunSwarmIdea(input);
+        createdTaskCount = result.plan.created_task_ids.length;
+      } catch (autoError) {
+        const autoMessage = String(autoError);
+        if (!autoMessage.includes("auto_run_swarm_idea") && !autoMessage.includes("Command")) {
+          throw autoError;
+        }
+        const fallback = await autoGenerateProjectPlanTasks(input);
+        createdTaskCount = fallback.created_task_ids.length;
+      }
+      if (createdTaskCount === 0) {
+        throw new Error("蜂群没有生成任何任务，请检查模型配置或任务模板。");
+      }
+      setIntakeIdea("");
+      onRefresh?.();
+      onNavigate("tasks");
+      window.setTimeout(() => onRefresh?.(), 250);
     } catch (error) {
-      setIntakeError(userErrorLabel(error, "想法分流失败，请稍后重试"));
+      setIntakeError(userErrorLabel(error, "蜂群全自动执行失败"));
     } finally {
-      setIntakeLoading(false);
+      setAutoRunning(false);
     }
   };
 
-  const handleOpenGuidance = () => {
-    if (intakeResult) {
-      const handoff: IdeaGuidanceHandoff = {
-        idea: intakeIdea.trim() || intakeResult.session.normalized_idea,
-        projectTypeLabel: intakeResult.session.project_type_label,
-        reason: intakeResult.session.reason,
-        questions: intakeResult.session.recommended_questions,
-      };
-      window.sessionStorage.setItem(IDEA_GUIDANCE_HANDOFF_KEY, JSON.stringify(handoff));
+  const handleControllerChat = () => {
+    const idea = intakeIdea.trim();
+    if (!idea) {
+      setIntakeError("先写一句你想问什么，或者想让总控做什么。");
+      return;
     }
-    onNavigate("projectPlan");
+
+    const shouldCreateWorkflow = /添加|生成|创建|流程|工作流/.test(idea);
+    setControllerMessages((current) => [
+      ...current,
+      { id: `user-${Date.now()}`, role: "user", text: idea },
+      { id: `controller-${Date.now()}`, role: "controller", text: getControllerReply(idea) },
+    ]);
+
+    if (shouldCreateWorkflow) {
+      addBasicWorkflowTemplate();
+    }
+
+    setIntakeIdea("");
+    setIntakeError(null);
+  };
+
+  const addBlueprintModuleFromLibrary = (option: (typeof BLUEPRINT_MODULE_OPTIONS)[number], index: number) => {
+    const offsetX = 250 + (index % 2) * 214;
+    const offsetY = 230 + Math.floor(index / 2) * 112;
+    setCustomModules((current) => [
+      ...current,
+      {
+        id: `module-${Date.now()}-${current.length}`,
+        kind: option.kind,
+        title: option.title,
+        subtitle: option.subtitle,
+        x: offsetX,
+        y: offsetY,
+      },
+    ]);
+  };
+
+  const addBasicWorkflowTemplate = () => {
+    const baseX = 230;
+    const baseY = 210;
+    const nodes = BASIC_WORKFLOW_TEMPLATE.map((option, index) => ({
+      id: `workflow-${Date.now()}-${index}`,
+      kind: option.kind,
+      title: option.title,
+      subtitle: option.subtitle,
+      x: baseX + (index % 3) * 230,
+      y: baseY + Math.floor(index / 3) * 130,
+    }));
+
+    const connections = nodes.slice(0, -1).map((node, index) => ({
+      id: `workflow-connection-${Date.now()}-${index}`,
+      fromId: node.id,
+      toId: nodes[index + 1].id,
+    }));
+
+    setCustomModules((current) => [...current, ...nodes]);
+    setCustomConnections((current) => [...current, ...connections]);
+  };
+
+
+  const screenToWorld = (clientX: number, clientY: number, rect?: DOMRect) => {
+    const canvasRect = rect ?? canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) {
+      return { worldX: 0, worldY: 0, screenX: 0, screenY: 0 };
+    }
+
+    const screenX = clientX - canvasRect.left;
+    const screenY = clientY - canvasRect.top;
+    return {
+      screenX,
+      screenY,
+      worldX: (screenX - blueprintViewport.x) / blueprintViewport.scale,
+      worldY: (screenY - blueprintViewport.y) / blueprintViewport.scale,
+    };
+  };
+
+  const zoomBlueprint = (nextScale: number, anchorClientX?: number, anchorClientY?: number) => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    const scale = clamp(nextScale, BLUEPRINT_MIN_SCALE, BLUEPRINT_MAX_SCALE);
+
+    if (!canvasRect || anchorClientX === undefined || anchorClientY === undefined) {
+      setBlueprintViewport((current) => ({ ...current, scale }));
+      return;
+    }
+
+    setBlueprintViewport((current) => {
+      const screenX = anchorClientX - canvasRect.left;
+      const screenY = anchorClientY - canvasRect.top;
+      const worldX = (screenX - current.x) / current.scale;
+      const worldY = (screenY - current.y) / current.scale;
+      return {
+        scale,
+        x: screenX - worldX * scale,
+        y: screenY - worldY * scale,
+      };
+    });
+  };
+
+  const resetBlueprintView = () => {
+    setBlueprintViewport({ x: 0, y: 0, scale: 1 });
+  };
+
+  const handleCanvasWheel = (event: WheelEvent<HTMLElement>) => {
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? -1 : 1;
+    zoomBlueprint(blueprintViewport.scale + direction * 0.08, event.clientX, event.clientY);
+  };
+
+  const handleCanvasContextMenu = (event: MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, textarea, select, a")) {
+      return;
+    }
+
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 150;
+    const menuHeight = 226;
+    const x = Math.min(Math.max(event.clientX - rect.left, 12), rect.width - menuWidth - 12);
+    const y = Math.min(Math.max(event.clientY - rect.top, 12), rect.height - menuHeight - 12);
+    const { worldX, worldY } = screenToWorld(event.clientX, event.clientY, rect);
+    setBlueprintMenu({
+      x,
+      y,
+      worldX: clamp(worldX, 12, BLUEPRINT_WORLD_WIDTH - BLUEPRINT_NODE_WIDTH),
+      worldY: clamp(worldY, 12, BLUEPRINT_WORLD_HEIGHT - BLUEPRINT_NODE_HEIGHT),
+    });
+  };
+
+  const addBlueprintModule = (option: (typeof BLUEPRINT_MODULE_OPTIONS)[number]) => {
+    if (!blueprintMenu) {
+      return;
+    }
+
+    setCustomModules((current) => [
+      ...current,
+      {
+        id: `module-${Date.now()}-${current.length}`,
+        kind: option.kind,
+        title: option.title,
+        subtitle: option.subtitle,
+        x: blueprintMenu.worldX,
+        y: blueprintMenu.worldY,
+      },
+    ]);
+    setBlueprintMenu(null);
+  };
+
+  const removeBlueprintModule = (event: MouseEvent<HTMLButtonElement>, moduleId: string) => {
+    event.stopPropagation();
+    setCustomModules((current) => current.filter((module) => module.id !== moduleId));
+    setCustomConnections((current) => current.filter((connection) => connection.fromId !== moduleId && connection.toId !== moduleId));
+    setSelectedPort((current) => (current?.moduleId === moduleId ? null : current));
+  };
+
+  const toggleBlueprintPort = (
+    event: MouseEvent<HTMLButtonElement>,
+    moduleId: string,
+    side: BlueprintPortSide,
+  ) => {
+    event.stopPropagation();
+    setBlueprintMenu(null);
+
+    if (!selectedPort) {
+      setSelectedPort({ moduleId, side });
+      return;
+    }
+
+    if (selectedPort.moduleId === moduleId && selectedPort.side === side) {
+      setSelectedPort(null);
+      return;
+    }
+
+    const fromId = selectedPort.side === "right" ? selectedPort.moduleId : moduleId;
+    const toId = selectedPort.side === "right" ? moduleId : selectedPort.moduleId;
+
+    if (fromId === toId) {
+      setSelectedPort(null);
+      return;
+    }
+
+    setCustomConnections((current) => {
+      const exists = current.some((connection) => connection.fromId === fromId && connection.toId === toId);
+      if (exists) {
+        return current;
+      }
+
+      return [...current, { id: `connection-${Date.now()}-${current.length}`, fromId, toId }];
+    });
+    setSelectedPort(null);
+  };
+
+  const startModulePointer = (event: PointerEvent<HTMLElement>, module: BlueprintCustomModule) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.stopPropagation();
+    setBlueprintMenu(null);
+    const { worldX, worldY } = screenToWorld(event.clientX, event.clientY);
+    const dragState: BlueprintDragState = {
+      id: module.id,
+      pointerId: event.pointerId,
+      offsetX: worldX - module.x,
+      offsetY: worldY - module.y,
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activeDragRef.current = dragState;
+    setDraggingModuleId(module.id);
+  };
+
+  const moveModulePointer = (event: PointerEvent<HTMLElement>) => {
+    const dragState = activeDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    const { worldX, worldY } = screenToWorld(event.clientX, event.clientY);
+    const nextX = clamp(worldX - dragState.offsetX, 12, BLUEPRINT_WORLD_WIDTH - BLUEPRINT_NODE_WIDTH);
+    const nextY = clamp(worldY - dragState.offsetY, 12, BLUEPRINT_WORLD_HEIGHT - BLUEPRINT_NODE_HEIGHT);
+
+    setCustomModules((current) =>
+      current.map((module) => (module.id === dragState.id ? { ...module, x: nextX, y: nextY } : module)),
+    );
+  };
+
+  const endModulePointer = (event: PointerEvent<HTMLElement>) => {
+    activeDragRef.current = null;
+    setDraggingModuleId(null);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const startCanvasPan = (event: PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, textarea, select, a, .blueprint-custom-node")) {
+      return;
+    }
+
+    setBlueprintMenu(null);
+    panRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: blueprintViewport.x,
+      startY: blueprintViewport.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanningBlueprint(true);
+  };
+
+  const moveCanvasPan = (event: PointerEvent<HTMLElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    setBlueprintViewport((current) => ({
+      ...current,
+      x: pan.startX + event.clientX - pan.startClientX,
+      y: pan.startY + event.clientY - pan.startClientY,
+    }));
+  };
+
+  const endCanvasPan = (event: PointerEvent<HTMLElement>) => {
+    panRef.current = null;
+    setIsPanningBlueprint(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   return (
-    <div className="console-dashboard">
+    <div className="console-dashboard console-dashboard--canvas">
       {notice ? (
         <div className="console-warning" role="status">
           <AlertTriangle size={18} aria-hidden="true" />
@@ -452,239 +712,222 @@ export function ConsoleDashboardPage({
         </div>
       ) : null}
 
-      <section className="console-status-strip" aria-label="当前任务态势">
-        <article className="console-mission-card">
-          <span>{connectionLabel}</span>
-          <strong>{missionText}</strong>
-        </article>
-        <article className="console-metric-card is-safe">
-          <span>安全等级</span>
-          <strong>{getSafetyLabel(connectionStatus)}</strong>
-        </article>
-        <article className="console-metric-card">
-          <span>活跃智能体</span>
-          <strong>{activeAgents} / {agents.length}</strong>
-        </article>
-        <article className="console-metric-card">
-          <span>待确认</span>
-          <strong>{pendingApprovalCount}</strong>
-        </article>
-        <article className="console-metric-card">
-          <span>项目推进</span>
-          <strong>{totalProgress}%</strong>
-        </article>
-      </section>
+      <section
+        ref={canvasRef}
+        className={`blueprint-canvas${isPanningBlueprint ? " is-panning" : ""}`}
+        aria-label="主控蓝图画布"
+        onClick={() => setBlueprintMenu(null)}
+        onContextMenu={handleCanvasContextMenu}
+        onPointerDown={startCanvasPan}
+        onPointerMove={moveCanvasPan}
+        onPointerUp={endCanvasPan}
+        onPointerCancel={endCanvasPan}
+        onPointerLeave={endCanvasPan}
+        onWheel={handleCanvasWheel}
+      >
+        <div className="blueprint-canvas__tabs" aria-label="蓝图切换">
+          <button type="button" className="is-active">
+            架构蓝图
+          </button>
+          <button type="button" onClick={() => onNavigate("workflow")}>
+            业务蓝图
+          </button>
+        </div>
 
-      <div className="console-grid">
-        <aside className="agent-rail" aria-label="智能体工作进度">
-          <div className="panel-heading">
-            <span>智能体队列</span>
-            <strong>角色进度</strong>
+        <div className="blueprint-canvas__toolbar" aria-label="画布工具">
+          <button type="button" aria-label="放大" title="放大" onClick={() => zoomBlueprint(blueprintViewport.scale + 0.12)}>
+            <Plus size={16} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="缩小" title="缩小" onClick={() => zoomBlueprint(blueprintViewport.scale - 0.12)}>
+            <Minus size={16} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="适应画布" title="适应画布" onClick={resetBlueprintView}>
+            <Maximize2 size={15} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="刷新" title="刷新" onClick={() => onRefresh?.()}>
+            <RefreshCw size={15} aria-hidden="true" />
+          </button>
+        </div>
+
+        <aside className="blueprint-canvas__minimap" aria-label="蓝图小地图">
+          <span />
+          <i />
+        </aside>
+
+        <div className="blueprint-zoom-badge">{Math.round(blueprintViewport.scale * 100)}%</div>
+
+        <div className="blueprint-canvas__summary">
+          <div>
+            <span>{connectionLabel}</span>
+            <strong>{missionText}</strong>
           </div>
-          <div className="agent-progress-list">
-            {agentProgress.map((item) => (
-              <article className={`agent-progress-card tone-${item.tone}`} key={item.agent.id}>
-                <div className="agent-progress-card__top">
-                  <div className="agent-avatar">{getAgentInitials(item.agent.name)}</div>
-                  <div>
-                    <h2>{agentNameLabel(item.agent.name)}</h2>
-                    <p>{getRoleLabel(item.agent.role)}</p>
-                  </div>
-                  <span className="agent-state">{item.stateLabel}</span>
+          <button type="button" onClick={() => onNavigate("workflow")}>
+            看完整流程
+          </button>
+        </div>
+
+        <div
+          className="blueprint-viewport"
+          style={{
+            width: BLUEPRINT_WORLD_WIDTH,
+            height: BLUEPRINT_WORLD_HEIGHT,
+            transform: `translate(${blueprintViewport.x}px, ${blueprintViewport.y}px) scale(${blueprintViewport.scale})`,
+          }}
+        >
+          <svg className="blueprint-canvas__wires" viewBox="0 0 1180 680" aria-hidden="true">
+            {customConnections.map((connection) => {
+              const from = customModules.find((module) => module.id === connection.fromId);
+              const to = customModules.find((module) => module.id === connection.toId);
+              if (!from || !to) {
+                return null;
+              }
+
+              return <path className="is-custom" d={getConnectionPath(from, to)} key={connection.id} />;
+            })}
+          </svg>
+
+          <article className="blueprint-node blueprint-node--starter">
+          <div className="blueprint-node__ports is-left">
+            <i className="port port-blue" />
+            <i className="port port-amber" />
+          </div>
+          <div className="blueprint-node__badge">Basic</div>
+          <div className="blueprint-node__head">
+            <span className="blueprint-node__icon">
+              <Workflow size={16} aria-hidden="true" />
+            </span>
+            <div>
+              <h2>基础工作流</h2>
+              <p>开始到汇总的最小闭环</p>
+            </div>
+          </div>
+          <div className="blueprint-basic-flow">
+            {BASIC_WORKFLOW_TEMPLATE.map((option, index) => (
+              <button type="button" key={option.kind} onClick={() => addBlueprintModuleFromLibrary(option, index)}>
+                <span>{getBlueprintModuleIcon(option.kind)}</span>
+                <div>
+                  <strong>{index + 1}. {option.title}</strong>
+                  <small>{option.subtitle}</small>
                 </div>
-                <div className="agent-progress-card__task">
-                  {item.task ? item.task.title : "当前无任务，等待总控分配下一步。"}
-                </div>
-                <div className="progress-track" aria-label={`${item.agent.name} 进度 ${item.progress}%`}>
-                  <span style={{ width: `${item.progress}%` }} />
-                </div>
-                <div className="agent-progress-card__meta">
-                  <span>{item.progress}%</span>
-                  <span>{item.agent.model ?? "受控模型目录"}</span>
-                </div>
-              </article>
+              </button>
             ))}
           </div>
-        </aside>
-
-        <main className="conversation-stage" aria-label="主控台对话流">
-          <div className="panel-heading">
-            <span>总控智能体</span>
-            <strong>以后只在这里下达目标</strong>
+          <div className="blueprint-starter-actions">
+            <button type="button" onClick={addBasicWorkflowTemplate}>添加整套流程</button>
+            <span>单点可加一个节点，按钮可加整条最小工作流。</span>
           </div>
+          <div className="blueprint-node__ports is-right">
+            <i className="port port-blue" />
+            <i className="port port-amber" />
+            <i className="port port-slate" />
+          </div>
+          </article>
 
-          <div className="chat-thread">
-            <article className="chat-bubble chat-bubble--user">
-              <span>你</span>
-              <p>我只想在这里和最高权限的总控智能体对话，由它帮我调度其他智能体。</p>
-            </article>
-            <article className="chat-bubble chat-bubble--agent">
-              <span>主控智能体</span>
-              <p>
-                可以。这里会成为唯一主入口。你只说目标，我先识别项目类型、追问关键问题，再把任务、模型、智能体和执行权限分发到后面的受控链路里。
-              </p>
-            </article>
-            <article className="controller-flow-card" aria-label="总控处理链路">
-              <span>总控处理链路</span>
-              <div className="controller-flow-card__steps">
-                {["听懂目标", "澄清问题", "分配智能体", "进入受控执行"].map((step, index) => (
-                  <div className="controller-flow-card__step" key={step}>
-                    <strong>{step}</strong>
-                    {index < 3 ? <ArrowRight size={15} aria-hidden="true" /> : null}
-                  </div>
-                ))}
-              </div>
-            </article>
-            <article className="console-artifact">
+          {customModules.map((module, index) => (
+            <article
+              className={`blueprint-custom-node blueprint-custom-node--${module.kind}${draggingModuleId === module.id ? " is-dragging" : ""}`}
+              key={module.id}
+              style={{ left: module.x, top: module.y }}
+              onPointerDown={(event) => startModulePointer(event, module)}
+              onPointerMove={moveModulePointer}
+              onPointerUp={endModulePointer}
+              onPointerCancel={endModulePointer}
+            >
+              <button
+                type="button"
+                className={`port-button port-button--left${selectedPort?.moduleId === module.id && selectedPort.side === "left" ? " is-selected" : ""}`}
+                aria-label={`${module.title} 输入端口`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => toggleBlueprintPort(event, module.id, "left")}
+              />
+              <span className="blueprint-custom-node__icon">{getBlueprintModuleIcon(module.kind)}</span>
               <div>
-                <span>项目快照</span>
-                <strong>{project.name}</strong>
+                <h2>{index + 1}. {module.title}</h2>
+                <p>{module.subtitle}</p>
               </div>
-              <p>
-                当前阶段：{project.phase}。数据来源：{connectionLabel}。主控台会根据任务、智能体和审批状态推导当前态势。
-              </p>
-              <div className="artifact-metrics">
-                <span>任务 {tasks.length}</span>
-                <span>智能体 {agents.length}</span>
-                <span>待审 {pendingApprovalCount}</span>
-              </div>
+              <small>右键添加的临时模块</small>
+              <button
+                type="button"
+                className="blueprint-custom-node__delete"
+                aria-label={`删除${module.title}`}
+                title="删除模块"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => removeBlueprintModule(event, module.id)}
+              >
+                <Trash2 size={12} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={`port-button port-button--right${selectedPort?.moduleId === module.id && selectedPort.side === "right" ? " is-selected" : ""}`}
+                aria-label={`${module.title} 输出端口`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => toggleBlueprintPort(event, module.id, "right")}
+              />
             </article>
-            <article className="chat-bubble chat-bubble--agent">
-              <span>执行观察员</span>
-              <p>
-                {runningTaskCount > 0
-                  ? `当前有 ${runningTaskCount} 个任务处于推进中，右侧会持续显示安全边界和待确认动作。`
-                  : guidanceText}
-              </p>
-            </article>
+          ))}
+        </div>
+
+        <aside className="blueprint-inspector">
+          <div className="blueprint-inspector__button">
+            <Sparkles size={18} aria-hidden="true" />
           </div>
-
-          <div className="command-box" aria-label="主控输入区">
-            <MessageSquareText size={19} aria-hidden="true" />
-            <input
-              value={intakeIdea}
-              maxLength={1000}
-              placeholder="对总控智能体说：我想做什么？"
-              onChange={(event) => setIntakeIdea(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void handleClassifyIntake();
-                }
-              }}
-            />
-            <button type="button" disabled={intakeLoading} onClick={() => void handleClassifyIntake()}>
-              {intakeLoading ? "总控梳理中" : "发送给总控"}
-            </button>
+          <div className="blueprint-inspector__button">
+            <span>文</span>
           </div>
-          {intakeError ? <div className="intake-error">{intakeError}</div> : null}
-          {intakeResult ? (
-            <article className="intake-card">
-              <div className="intake-card__header">
-                <span>项目类型识别</span>
-                <strong>{intakeResult.session.project_type_label}</strong>
-                <em>{intakeResult.session.confidence}%</em>
-              </div>
-              <p>{intakeResult.session.reason}</p>
-              <div className="intake-card__questions">
-                {intakeResult.session.recommended_questions.map((question, index) => (
-                  <span key={question}>{index + 1}. {question}</span>
-                ))}
-              </div>
-              <div className="controller-assignment-card">
-                <span>总控分配预案</span>
-                <div>
-                  {controllerAssignments.map((item) => (
-                    <section key={`${item.owner}-${item.title}`}>
-                      <strong>{item.title}</strong>
-                      <em>{item.owner}</em>
-                      <p>{item.description}</p>
-                    </section>
-                  ))}
-                </div>
-              </div>
-              <div className="intake-card__footer">
-                <span>{intakeResult.session.recommended_next_step}</span>
-                <small>总控第一步只做分流和澄清；后续会把任务分配下去，但当前不会执行、不写文件、不改 Git。</small>
-                <button type="button" onClick={handleOpenGuidance}>
-                  让总控进入澄清流程
-                </button>
-              </div>
-            </article>
-          ) : null}
-        </main>
-
-        <aside className="safety-inspector" aria-label="项目与安全状态">
-          <div className="panel-heading">
-            <span>安全仪表</span>
-            <strong>状态总览</strong>
-          </div>
-
-          <section className="instrument-card">
-            <div className="instrument-card__icon">
-              <ShieldCheck size={18} aria-hidden="true" />
-            </div>
-            <div>
-              <h2>执行边界</h2>
-              <p>沙箱 + 版本管理只读 + 二次确认</p>
-            </div>
-            <i className="instrument-card__lamp" />
-          </section>
-
-          <section className="instrument-card">
-            <div className="instrument-card__icon is-warning">
-              <LockKeyhole size={18} aria-hidden="true" />
-            </div>
-            <div>
-              <h2>审批闸门</h2>
-              <p>{pendingApprovalCount > 0 ? `${pendingApprovalCount} 个动作等待确认` : "暂无待确认动作"}</p>
-            </div>
-            <i className={pendingApprovalCount > 0 ? "instrument-card__lamp is-warning" : "instrument-card__lamp"} />
-          </section>
-
-          <section className="instrument-card">
-            <div className="instrument-card__icon">
-              <Sparkles size={18} aria-hidden="true" />
-            </div>
-            <div>
-              <h2>模型目录</h2>
-              <p>仅允许受控模型选择</p>
-            </div>
-            <i className="instrument-card__lamp" />
-          </section>
-
-          <section className="instrument-card">
-            <div className="instrument-card__icon">
-              <FileText size={18} aria-hidden="true" />
-            </div>
-            <div>
-              <h2>文件变更</h2>
-              <p>当前无写入动作</p>
-            </div>
-            <i className="instrument-card__lamp" />
-          </section>
-
-          <section className="next-step-card">
-            <span>下一步建议</span>
-            <p>{latestTask ? latestTask.title : "先优化外围视觉壳，不接入真实执行按钮；等你确认后再逐步组件化。"}</p>
-          </section>
-
-          <section className="activity-stack" aria-label="近期活动">
-            <div className="activity-item">
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span>想法引导官已完成项目种子梳理</span>
-            </div>
-            <div className="activity-item">
-              <Bot size={16} aria-hidden="true" />
-              <span>智能体进度条已接入任务状态推导</span>
-            </div>
-            <div className="activity-item">
-              <Clock3 size={16} aria-hidden="true" />
-              <span>真实执行仍等待人工确认</span>
-            </div>
-          </section>
         </aside>
-      </div>
+
+        <div className="blueprint-command" aria-label="主控输入区">
+          <div className="blueprint-chat-panel" aria-label="总控对话记录">
+            {controllerMessages.slice(-4).map((message) => (
+              <div className={`blueprint-chat-bubble is-${message.role}`} key={message.id}>
+                <span>{message.role === "user" ? "你" : "总控"}</span>
+                <p>{message.text}</p>
+              </div>
+            ))}
+          </div>
+          <MessageSquareText size={19} aria-hidden="true" />
+          <input
+            value={intakeIdea}
+            maxLength={1000}
+            placeholder="问总控：这个模块怎么用？或者说：生成一个基础工作流"
+            onChange={(event) => setIntakeIdea(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleControllerChat();
+              }
+            }}
+          />
+          <button type="button" onClick={handleControllerChat}>
+            问总控
+          </button>
+          <button type="button" disabled={autoRunning} onClick={() => void handleAutoRunIntake()}>
+            {autoRunning ? "蜂群执行中" : "全自动执行"}
+          </button>
+        </div>
+        {intakeError ? <div className="blueprint-error">{intakeError}</div> : null}
+
+        {blueprintMenu ? (
+          <div
+            className="blueprint-context-menu"
+            style={{ left: blueprintMenu.x, top: blueprintMenu.y }}
+            role="menu"
+            aria-label="添加画布模块"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <strong>节点</strong>
+            {BLUEPRINT_MODULE_OPTIONS.map((option) => (
+              <button type="button" key={option.kind} onClick={() => addBlueprintModule(option)}>
+                <span>{getBlueprintModuleIcon(option.kind)}</span>
+                <div>
+                  <b>{option.title}</b>
+                  <small>{option.subtitle}</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Alert, Card, Space, Spin, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { invoke } from "@tauri-apps/api/core";
 import { Activity } from "lucide-react";
 
 import type { AgentRunSummary, RuntimeEventSummary } from "@agent-swarm/shared";
-import { isTauriHost } from "../utils/desktopHost";
+import { isTauriHost, listAgentRuns, listRuntimeEvents } from "../utils/desktopHost";
 import { roleLabel, statusLabel, agentNameLabel } from "../utils/labels";
 import { userErrorLabel } from "../utils/userError";
 
@@ -62,8 +61,8 @@ export function AgentRunsPage() {
     async function fetchData() {
       try {
         const [r, e] = await Promise.all([
-          invoke<AgentRunSummary[]>("list_agent_runs"),
-          invoke<RuntimeEventSummary[]>("list_runtime_events"),
+          listAgentRuns(),
+          listRuntimeEvents(),
         ]);
         if (!cancelled) {
           setRuns(r);

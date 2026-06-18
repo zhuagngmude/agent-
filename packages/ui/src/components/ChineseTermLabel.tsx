@@ -23,11 +23,11 @@ import {
 
 const TERM_MAP: Record<string, string> = {
   // Runner 相关
-  preflight: "执行前审查",
-  gate: "执行许可闸门",
-  "dry-run": "只读预演",
-  lock: "执行锁定",
-  "minimal-run": "最小范围执行",
+  preflight: "预检",
+  gate: "放行",
+  "dry-run": "试跑",
+  lock: "锁定",
+  "minimal-run": "真干",
 
   // 项目计划
   "project seed": "项目种子",
@@ -45,17 +45,17 @@ const TERM_MAP: Record<string, string> = {
   debug: "调试",
 
   // 扩展映射（下划线/驼峰兼容）
-  preflight_review: "执行前审查",
-  execution_gate: "执行许可闸门",
-  dry_run: "只读预演",
-  execution_lock: "执行锁定",
-  minimal_run: "最小范围执行",
+  preflight_review: "预检",
+  execution_gate: "放行",
+  dry_run: "试跑",
+  execution_lock: "锁定",
+  minimal_run: "真干",
   model_call: "模型调用审计",
-  runner_preflight: "执行前审查",
-  runner_gate: "执行许可闸门",
-  runner_dry_run: "只读预演",
-  runner_lock: "执行锁定",
-  runner_minimal_run: "最小范围执行",
+  runner_preflight: "预检",
+  runner_gate: "放行",
+  runner_dry_run: "试跑",
+  runner_lock: "锁定",
+  runner_minimal_run: "真干",
 
   // 项目阶段
   "MVP-0.4": "MVP 0.4 · 前端主控台",

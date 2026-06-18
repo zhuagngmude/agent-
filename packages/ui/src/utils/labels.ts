@@ -127,9 +127,15 @@ export function priorityColor(priority: string): string {
 export function roleLabel(role: string): string {
   const map: Record<string, string> = {
     // 主要角色
+    controller: "总控调度官",
+    product: "产品经理",
     architect: "产品规划官",
+    uiux: "界面体验官",
     frontend: "前端实现官",
     backend: "后端实现官",
+    desktop: "桌面端实现官",
+    database: "数据库工程官",
+    ai_prompt: "AI 提示词工程官",
     qa: "质量保证官",
     docs: "文档编写官",
     reviewer: "安全审查官",
@@ -237,6 +243,9 @@ export function modelLabel(model: string): string {
     "gpt-4o-mini": "GPT-4o Mini",
     "gpt-3.5-turbo": "GPT-3.5 Turbo",
     "gpt-4-turbo": "GPT-4 Turbo",
+    "gpt-4.1": "GPT-4.1",
+    "gpt-5-codex": "GPT-5 Codex",
+    "gpt-5.1-codex": "GPT-5.1 Codex",
     // Anthropic
     "claude-3-opus": "Claude 3 Opus",
     "claude-3-sonnet": "Claude 3 Sonnet",
@@ -244,10 +253,25 @@ export function modelLabel(model: string): string {
     "claude-3.5-sonnet": "Claude 3.5 Sonnet",
     "claude-opus-4-8": "Claude Opus 4.8",
     "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-opus-4.8": "Claude Opus 4.8",
+    "claude-sonnet-4.6": "Claude Sonnet 4.6",
     // DeepSeek
     "deepseek-v3": "DeepSeek V3",
     "deepseek-v4-pro": "DeepSeek V4 Pro",
     "deepseek-r1": "DeepSeek R1",
+    // Model gateway / executor catalog
+    "openclaw-default": "OpenClaw 默认模型",
+    "openclaw-coder": "OpenClaw 代码模型",
+    "openclaw-planner": "OpenClaw 规划模型",
+    "hermes-3": "Hermes 3",
+    "hermes-coder": "Hermes 代码模型",
+    "hermes-fast": "Hermes 快速模型",
+    "gemini-2.5-pro": "Gemini 2.5 Pro",
+    "gemini-2.5-flash": "Gemini 2.5 Flash",
+    "cursor-agent": "Cursor Agent",
+    "cursor-fast": "Cursor 快速模型",
+    "opencode-agent": "OpenCode Agent",
+    "opencode-coder": "OpenCode 代码模型",
     // 通用回退
     "gpt-api": "GPT API",
     "claude-ui": "Claude UI",
@@ -306,13 +330,13 @@ export function targetServiceLabel(service: string): string {
   const map: Record<string, string> = {
     project_plan: "项目计划",
     runner: "执行引擎",
-    runner_preflight: "执行前审查",
-    runner_gate: "执行许可闸门",
-    runner_execution_gate: "执行许可闸门",
-    runner_dry_run: "只读预演",
-    runner_lock: "执行锁定",
-    runner_execution_lock: "执行锁定",
-    runner_minimal_run: "最小执行",
+    runner_preflight: "预检",
+    runner_gate: "放行",
+    runner_execution_gate: "放行",
+    runner_dry_run: "试跑",
+    runner_lock: "锁定",
+    runner_execution_lock: "锁定",
+    runner_minimal_run: "真干",
     model_call: "模型调用",
     idea_guidance: "想法引导",
     task_update: "任务更新",
@@ -376,8 +400,8 @@ export function draftSourceLabel(source: string): string {
 export function blockedReasonLabel(reason: string): string {
   const map: Record<string, string> = {
     runner_execution_disabled_by_stage_boundary: "当前阶段边界禁止执行",
-    runner_execution_disabled_until_gate_approved: "执行许可未通过",
-    runner_execution_disabled_until_dry_run_reviewed: "只读预演未确认",
+    runner_execution_disabled_until_gate_approved: "放行未通过",
+    runner_execution_disabled_until_dry_run_reviewed: "试跑未确认",
     runner_execution_not_allowed_by_stage: "当前阶段不允许执行",
     manual_checkpoint_required_before_stage34: "阶段 34 前需人工检查点",
     command_failed: "命令执行失败",
@@ -406,7 +430,7 @@ export function checkpointStrategyLabel(strategy: string): string {
   const map: Record<string, string> = {
     manual_checkpoint_required_before_stage34: "阶段 34 前需人工检查点",
     manual_checkpoint_required: "需人工检查点",
-    not_required_for_readonly_preview: "只读预演无需检查点",
+    not_required_for_readonly_preview: "试跑无需检查点",
     no_checkpoint_required: "无需检查点",
     auto_checkpoint_before_execution: "执行前自动检查点",
   };

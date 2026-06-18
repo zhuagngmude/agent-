@@ -34,3 +34,19 @@ export type UpdateTaskStatusInput = {
   id: string;
   status: TaskStatus;
 };
+
+export type DeleteTasksInput = {
+  task_ids: string[];
+};
+
+export type DeleteTasksResponse = {
+  deleted_task_ids: string[];
+};
+
+export type OpenTaskOutputFolderInput = {
+  task_ids: string[];
+};
+
+export type OpenTaskOutputFolderResponse = {
+  path: string;
+};

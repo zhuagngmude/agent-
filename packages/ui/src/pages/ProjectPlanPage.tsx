@@ -341,6 +341,7 @@ export function ProjectPlanPage({ approvals, refreshOverview, canWrite }: Projec
   const [models, setModels] = useState<ModelCatalogEntry[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [activeTabKey, setActiveTabKey] = useState("draft");
   const [advancedPanelKeys, setAdvancedPanelKeys] = useState<string[]>([]);
   const [ideaGuidanceHandoff, setIdeaGuidanceHandoff] =
@@ -511,6 +512,7 @@ export function ProjectPlanPage({ approvals, refreshOverview, canWrite }: Projec
   const loadModels = useCallback(async () => {
     if (!isTauriHost()) return;
     setModelsLoading(true);
+    setModelsError(null);
     try {
       const list = await listProjectPlanModels();
       setModels(list);
@@ -520,7 +522,11 @@ export function ProjectPlanPage({ approvals, refreshOverview, canWrite }: Projec
         const first = list.find((m) => m.enabled);
         return first?.id ?? null;
       });
-    } catch { /* 静默 */ } finally {
+    } catch {
+      setModels([]);
+      setSelectedModelId(null);
+      setModelsError("模型目录读取失败，请检查桌面宿主是否已启动。");
+    } finally {
       setModelsLoading(false);
     }
   }, []);
@@ -1236,7 +1242,8 @@ export function ProjectPlanPage({ approvals, refreshOverview, canWrite }: Projec
                 value={selectedModelId}
                 onChange={setSelectedModelId}
                 loading={modelsLoading}
-                notFoundContent="暂无可用模型，请先启用一个模型"
+                placeholder="选择一个已启用模型"
+                notFoundContent="暂无模型目录记录"
                 style={{ maxWidth: 400 }}
                 options={models.map((m) => ({
                   value: m.id,
@@ -1244,10 +1251,31 @@ export function ProjectPlanPage({ approvals, refreshOverview, canWrite }: Projec
                   disabled: !m.enabled,
                 }))}
               />
+              {modelsError && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 8, maxWidth: 640 }}
+                  message={modelsError}
+                />
+              )}
+              {!modelsLoading && !modelsError && models.length === 0 && (
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 8, maxWidth: 640 }}
+                  message="还没有模型目录记录"
+                  description="如需调用 DeepSeek/OpenAI 兼容模型，请用 scripts/start-desktop-real-model.ps1 启动桌面端，或确认数据库已初始化模型目录。"
+                />
+              )}
               {models.length > 0 && !models.some((m) => m.enabled) && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  请先在模型目录中启用一个模型
-                </Typography.Text>
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 8, maxWidth: 640 }}
+                  message="模型目录里没有已启用模型"
+                  description="请在模型目录中启用一个项目计划模型；真实模型草案按钮会在选中已启用模型后可用。"
+                />
               )}
             </Form.Item>
 

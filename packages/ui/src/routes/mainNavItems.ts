@@ -1,15 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Bot, ClipboardCheck, Compass, Lightbulb, Network, Settings, Workflow } from "lucide-react";
+import { Activity, Bot, Compass, GitBranch, Lightbulb, Settings, ShieldCheck } from "lucide-react";
 
 export type PageKey =
   | "overview"
-  | "workflow"
-  | "projectPlan"
   | "tasks"
+  | "workflow"
+  | "runs"
   | "agents"
   | "approvals"
-  | "settings"
-  | "agentRuns";
+  | "settings";
 
 export type MainNavItem = {
   key: PageKey;
@@ -19,11 +18,10 @@ export type MainNavItem = {
 
 export const mainNavItems: MainNavItem[] = [
   { key: "overview", label: "主控台", icon: Compass },
-  { key: "workflow", label: "蜂群工作流", icon: Workflow },
-  { key: "projectPlan", label: "项目计划", icon: Network },
   { key: "tasks", label: "任务拆解", icon: Lightbulb },
-  { key: "agents", label: "智能体队列", icon: Bot },
-  { key: "approvals", label: "审批闸门", icon: ClipboardCheck },
-  { key: "agentRuns", label: "运行记录", icon: Activity },
+  { key: "workflow", label: "流程蓝图", icon: GitBranch },
+  { key: "runs", label: "运行输出", icon: Activity },
+  { key: "agents", label: "AI 员工", icon: Bot },
+  { key: "approvals", label: "审批与安全", icon: ShieldCheck },
   { key: "settings", label: "系统设置", icon: Settings },
 ];

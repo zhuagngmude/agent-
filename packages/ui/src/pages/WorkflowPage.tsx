@@ -40,7 +40,6 @@ import {
 } from "../utils/desktopHost";
 import { userErrorLabel } from "../utils/userError";
 import { agentNameLabel, roleLabel } from "../utils/labels";
-import type { PageKey } from "../routes/mainNavItems";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -53,7 +52,6 @@ type WorkflowPageProps = {
   approvals: ApprovalSummary[];
   connectionStatus: "loading" | "browser" | "connected" | "error";
   message?: string;
-  onNavigate?: (page: PageKey) => void;
   onRefresh?: () => void;
 };
 
@@ -67,11 +65,11 @@ const STAGE_DEFS: { key: string; label: string }[] = [
   { key: "req_breakdown", label: "需求拆解" },
   { key: "plan_draft", label: "计划草案" },
   { key: "agent_assign", label: "智能体分配" },
-  { key: "preflight_review", label: "执行前审查" },
-  { key: "execution_gate", label: "执行许可闸门" },
-  { key: "dry_run", label: "只读预演" },
+  { key: "preflight_review", label: "预检" },
+  { key: "execution_gate", label: "放行" },
+  { key: "dry_run", label: "试跑" },
   { key: "human_confirm", label: "人工确认" },
-  { key: "minimal_run", label: "最小范围执行" },
+  { key: "minimal_run", label: "真干" },
   { key: "review", label: "验收复盘" },
   { key: "next_round", label: "下一轮计划" },
 ];
@@ -171,6 +169,7 @@ function buildWorkflowNodes(data: WorkflowDataSource): WorkflowNodeData[] {
       status: "pending",
       statusLabel: "等待数据",
       agentName: null,
+      assignedAgents: assignedAgentsForStage(def.key),
       canAutoAdvance: false,
       requiresApproval: false,
       riskLevel: "none",
@@ -492,6 +491,75 @@ function buildWorkflowNodes(data: WorkflowDataSource): WorkflowNodeData[] {
   });
 }
 
+function assignedAgentsForStage(stageKey: string): WorkflowNodeData["assignedAgents"] {
+  switch (stageKey) {
+    case "idea_clarify":
+      return [
+        { name: "总控 Agent", responsibility: "理解用户目标，判断项目类型和风险" },
+        { name: "产品规划员", responsibility: "补齐目标、用户、核心功能和边界" },
+      ];
+    case "project_seed":
+      return [
+        { name: "产品规划员", responsibility: "生成项目种子、MVP 范围和验收标准" },
+        { name: "技术架构师", responsibility: "预判技术栈、模块边界和产物目录" },
+      ];
+    case "req_breakdown":
+      return [
+        { name: "总控 Agent", responsibility: "把大目标拆成可执行阶段" },
+        { name: "产品规划员", responsibility: "把需求拆成用户流程和功能清单" },
+      ];
+    case "plan_draft":
+      return [
+        { name: "项目计划官", responsibility: "生成任务草案、依赖顺序和风险点" },
+        { name: "技术架构师", responsibility: "检查任务是否跨模块、是否需要转派" },
+      ];
+    case "agent_assign":
+      return [
+        { name: "总控 Agent", responsibility: "按技术栈选择固定员工和项目专家" },
+        { name: "前端工程师", responsibility: "接收页面、组件、交互任务" },
+        { name: "后端工程师", responsibility: "接收 API、数据结构、服务任务" },
+        { name: "测试验收员", responsibility: "接收验证、回归和验收任务" },
+      ];
+    case "preflight_review":
+      return [
+        { name: "安全审查官", responsibility: "检查文件写入、命令、网络和密钥风险" },
+        { name: "总控 Agent", responsibility: "决定是否拆小任务或要求确认" },
+      ];
+    case "execution_gate":
+      return [
+        { name: "安全审查官", responsibility: "判断是否允许 Runner 执行" },
+        { name: "执行器调度员", responsibility: "选择 Codex、Claude 或模型网关执行路径" },
+      ];
+    case "dry_run":
+      return [
+        { name: "执行观察官", responsibility: "只读预演文件变更和执行计划" },
+        { name: "总控 Agent", responsibility: "根据预演结果决定继续、回滚或改计划" },
+      ];
+    case "human_confirm":
+      return [
+        { name: "审批助手", responsibility: "把高风险动作解释给用户确认" },
+        { name: "总控 Agent", responsibility: "等待确认后继续调度" },
+      ];
+    case "minimal_run":
+      return [
+        { name: "执行器调度员", responsibility: "通过 Runner 执行受控写入" },
+        { name: "对应模块 AI 员工", responsibility: "只在自己负责的模块内写代码或产物" },
+      ];
+    case "review":
+      return [
+        { name: "测试验收员", responsibility: "检查产物是否满足目标和任务要求" },
+        { name: "文档员", responsibility: "整理运行结果、变更摘要和后续建议" },
+      ];
+    case "next_round":
+      return [
+        { name: "总控 Agent", responsibility: "根据验收结果生成下一轮任务" },
+        { name: "项目计划官", responsibility: "把遗留问题重新排期" },
+      ];
+    default:
+      return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 页面组件
 // ---------------------------------------------------------------------------
@@ -503,7 +571,6 @@ export function WorkflowPage({
   approvals,
   connectionStatus,
   message,
-  onNavigate,
   onRefresh,
 }: WorkflowPageProps) {
   const [loading, setLoading] = useState(true);
@@ -642,7 +709,7 @@ export function WorkflowPage({
     try {
       const input = {
         idea,
-        constraints: "全自动生成角色任务、执行单，并自动推进到最小执行记录；后续再逐步开放真实写文件、命令和 Git。",
+        constraints: "全自动生成角色任务、执行单，并自动推进到真实执行链路。",
         requested_by: "swarm_auto",
       };
       let result;
@@ -656,7 +723,7 @@ export function WorkflowPage({
         const fallback = await autoGenerateProjectPlanTasks(input);
         setIdeaInput("");
         setGenerationMessage(
-          `已生成 ${fallback.created_task_ids.length} 个角色任务和 ${fallback.created_runner_request_ids.length} 张执行单。重启桌面端后可继续自动推进执行链。`,
+          `已生成 ${fallback.created_task_ids.length} 个角色任务和 ${fallback.created_runner_request_ids.length} 张执行单。`,
         );
         await loadWorkflowData();
         onRefresh?.();
@@ -762,19 +829,9 @@ export function WorkflowPage({
           <strong>{approvals.filter((a) => a.status === "pending").length}</strong>
         </article>
         <article className="console-metric-card is-safe">
-          <span>安全边界</span>
-          <strong>只读</strong>
+          <span>Runner</span>
+          <strong>全自动</strong>
         </article>
-      </section>
-
-      <section className="workflow-project-plan-entry" aria-label="项目计划高级功能">
-        <div>
-          <strong>项目计划功能没有删除</strong>
-          <span>生成草案、审批、任务模板、执行前审查、执行许可、只读预演、执行范围锁和最小执行仍在原功能页。</span>
-        </div>
-        <button type="button" onClick={() => onNavigate?.("projectPlan")}>
-          打开项目计划高级功能
-        </button>
       </section>
 
       {/* 三栏布局 */}

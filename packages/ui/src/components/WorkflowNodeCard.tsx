@@ -18,6 +18,12 @@ export type WorkflowNodeStatus =
   | "pending"
   | "skipped";
 
+export type WorkflowAssignedAgent = {
+  name: string;
+  responsibility: string;
+  statusLabel?: string;
+};
+
 export type WorkflowNodeData = {
   /** 阶段标识（英文 key，如 "idea_clarify"） */
   stageKey: string;
@@ -31,6 +37,8 @@ export type WorkflowNodeData = {
   statusLabel: string;
   /** 负责 Agent 名称（null 表示未分配） */
   agentName: string | null;
+  /** 本阶段分配的 AI 员工 */
+  assignedAgents: WorkflowAssignedAgent[];
   /** 是否可自动推进 */
   canAutoAdvance: boolean;
   /** 是否需要审批 */
@@ -120,6 +128,36 @@ export function WorkflowNodeCard({ node, isActive, isLast }: WorkflowNodeCardPro
             </span>
           )}
         </div>
+
+        {node.assignedAgents.length > 0 && (
+          <div className="workflow-node-card__agents">
+            <span className="workflow-node-card__label">本阶段 AI 员工</span>
+            {isActive ? (
+              <div className="workflow-node-card__agent-list">
+                {node.assignedAgents.map((agent, index) => (
+                  <div className="workflow-node-card__agent-item" key={`${agent.name}-${index}`}>
+                    <Bot size={14} aria-hidden="true" />
+                    <div>
+                      <strong>{agent.name}</strong>
+                      <span>{agent.responsibility}</span>
+                    </div>
+                    {agent.statusLabel ? <em>{agent.statusLabel}</em> : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="workflow-node-card__agent-chips">
+                {node.assignedAgents.slice(0, 4).map((agent, index) => (
+                  <span key={`${agent.name}-${index}`}>
+                    <Bot size={11} aria-hidden="true" />
+                    {agent.name}
+                  </span>
+                ))}
+                {node.assignedAgents.length > 4 ? <span>还有 {node.assignedAgents.length - 4} 个</span> : null}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 产出物 */}
         {node.artifacts.length > 0 && (

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 // 跨端类型从 packages/shared 导入，在此重导出以保持现有引用路径兼容
 export type {
   AgentSummary,
+  AgentRunSummary,
   ApprovalSummary,
   ApproveProjectPlanInput,
   ApproveProjectPlanResponse,
@@ -11,11 +12,17 @@ export type {
   AutoRunSwarmIdeaInput,
   AutoRunSwarmIdeaResponse,
   AutoRunSwarmTaskResult,
+  ContinueSwarmTasksInput,
+  ContinueSwarmTasksResponse,
   CreateProjectPlanDraftInput,
   CreateProjectPlanDraftResponse,
   DeleteProjectPlanDraftInput,
   DeleteProjectPlanDraftResponse,
+  DeleteTasksInput,
+  DeleteTasksResponse,
   CreateTaskInput,
+  OpenTaskOutputFolderInput,
+  OpenTaskOutputFolderResponse,
   DesktopHostOverviewData,
   DesktopHostOverviewState,
   ProjectSummary,
@@ -44,7 +51,10 @@ export type {
   SaveProjectPlanModelDraftInput,
   UpdateProjectPlanTaskTemplateInput,
   ModelCatalogEntry,
+  RuntimeModelProviderStatus,
+  TestRuntimeModelProviderResponse,
   UpdateModelEnabledInput,
+  UpdateRuntimeModelProviderInput,
   RunnerRequestSummary,
   TaskStatus,
   TaskSummary,
@@ -60,11 +70,13 @@ export type {
   ClassifyProjectIntakeInput,
   ClassifyProjectIntakeResponse,
   ProjectIntakeSession,
+  RuntimeEventSummary,
 } from "@agent-swarm/shared";
 import { userErrorLabel } from "./userError";
 
 import type {
   AgentSummary,
+  AgentRunSummary,
   ApprovalSummary,
   ApproveProjectPlanInput,
   ApproveProjectPlanResponse,
@@ -72,11 +84,17 @@ import type {
   AutoRunSwarmIdeaInput,
   AutoRunSwarmIdeaResponse,
   AutoRunSwarmTaskResult,
+  ContinueSwarmTasksInput,
+  ContinueSwarmTasksResponse,
   CreateProjectPlanDraftInput,
   CreateProjectPlanDraftResponse,
   DeleteProjectPlanDraftInput,
   DeleteProjectPlanDraftResponse,
+  DeleteTasksInput,
+  DeleteTasksResponse,
   CreateTaskInput,
+  OpenTaskOutputFolderInput,
+  OpenTaskOutputFolderResponse,
   DesktopHostOverviewData,
   DesktopHostOverviewState,
   ProjectSummary,
@@ -105,7 +123,10 @@ import type {
   SaveProjectPlanModelDraftInput,
   UpdateProjectPlanTaskTemplateInput,
   ModelCatalogEntry,
+  RuntimeModelProviderStatus,
+  TestRuntimeModelProviderResponse,
   UpdateModelEnabledInput,
+  UpdateRuntimeModelProviderInput,
   RunnerRequestSummary,
   TaskSummary,
   UpdateTaskStatusInput,
@@ -120,6 +141,7 @@ import type {
   ClassifyProjectIntakeInput,
   ClassifyProjectIntakeResponse,
   ProjectIntakeSession,
+  RuntimeEventSummary,
 } from "@agent-swarm/shared";
 
 // ---------------------------------------------------------------------------
@@ -148,6 +170,18 @@ export async function createTask(input: CreateTaskInput): Promise<{ task: TaskSu
 export async function updateTaskStatus(input: UpdateTaskStatusInput): Promise<{ task: TaskSummary }> {
   requireTauri();
   return invoke("update_task_status", { input });
+}
+
+export async function deleteTasks(input: DeleteTasksInput): Promise<DeleteTasksResponse> {
+  requireTauri();
+  return invoke("delete_tasks", { input });
+}
+
+export async function openTaskOutputFolder(
+  input: OpenTaskOutputFolderInput,
+): Promise<OpenTaskOutputFolderResponse> {
+  requireTauri();
+  return invoke("open_task_output_folder", { input });
 }
 
 export async function approveApproval(id: string): Promise<{ approval: ApprovalSummary }> {
@@ -196,6 +230,13 @@ export async function autoRunSwarmIdea(
   return invoke("auto_run_swarm_idea", { input });
 }
 
+export async function continueSwarmTasks(
+  input: ContinueSwarmTasksInput,
+): Promise<ContinueSwarmTasksResponse> {
+  requireTauri();
+  return invoke("continue_swarm_tasks", { input });
+}
+
 export async function listProjectPlanDrafts(): Promise<ProjectPlanDraftSummary[]> {
   requireTauri();
   return invoke("list_project_plan_drafts");
@@ -211,6 +252,16 @@ export async function deleteProjectPlanDraft(
 export async function listRunnerRequests(): Promise<RunnerRequestSummary[]> {
   requireTauri();
   return invoke("list_runner_requests");
+}
+
+export async function listAgentRuns(): Promise<AgentRunSummary[]> {
+  requireTauri();
+  return invoke("list_agent_runs");
+}
+
+export async function listRuntimeEvents(): Promise<RuntimeEventSummary[]> {
+  requireTauri();
+  return invoke("list_runtime_events");
 }
 
 export async function requestProjectPlanModelDraft(
@@ -342,6 +393,23 @@ export async function updateProjectPlanModelEnabled(
 ): Promise<ModelCatalogEntry[]> {
   requireTauri();
   return invoke("update_project_plan_model_enabled", { input });
+}
+
+export async function getRuntimeModelProviderStatus(): Promise<RuntimeModelProviderStatus> {
+  requireTauri();
+  return invoke("get_runtime_model_provider_status");
+}
+
+export async function updateRuntimeModelProvider(
+  input: UpdateRuntimeModelProviderInput,
+): Promise<RuntimeModelProviderStatus> {
+  requireTauri();
+  return invoke("update_runtime_model_provider", { input });
+}
+
+export async function testRuntimeModelProvider(): Promise<TestRuntimeModelProviderResponse> {
+  requireTauri();
+  return invoke("test_runtime_model_provider");
 }
 
 // ---------------------------------------------------------------------------

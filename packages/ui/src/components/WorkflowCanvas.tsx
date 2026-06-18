@@ -28,7 +28,7 @@ export function WorkflowCanvas({
   commandPlaceholder = "输入一个想法，蜂群会自动分析并生成角色任务...",
   commandDisabled = false,
   commandLoading = false,
-  commandButtonLabel = "交给蜂群",
+  commandButtonLabel = "交给总控",
   onCommandChange,
   onCommandSubmit,
 }: WorkflowCanvasProps) {
@@ -42,7 +42,7 @@ export function WorkflowCanvas({
         <div>
           <h2>工作流画布</h2>
           <span>
-            阶段管道 · {nodes.length} 个阶段 · {completedNodes} 个已完成
+            总控调度蓝图 · {nodes.length} 个阶段 · {completedNodes} 个已完成
           </span>
         </div>
         {summaryText && (
