@@ -274,6 +274,8 @@ list_agent_boundary_checks
 
 ### 阶段 1：盘点现有 schema 和命令
 
+状态：已完成，结论见 [P0-阶段1-SQLite schema 和命令盘点结论.md](./P0-阶段1-SQLite-schema和命令盘点结论.md)。
+
 目标：
 
 - 确认现有 `model_catalog` 能否复用，哪些字段需要新表补齐。
