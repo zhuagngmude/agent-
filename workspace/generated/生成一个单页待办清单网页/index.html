@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>待办清单</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>📋 我的待办清单</h1>
+      <p class="subtitle">高效管理每一天</p>
+    </header>
+    <main>
+      <div class="input-area">
+        <input type="text" id="todo-input" placeholder="输入新的待办事项..." />
+        <button id="add-btn">添加</button>
+      </div>
+      <ul id="todo-list"></ul>
+      <div class="footer-actions">
+        <span id="item-count">0 项待办</span>
+        <button id="clear-btn">清除已完成</button>
+      </div>
+    </main>
+  </div>
+  <script src="./main.js"></script>
+</body>
+</html>
