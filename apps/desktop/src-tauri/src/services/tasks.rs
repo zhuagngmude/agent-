@@ -2,6 +2,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
+    path::PathBuf,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -45,9 +47,31 @@ pub struct UpdateTaskStatusInput {
     pub status: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteTasksInput {
+    pub task_ids: Vec<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UpdateTaskStatusResponse {
     pub task: TaskSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DeleteTasksResponse {
+    pub deleted_task_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenTaskOutputFolderInput {
+    pub task_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpenTaskOutputFolderResponse {
+    pub path: String,
 }
 
 pub fn list_tasks(connection: &Connection) -> Result<Vec<TaskSummary>, String> {
@@ -180,8 +204,275 @@ pub fn update_task_status(
     Ok(UpdateTaskStatusResponse { task })
 }
 
+pub fn delete_tasks(
+    connection: &mut Connection,
+    input: DeleteTasksInput,
+) -> Result<DeleteTasksResponse, String> {
+    let project_id = get_current_project_id(connection)?;
+    let mut task_ids = Vec::new();
+    let mut seen = HashSet::new();
+    for id in input.task_ids {
+        let normalized = normalize_required_text(id, 1, 200, "task_id")?;
+        if seen.insert(normalized.clone()) {
+            task_ids.push(normalized);
+        }
+    }
+    if task_ids.is_empty() {
+        return Err("invalid_input: task_ids must not be empty".to_string());
+    }
+
+    let tx = connection.transaction().map_err(|error| {
+        format!("database_error: start delete task transaction failed: {error}")
+    })?;
+
+    for task_id in &task_ids {
+        let exists: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM tasks WHERE id = ?1 AND project_id = ?2",
+                params![task_id.as_str(), project_id.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(|error| format!("database_error: check task exists failed: {error}"))?;
+        if exists == 0 {
+            return Err(format!("not_found: task '{}' not found", task_id));
+        }
+
+        delete_task_dependents(&tx, &project_id, task_id)?;
+        tx.execute(
+            "DELETE FROM tasks WHERE project_id = ?1 AND id = ?2",
+            params![project_id.as_str(), task_id.as_str()],
+        )
+        .map_err(|error| format!("database_error: delete task failed: {error}"))?;
+    }
+
+    remove_deleted_dependencies(&tx, &project_id, &seen)?;
+
+    tx.commit().map_err(|error| {
+        format!("database_error: commit delete task transaction failed: {error}")
+    })?;
+
+    Ok(DeleteTasksResponse {
+        deleted_task_ids: task_ids,
+    })
+}
+
+pub fn open_task_output_folder(
+    connection: &Connection,
+    input: OpenTaskOutputFolderInput,
+) -> Result<OpenTaskOutputFolderResponse, String> {
+    let project_id = get_current_project_id(connection)?;
+    let first_task_id = input
+        .task_ids
+        .into_iter()
+        .next()
+        .ok_or_else(|| "invalid_input: task_ids must not be empty".to_string())
+        .and_then(|value| normalize_required_text(value, 1, 200, "task_id"))?;
+    let task = get_task_by_id(connection, &first_task_id)?;
+    if task.project_id != project_id {
+        return Err("not_found: task not found".to_string());
+    }
+
+    let path = generated_base(connection, &project_id)?.join(task_output_folder_name(&task));
+    std::fs::create_dir_all(&path)
+        .map_err(|error| format!("io_error: create output folder failed: {error}"))?;
+    open_folder_in_os(&path)?;
+
+    Ok(OpenTaskOutputFolderResponse {
+        path: path.to_string_lossy().to_string(),
+    })
+}
+
 fn parse_string_list(value: &str) -> Vec<String> {
     serde_json::from_str(value).unwrap_or_default()
+}
+
+fn generated_base(connection: &Connection, project_id: &str) -> Result<PathBuf, String> {
+    let workspace_path = connection
+        .query_row(
+            "SELECT COALESCE(workspace_path, '') FROM projects WHERE id=?1",
+            params![project_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(|error| format!("database_error: read workspace path failed: {error}"))?
+        .and_then(|value| normalize_workspace_root(value.trim()));
+
+    let root = match workspace_path {
+        Some(path) => path,
+        None => repo_root_from_current_dir()
+            .or_else(repo_root_from_manifest_dir)
+            .ok_or_else(|| "invalid_state: cannot locate agent-swarm workspace".to_string())?,
+    };
+
+    Ok(root.join("workspace").join("generated"))
+}
+
+fn normalize_workspace_root(value: &str) -> Option<PathBuf> {
+    if value.is_empty() {
+        return None;
+    }
+
+    let path = PathBuf::from(value);
+    if path.join("apps").exists() && path.join("packages").exists() {
+        return Some(path);
+    }
+    if path.file_name().is_some_and(|name| name == "generated") {
+        return path
+            .parent()
+            .and_then(|workspace| workspace.parent())
+            .map(PathBuf::from);
+    }
+    if path.file_name().is_some_and(|name| name == "workspace") {
+        return path.parent().map(PathBuf::from);
+    }
+    Some(path)
+}
+
+fn repo_root_from_current_dir() -> Option<PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
+    find_repo_root_from(&mut dir)
+}
+
+fn repo_root_from_manifest_dir() -> Option<PathBuf> {
+    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    find_repo_root_from(&mut dir)
+}
+
+fn find_repo_root_from(dir: &mut PathBuf) -> Option<PathBuf> {
+    loop {
+        if dir.join(".git").exists() && dir.join("packages").exists() && dir.join("apps").exists() {
+            return Some(dir.clone());
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+fn task_output_folder_name(task: &TaskSummary) -> String {
+    let label = task
+        .description
+        .as_deref()
+        .and_then(extract_project_idea_label)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| task.title.clone());
+    safe_folder_name(&label)
+}
+
+fn extract_project_idea_label(description: &str) -> Option<String> {
+    description.lines().find_map(|line| {
+        let line = line.trim();
+        let value = line
+            .strip_prefix("项目想法：")
+            .or_else(|| line.strip_prefix("项目想法:"))?;
+        let value = value.trim();
+        if value.is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    })
+}
+
+fn safe_folder_name(value: &str) -> String {
+    let mut name = value
+        .trim()
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect::<String>();
+    name = name.trim_matches(['.', ' ']).to_string();
+    if name.is_empty() {
+        return "未命名项目".to_string();
+    }
+    name.chars().take(80).collect()
+}
+
+fn open_folder_in_os(path: &PathBuf) -> Result<(), String> {
+    let path = path
+        .canonicalize()
+        .map_err(|error| format!("io_error: resolve output folder failed: {error}"))?;
+
+    #[cfg(target_os = "windows")]
+    let result = Command::new("explorer").arg(path).spawn();
+
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open").arg(path).spawn();
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = Command::new("xdg-open").arg(path).spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|error| format!("io_error: open output folder failed: {error}"))
+}
+
+fn delete_task_dependents(
+    connection: &Connection,
+    project_id: &str,
+    task_id: &str,
+) -> Result<(), String> {
+    for (table, label) in [
+        ("runner_minimal_runs", "minimal runs"),
+        ("runner_execution_locks", "execution locks"),
+        ("runner_dry_runs", "dry runs"),
+        ("runner_execution_gates", "execution gates"),
+        ("runner_preflight_reviews", "preflight reviews"),
+        ("runner_requests", "runner requests"),
+        ("approvals", "approvals"),
+    ] {
+        let sql = format!("DELETE FROM {table} WHERE project_id = ?1 AND task_id = ?2");
+        connection
+            .execute(&sql, params![project_id, task_id])
+            .map_err(|error| format!("database_error: delete {label} failed: {error}"))?;
+    }
+    Ok(())
+}
+
+fn remove_deleted_dependencies(
+    connection: &Connection,
+    project_id: &str,
+    deleted_task_ids: &HashSet<String>,
+) -> Result<(), String> {
+    let mut statement = connection
+        .prepare("SELECT id, COALESCE(depends_on, '[]') FROM tasks WHERE project_id = ?1")
+        .map_err(|error| format!("database_error: read task dependencies failed: {error}"))?;
+    let rows = statement
+        .query_map([project_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| format!("database_error: read task dependencies failed: {error}"))?;
+
+    let now = current_timestamp();
+    for row in rows {
+        let (task_id, depends_on_json) = row
+            .map_err(|error| format!("database_error: read task dependency row failed: {error}"))?;
+        let before = parse_string_list(&depends_on_json);
+        let after: Vec<String> = before
+            .iter()
+            .filter(|dependency| !deleted_task_ids.contains(*dependency))
+            .cloned()
+            .collect();
+
+        if after.len() == before.len() {
+            continue;
+        }
+
+        let after_json = serde_json::to_string(&after).map_err(|error| {
+            format!("database_error: serialize updated task dependencies failed: {error}")
+        })?;
+        connection
+            .execute(
+                "UPDATE tasks SET depends_on = ?1, updated_at = ?2 WHERE project_id = ?3 AND id = ?4",
+                params![after_json.as_str(), now.as_str(), project_id, task_id.as_str()],
+            )
+            .map_err(|error| format!("database_error: update task dependencies failed: {error}"))?;
+    }
+
+    Ok(())
 }
 
 fn get_current_project_id(connection: &Connection) -> Result<String, String> {

@@ -2,7 +2,7 @@
 
 日期：2026-06-13
 
-本文是教材 #9 要求的 `docs/backend-architecture.md`。本项目为 Tauri 桌面应用，架构内容分散在以下文档中，本文仅做索引。
+本文是 `docs/backend-architecture.md` 的索引页。本项目为 Tauri 桌面应用，架构内容分散在以下文档中，本文只保留仍在用的入口。
 
 ## 指向
 
@@ -12,9 +12,9 @@
 | 数据库表结构、字段规范、迁移顺序 | [docs/data-model-draft.md](data-model-draft.md) |
 | SQLite 初始化、seed、验证方案 | [docs/sqlite-seed-plan.md](sqlite-seed-plan.md) |
 | 前端技术栈、目录、组件规范 | [packages/ui/README.md](../packages/ui/README.md) |
-| 目录架构确认 | [dev-docs/目录架构确认.md](../dev-docs/目录架构确认.md) |
-| 共享 UI 方案确认 | [dev-docs/共享UI方案确认.md](../dev-docs/共享UI方案确认.md) |
-| 后端骨架执行清单 | [dev-docs/后端骨架搭建执行清单.md](../dev-docs/后端骨架搭建执行清单.md) |
+| 当前项目导航 | [dev-docs/当前项目导航.md](../dev-docs/当前项目导航.md) |
+| 下一步开发路线 | [dev-docs/下一步开发路线.md](../dev-docs/下一步开发路线.md) |
+| 新窗口交接说明 | [dev-docs/新窗口交接说明.md](../dev-docs/新窗口交接说明.md) |
 
 ## 技术路线
 

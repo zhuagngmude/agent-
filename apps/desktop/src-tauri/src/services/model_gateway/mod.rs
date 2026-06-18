@@ -294,6 +294,8 @@ pub(crate) fn create_project_plan_draft_core(
                 ProviderError::Timeout => "timeout",
                 ProviderError::NetworkError => "network_error",
                 ProviderError::ProviderError => "provider_error",
+                ProviderError::AuthError => "auth_error",
+                ProviderError::RateLimited => "rate_limited",
                 ProviderError::ResponseTooLarge => "response_too_large",
                 ProviderError::InvalidResponse => "provider_error",
             };
@@ -1157,6 +1159,8 @@ mod tests {
             (ProviderError::Timeout, "timeout"),
             (ProviderError::NetworkError, "network_error"),
             (ProviderError::ProviderError, "provider_error"),
+            (ProviderError::AuthError, "auth_error"),
+            (ProviderError::RateLimited, "rate_limited"),
             (ProviderError::ResponseTooLarge, "response_too_large"),
             (ProviderError::InvalidResponse, "provider_error"),
         ];

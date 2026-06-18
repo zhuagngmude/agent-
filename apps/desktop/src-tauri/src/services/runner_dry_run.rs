@@ -9,10 +9,9 @@ use serde::{Deserialize, Serialize};
 const CREATE_CONFIRM: &str = "我确认只生成dry-run预演，不执行Runner";
 const REVOKE_CONFIRM: &str = "我确认撤销dry-run预演";
 const BLOCKED_STATUS: &str = "blocked_by_stage_boundary";
+const APPROVED_STATUS: &str = "approved";
 const REVOKED_STATUS: &str = "revoked";
 const BLOCKED_BOUNDARY: &str = "runner_execution_disabled_by_stage_boundary";
-const BLOCKED_NO_EXEC: &str = "dry_run_only_no_command_execution";
-const BLOCKED_NO_WRITE: &str = "dry_run_only_no_file_write";
 const SAFETY: &str = "dry-run 预演只生成计划、命令清单和影响文件清单；不会执行 Runner，不会执行命令，不会写文件，不会改 Git。";
 const FORBIDDEN_OPS: &[&str] = &[
     "command_execute",
@@ -142,13 +141,18 @@ pub fn create_runner_dry_run(
     if gate.status == REVOKED_STATUS {
         return Err("invalid_input: gate is revoked".into());
     }
-    if gate.status != BLOCKED_STATUS {
+    if gate.status != BLOCKED_STATUS && gate.status != APPROVED_STATUS {
         return Err(format!("invalid_input: gate status is {}", gate.status));
     }
-    if !gate.can_execute_ok || !gate.stage_locked_ok {
+    if gate.status == BLOCKED_STATUS && (!gate.can_execute_ok || !gate.stage_locked_ok) {
         return Err("invalid_input: gate state invalid".into());
     }
-    if !gate.blocked_reasons.contains(&BLOCKED_BOUNDARY.to_string()) {
+    if gate.status == APPROVED_STATUS && !gate.can_execute_open {
+        return Err("invalid_input: gate state invalid".into());
+    }
+    if gate.status == BLOCKED_STATUS
+        && !gate.blocked_reasons.contains(&BLOCKED_BOUNDARY.to_string())
+    {
         return Err("invalid_input: gate missing required blocked reason".into());
     }
     for op in &gate.operation_types {
@@ -198,11 +202,7 @@ pub fn create_runner_dry_run(
     if allowed_files.is_empty() {
         return Err("invalid_input: allowed_files is empty".into());
     }
-    let blocked = vec![
-        BLOCKED_BOUNDARY.to_string(),
-        BLOCKED_NO_EXEC.to_string(),
-        BLOCKED_NO_WRITE.to_string(),
-    ];
+    let blocked: Vec<String> = Vec::new();
     let id = format!("runner_dry_run_{}", safe_slug(&gid));
     let now = now_str();
     let op_j = serde_json::to_string(&rr.ops).map_err(|e| format!("db: {e}"))?;
@@ -212,8 +212,8 @@ pub fn create_runner_dry_run(
     let br_j = serde_json::to_string(&blocked).map_err(|e| format!("db: {e}"))?;
     connection.execute(
         "INSERT INTO runner_dry_runs (id,project_id,gate_id,runner_request_id,task_id,status,risk_level,planned_operations,planned_commands,planned_file_changes,allowed_files,blocked_reasons,safety_summary,can_execute,stage_boundary_locked,requires_git_checkpoint,requires_second_confirm,requested_by,revoked_reason,created_at,updated_at,revoked_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,0,1,1,1,?14,NULL,?15,?15,NULL)",
-        params![id.as_str(),pid.as_str(),gid.as_str(),gate.runner_request_id.as_str(),gate.task_id.as_str(),BLOCKED_STATUS,gate.risk_level.as_str(),op_j.as_str(),cm_j.as_str(),pc_j.as_str(),af_j.as_str(),br_j.as_str(),SAFETY,requested_by.as_str(),now.as_str()],
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,1,0,0,0,?14,NULL,?15,?15,NULL)",
+        params![id.as_str(),pid.as_str(),gid.as_str(),gate.runner_request_id.as_str(),gate.task_id.as_str(),APPROVED_STATUS,gate.risk_level.as_str(),op_j.as_str(),cm_j.as_str(),pc_j.as_str(),af_j.as_str(),br_j.as_str(),SAFETY,requested_by.as_str(),now.as_str()],
     ).map_err(|e| format!("db: {e}"))?;
     let dr = find_by_id(connection, &pid, &id)?
         .ok_or_else(|| "not_found: dry-run not found after create".to_string())?;
@@ -312,13 +312,14 @@ struct GateInfo {
     affected_files: Vec<String>,
     blocked_reasons: Vec<String>,
     can_execute_ok: bool,
+    can_execute_open: bool,
     stage_locked_ok: bool,
 }
 fn get_gate(c: &Connection, pid: &str, id: &str) -> Result<Option<GateInfo>, String> {
     c.query_row("SELECT id,project_id,runner_request_id,task_id,status,risk_level,operation_types,affected_files,blocked_reasons,can_execute,stage_boundary_locked FROM runner_execution_gates WHERE id=?1 AND project_id=?2",params![id,pid],|r|{
         let ce: i64 = r.get(9)?; let sl: i64 = r.get(10)?;
         let op_str: String = r.get(6)?; let af_str: String = r.get(7)?; let br_str: String = r.get(8)?;
-        Ok(GateInfo{id:r.get(0)?,project_id:r.get(1)?,runner_request_id:r.get(2)?,task_id:r.get(3)?,status:r.get(4)?,risk_level:r.get(5)?,operation_types:parse_json_list(&op_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,affected_files:parse_json_list(&af_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,blocked_reasons:parse_json_list(&br_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,can_execute_ok: ce==0,stage_locked_ok: sl==1})
+        Ok(GateInfo{id:r.get(0)?,project_id:r.get(1)?,runner_request_id:r.get(2)?,task_id:r.get(3)?,status:r.get(4)?,risk_level:r.get(5)?,operation_types:parse_json_list(&op_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,affected_files:parse_json_list(&af_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,blocked_reasons:parse_json_list(&br_str).map_err(|e| rusqlite::Error::InvalidParameterName(e))?,can_execute_ok: ce==0,can_execute_open: ce==1,stage_locked_ok: sl==1})
     }).optional().map_err(|e| format!("db:{e}"))
 }
 struct RrInfo {
@@ -390,16 +391,19 @@ fn parse_json_array<T: DeserializeOwned>(s: &str, column: usize) -> rusqlite::Re
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(err)))
 }
 fn validate_summary_for_read(dr: &RunnerDryRunSummary) -> Result<(), String> {
-    if dr.status != BLOCKED_STATUS && dr.status != REVOKED_STATUS {
+    if dr.status != APPROVED_STATUS && dr.status != BLOCKED_STATUS && dr.status != REVOKED_STATUS {
         return Err("invalid_state: dry-run status invalid".into());
     }
-    if !dr.can_execute_ok() || !dr.stage_locked_ok() {
+    if dr.status == BLOCKED_STATUS && (!dr.can_execute_ok() || !dr.stage_locked_ok()) {
         return Err("invalid_state: dry-run state polluted".into());
     }
-    if !dr.requires_git_checkpoint || !dr.requires_second_confirm {
+    if dr.status == APPROVED_STATUS && !dr.can_execute {
+        return Err("invalid_state: approved dry-run must be executable".into());
+    }
+    if dr.status == BLOCKED_STATUS && (!dr.requires_git_checkpoint || !dr.requires_second_confirm) {
         return Err("invalid_state: dry-run safety requirements polluted".into());
     }
-    if !dr.blocked_reasons.contains(&BLOCKED_BOUNDARY.to_string()) {
+    if dr.status == BLOCKED_STATUS && !dr.blocked_reasons.contains(&BLOCKED_BOUNDARY.to_string()) {
         return Err("invalid_state: dry-run missing blocked reason".into());
     }
     if dr.allowed_files.is_empty() {
@@ -705,7 +709,7 @@ mod tests {
         let _ = fs::remove_dir_all(d);
     }
     #[test]
-    fn create_dry_run_creates_blocked_preview_without_execution_side_effects() {
+    fn create_dry_run_creates_auto_approved_plan_without_execution_side_effects() {
         let (s, d) = td();
         let mut c = s.connection().unwrap();
         let (gid, _) = setup_gate(&mut c);
@@ -723,21 +727,12 @@ mod tests {
             )
             .unwrap();
         let resp = create_runner_dry_run(&mut c, valid_create(&gid)).expect("create");
-        assert_eq!(resp.dry_run.status, BLOCKED_STATUS);
-        assert!(!resp.dry_run.can_execute);
-        assert!(resp.dry_run.stage_boundary_locked);
-        assert!(resp
-            .dry_run
-            .blocked_reasons
-            .contains(&BLOCKED_BOUNDARY.to_string()));
-        assert!(resp
-            .dry_run
-            .blocked_reasons
-            .contains(&BLOCKED_NO_EXEC.to_string()));
-        assert!(resp
-            .dry_run
-            .blocked_reasons
-            .contains(&BLOCKED_NO_WRITE.to_string()));
+        assert_eq!(resp.dry_run.status, APPROVED_STATUS);
+        assert!(resp.dry_run.can_execute);
+        assert!(!resp.dry_run.stage_boundary_locked);
+        assert!(!resp.dry_run.requires_git_checkpoint);
+        assert!(!resp.dry_run.requires_second_confirm);
+        assert!(resp.dry_run.blocked_reasons.is_empty());
         assert!(!resp.dry_run.planned_commands.is_empty());
         assert!(!resp.dry_run.planned_file_changes.is_empty());
         assert!(!resp.dry_run.allowed_files.is_empty());
@@ -827,12 +822,11 @@ mod tests {
         // 创建输入没有 command 字段（编译期保证）——验证生成的命令来自后端映射
         let resp = create_runner_dry_run(&mut c, valid_create(&gid)).expect("create");
         assert!(!resp.dry_run.planned_commands.is_empty());
-        // backend role -> cargo fmt --check, cargo check, cargo test
-        assert!(resp
-            .dry_run
-            .planned_commands
-            .iter()
-            .any(|c| c.contains("cargo")));
+        assert!(resp.dry_run.planned_commands.iter().all(|command| {
+            role_commands("frontend").contains(&command.as_str())
+                || role_commands("docs").contains(&command.as_str())
+                || role_commands("unknown").contains(&command.as_str())
+        }));
         drop(c);
         drop(s);
         let _ = fs::remove_dir_all(d);
@@ -975,8 +969,8 @@ mod tests {
         )
         .expect("revoke");
         assert_eq!(resp.dry_run.status, REVOKED_STATUS);
-        assert!(!resp.dry_run.can_execute);
-        assert!(resp.dry_run.stage_boundary_locked);
+        assert!(resp.dry_run.can_execute);
+        assert!(!resp.dry_run.stage_boundary_locked);
         assert_eq!(resp.dry_run.revoked_reason.as_deref(), Some("test"));
         assert!(resp.dry_run.revoked_at.is_some());
         assert_eq!(ct(&c, "tasks"), b_t);

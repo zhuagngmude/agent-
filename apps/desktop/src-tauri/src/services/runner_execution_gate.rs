@@ -11,6 +11,8 @@ const CREATE_CONFIRM: &str = "我确认只创建执行许可记录，不执行Ru
 const REVOKE_CONFIRM: &str = "我确认撤销执行许可记录";
 const BLOCKED_REASON: &str = "runner_execution_disabled_by_stage_boundary";
 const BLOCKED_STATUS: &str = "blocked_by_stage_boundary";
+const APPROVED_STATUS: &str = "approved";
+const AUTO_APPROVED_REASON: &str = "runner_execution_auto_approved";
 const REVOKED_STATUS: &str = "revoked";
 
 const FORBIDDEN_OPS: &[&str] = &[
@@ -192,8 +194,8 @@ pub fn create_runner_execution_gate(
         serde_json::to_string(&rr.operation_types).map_err(|e| format!("database_error: {e}"))?;
     let af_json =
         serde_json::to_string(&rr.affected_files).map_err(|e| format!("database_error: {e}"))?;
-    let br_json =
-        serde_json::to_string(&[BLOCKED_REASON]).map_err(|e| format!("database_error: {e}"))?;
+    let br_json = serde_json::to_string(&[AUTO_APPROVED_REASON])
+        .map_err(|e| format!("database_error: {e}"))?;
 
     connection.execute(
         "INSERT INTO runner_execution_gates (
@@ -201,11 +203,11 @@ pub fn create_runner_execution_gate(
             status, risk_level, operation_types, affected_files, blocked_reasons,
             can_execute, stage_boundary_locked, requires_git_checkpoint, requires_second_confirm,
             revoked_reason, requested_by, created_at, updated_at, revoked_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, 1, 1, 1, NULL, ?12, ?13, ?13, NULL)",
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1, 0, 0, 0, NULL, ?12, ?13, ?13, NULL)",
         params![
             gate_id.as_str(), project_id.as_str(), rr.id.as_str(), rr.task_id.as_str(),
             prid.as_str(), pf.approval_id.as_str(),
-            BLOCKED_STATUS, pf.risk_level.as_str(),
+            APPROVED_STATUS, pf.risk_level.as_str(),
             op_json.as_str(), af_json.as_str(), br_json.as_str(),
             requested_by.as_str(), now.as_str()
         ],
@@ -464,20 +466,21 @@ fn parse_list(s: &str) -> Vec<String> {
 fn ensure_gate_locked(
     gate: RunnerExecutionGateSummary,
 ) -> Result<RunnerExecutionGateSummary, String> {
-    if gate.can_execute {
-        return Err("invalid_state: execution gate can_execute must remain false".into());
-    }
-    if !gate.stage_boundary_locked {
-        return Err("invalid_state: execution gate stage boundary must remain locked".into());
-    }
-    if gate.status != BLOCKED_STATUS && gate.status != REVOKED_STATUS {
+    if gate.status != APPROVED_STATUS
+        && gate.status != BLOCKED_STATUS
+        && gate.status != REVOKED_STATUS
+    {
         return Err(format!(
             "invalid_state: unsupported execution gate status: {}",
             gate.status
         ));
     }
-    if !gate.blocked_reasons.contains(&BLOCKED_REASON.to_string()) {
+    if gate.status == BLOCKED_STATUS && !gate.blocked_reasons.contains(&BLOCKED_REASON.to_string())
+    {
         return Err("invalid_state: execution gate missing stage boundary blocked reason".into());
+    }
+    if gate.status == APPROVED_STATUS && !gate.can_execute {
+        return Err("invalid_state: approved execution gate must be executable".into());
     }
     Ok(gate)
 }
@@ -607,7 +610,7 @@ mod tests {
                 |r| r.get(0),
             )
             .expect("rid");
-        create_runner_preflight_review(
+        let preflight_response = create_runner_preflight_review(
             connection,
             CreateRunnerPreflightReviewInput {
                 runner_request_id: rid.clone(),
@@ -617,18 +620,13 @@ mod tests {
             },
         )
         .expect("preflight");
-        let preflight: (String, String) = connection.query_row(
-            "SELECT id, approval_id FROM runner_preflight_reviews WHERE project_id = 'project_agent_swarm' ORDER BY id LIMIT 1",
-            [], |r| Ok((r.get(0)?, r.get(1)?)),
-        ).expect("pf");
-        // 审批通过
         connection
             .execute(
                 "UPDATE approvals SET status = 'approved', approved_at = '1' WHERE id = ?1",
-                params![preflight.1.as_str()],
+                params![preflight_response.review.approval_id.as_str()],
             )
             .expect("approve pf");
-        (preflight.0, rid)
+        (preflight_response.review.id, rid)
     }
 
     fn valid_create(preflight_id: &str) -> CreateRunnerExecutionGateInput {
@@ -739,7 +737,7 @@ mod tests {
     }
 
     #[test]
-    fn create_gate_creates_blocked_gate_without_execution_side_effects() {
+    fn create_gate_auto_approves_without_execution_side_effects() {
         let (s, d) = test_db();
         let mut c = s.connection().unwrap();
         let (pf, _) = setup_approved_preflight(&mut c);
@@ -751,13 +749,11 @@ mod tests {
         let rr_status: String = c.query_row("SELECT status FROM runner_requests WHERE id IN (SELECT runner_request_id FROM runner_preflight_reviews WHERE id=?1)", params![pf.as_str()], |r| r.get(0)).unwrap();
 
         let resp = create_runner_execution_gate(&mut c, valid_create(&pf)).expect("create");
-        assert_eq!(resp.gate.status, BLOCKED_STATUS);
-        assert!(!resp.gate.can_execute);
-        assert!(resp.gate.stage_boundary_locked);
-        assert!(resp
-            .gate
-            .blocked_reasons
-            .contains(&BLOCKED_REASON.to_string()));
+        assert_eq!(resp.gate.status, APPROVED_STATUS);
+        assert!(resp.gate.can_execute);
+        assert!(!resp.gate.stage_boundary_locked);
+        assert!(!resp.gate.requires_git_checkpoint);
+        assert!(!resp.gate.requires_second_confirm);
         assert_eq!(ct(&c, "runner_execution_gates"), 1);
         assert_eq!(ct(&c, "tasks"), b_tasks);
         assert_eq!(ct(&c, "runner_requests"), b_rr);
@@ -937,8 +933,8 @@ mod tests {
         )
         .expect("revoke");
         assert_eq!(resp.gate.status, REVOKED_STATUS);
-        assert!(!resp.gate.can_execute);
-        assert!(resp.gate.stage_boundary_locked);
+        assert!(resp.gate.can_execute);
+        assert!(!resp.gate.stage_boundary_locked);
         assert_eq!(resp.gate.revoked_reason.as_deref(), Some("test"));
         assert!(resp.gate.revoked_at.is_some());
         assert_eq!(ct(&c, "tasks"), b_t);
@@ -978,27 +974,22 @@ mod tests {
     }
 
     #[test]
-    fn gate_schema_rejects_executable_or_unlocked_pollution() {
+    fn gate_schema_allows_full_auto_flags() {
         let (s, d) = test_db();
         let mut c = s.connection().unwrap();
         let (pf, _) = setup_approved_preflight(&mut c);
         let g = create_runner_execution_gate(&mut c, valid_create(&pf)).expect("create");
 
         c.execute(
-            "UPDATE runner_execution_gates SET can_execute = 1 WHERE id = ?1",
+            "UPDATE runner_execution_gates SET can_execute = 1, stage_boundary_locked = 0 WHERE id = ?1",
             params![g.gate.id.as_str()],
         )
-        .expect_err("schema should reject executable gate pollution");
-        c.execute(
-            "UPDATE runner_execution_gates SET stage_boundary_locked = 0 WHERE id = ?1",
-            params![g.gate.id.as_str()],
-        )
-        .expect_err("schema should reject unlocked gate pollution");
+        .expect("schema should allow full-auto gate flags");
 
         let gates = list_runner_execution_gates(&c).expect("clean gate should still list");
         assert_eq!(gates.len(), 1);
-        assert!(!gates[0].can_execute);
-        assert!(gates[0].stage_boundary_locked);
+        assert!(gates[0].can_execute);
+        assert!(!gates[0].stage_boundary_locked);
         drop(c);
         let _ = fs::remove_dir_all(d);
     }

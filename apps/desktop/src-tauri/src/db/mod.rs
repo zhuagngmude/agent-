@@ -38,6 +38,8 @@ const PROJECT_INTAKE_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/014_add_project_intake.sql");
 const AUTO_RUNNER_LOCKS_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/015_enable_auto_runner_execution_locks.sql");
+const OPEN_RUNNER_FULL_AUTO_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/016_open_runner_full_auto.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -77,6 +79,7 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     run_idea_guidance_migration(&connection)?;
     run_project_intake_migration(&connection)?;
     run_auto_runner_locks_migration(&connection)?;
+    run_open_runner_full_auto_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
     seed_builtin_task_templates(&connection)?;
     seed_builtin_models(&connection)?;
@@ -174,6 +177,11 @@ fn run_auto_runner_locks_migration(connection: &Connection) -> InitResult<()> {
     Ok(())
 }
 
+fn run_open_runner_full_auto_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(OPEN_RUNNER_FULL_AUTO_MIGRATION_SQL)?;
+    Ok(())
+}
+
 pub(crate) fn seed_builtin_task_templates(connection: &Connection) -> InitResult<()> {
     seed_builtin_task_templates_inner(connection)
 }
@@ -193,61 +201,62 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
         BuiltinTemplate {
             role: "frontend",
             agent_id: "agent_frontend",
-            title: "前端交互切片",
-            description: "把审批后的项目计划整理为第一版可用 UI 流程和状态展示。",
+            title: "生成可打开页面",
+            description:
+                "生成 index.html、style.css 和 main.js，做出用户能直接打开查看的第一版页面。",
             priority: "high",
             risk_level: "medium",
-            affected_file: "virtual/frontend-plan.md",
-            operation_type: "frontend_plan",
+            affected_files: &["virtual/index.html", "virtual/style.css", "virtual/main.js"],
+            operation_type: "frontend_impl",
             enabled: true,
             sort_order: 0,
         },
         BuiltinTemplate {
             role: "backend",
             agent_id: "agent_backend",
-            title: "后端状态切片",
-            description: "整理本地命令、状态流转和 SQLite 持久化边界。",
+            title: "后端接口实现",
+            description: "实现服务器端接口、业务逻辑和数据持久化。",
             priority: "high",
             risk_level: "medium",
-            affected_file: "virtual/backend-plan.md",
-            operation_type: "backend_plan",
-            enabled: true,
+            affected_files: &["virtual/server.js"],
+            operation_type: "backend_impl",
+            enabled: false,
             sort_order: 1,
         },
         BuiltinTemplate {
             role: "qa",
             agent_id: "agent_qa",
-            title: "验收检查切片",
-            description: "整理验收步骤、禁止路径和无副作用检查。",
+            title: "功能测试",
+            description: "编写测试用例，验证功能是否正常工作。",
             priority: "medium",
             risk_level: "low",
-            affected_file: "virtual/qa-plan.md",
-            operation_type: "qa_plan",
-            enabled: true,
+            affected_files: &["virtual/test.js"],
+            operation_type: "qa_test",
+            enabled: false,
             sort_order: 2,
         },
         BuiltinTemplate {
             role: "docs",
             agent_id: "agent_docs",
-            title: "文档交接切片",
-            description: "整理用户文档、AI 维护文档和阶段交接说明。",
-            priority: "medium",
+            title: "项目文档",
+            description: "编写用户文档和开发文档。",
+            priority: "low",
             risk_level: "low",
-            affected_file: "virtual/docs-plan.md",
-            operation_type: "docs_plan",
+            affected_files: &["virtual/README.md"],
+            operation_type: "docs_write",
             enabled: true,
             sort_order: 3,
         },
         BuiltinTemplate {
             role: "reviewer",
             agent_id: "agent_reviewer",
-            title: "风险审查切片",
-            description: "审查任务、只读 Runner request 和阶段边界是否一致。",
-            priority: "high",
-            risk_level: "medium",
-            affected_file: "virtual/review-plan.md",
-            operation_type: "review_plan",
-            enabled: true,
+            title: "代码审查",
+            description: "审查代码质量、安全性和最佳实践。",
+            priority: "medium",
+            risk_level: "low",
+            affected_files: &["virtual/review-comments.md"],
+            operation_type: "code_review",
+            enabled: false,
             sort_order: 4,
         },
         BuiltinTemplate {
@@ -257,7 +266,7 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
             description: "审查安全边界、敏感数据路径和保护路径合规。",
             priority: "high",
             risk_level: "high",
-            affected_file: "virtual/security-plan.md",
+            affected_files: &["virtual/security-plan.md"],
             operation_type: "security_review_plan",
             enabled: false,
             sort_order: 5,
@@ -269,7 +278,7 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
             description: "整理本地运行、脚本和验证命令。",
             priority: "medium",
             risk_level: "medium",
-            affected_file: "virtual/devops-plan.md",
+            affected_files: &["virtual/devops-plan.md"],
             operation_type: "devops_plan",
             enabled: false,
             sort_order: 6,
@@ -281,7 +290,7 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
             description: "整理用户交互流程和界面状态。",
             priority: "medium",
             risk_level: "low",
-            affected_file: "virtual/ux-plan.md",
+            affected_files: &["virtual/ux-plan.md"],
             operation_type: "ux_plan",
             enabled: false,
             sort_order: 7,
@@ -293,7 +302,7 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
             description: "整理数据模型、迁移策略和查询边界。",
             priority: "medium",
             risk_level: "medium",
-            affected_file: "virtual/data-plan.md",
+            affected_files: &["virtual/data-plan.md"],
             operation_type: "data_plan",
             enabled: false,
             sort_order: 8,
@@ -301,13 +310,24 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
     ];
 
     for t in builtins {
-        // INSERT OR IGNORE: 已存在不重复插入，已存在不覆盖用户修改的 enabled 状态
+        let affected_file = t.affected_files.join("\n");
         connection.execute(
-            "INSERT OR IGNORE INTO project_plan_task_templates (
+            "INSERT INTO project_plan_task_templates (
                 id, project_id, role, agent_id, title, description,
                 priority, risk_level, affected_file, operation_type,
                 enabled, sort_order, is_builtin, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, ?13)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, ?13)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                description = excluded.description,
+                priority = excluded.priority,
+                risk_level = excluded.risk_level,
+                affected_file = excluded.affected_file,
+                operation_type = excluded.operation_type,
+                enabled = excluded.enabled,
+                sort_order = excluded.sort_order,
+                is_builtin = 1,
+                updated_at = excluded.updated_at",
             rusqlite::params![
                 format!("template_{}_{}", project_id, t.role),
                 project_id.as_str(),
@@ -317,7 +337,7 @@ fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> 
                 t.description,
                 t.priority,
                 t.risk_level,
-                t.affected_file,
+                affected_file.as_str(),
                 t.operation_type,
                 t.enabled as i64,
                 t.sort_order,
@@ -335,7 +355,7 @@ struct BuiltinTemplate {
     description: &'static str,
     priority: &'static str,
     risk_level: &'static str,
-    affected_file: &'static str,
+    affected_files: &'static [&'static str],
     operation_type: &'static str,
     enabled: bool,
     sort_order: i64,
@@ -533,8 +553,8 @@ struct SeedApproval {
 mod tests {
     use super::initialize;
     use crate::services::{
-        agents::list_agents, approvals::list_approvals, model_gateway::create_project_plan_draft,
-        tasks::list_tasks,
+        agents::list_agents, approvals::list_approvals,
+        model_gateway::create_project_plan_draft_core, tasks::list_tasks,
     };
     use rusqlite::Connection;
     use std::{
@@ -695,8 +715,19 @@ mod tests {
             let connection = state.connection().expect("connection should be available");
             let before = count_rows(&connection, "model_calls");
 
-            let response = create_project_plan_draft("测试想法", &None, false, &None)
-                .expect("should return feature_disabled response");
+            let response = create_project_plan_draft_core(
+                "测试想法",
+                &None,
+                false,
+                &None,
+                "false",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("should return feature_disabled response");
             assert_eq!(response.status, "feature_disabled");
 
             let after = count_rows(&connection, "model_calls");
@@ -714,8 +745,19 @@ mod tests {
             let connection = state.connection().expect("connection should be available");
             let before = count_rows(&connection, "runtime_events");
 
-            let response = create_project_plan_draft("测试想法", &None, false, &None)
-                .expect("should return feature_disabled response");
+            let response = create_project_plan_draft_core(
+                "测试想法",
+                &None,
+                false,
+                &None,
+                "false",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("should return feature_disabled response");
             assert_eq!(response.status, "feature_disabled");
 
             let after = count_rows(&connection, "runtime_events");

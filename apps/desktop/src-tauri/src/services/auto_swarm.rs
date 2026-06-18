@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use super::{
     project_plan::{
@@ -39,6 +40,21 @@ pub struct AutoRunSwarmTaskResult {
 pub struct AutoRunSwarmIdeaResponse {
     pub plan: ApproveProjectPlanResponse,
     pub task_results: Vec<AutoRunSwarmTaskResult>,
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContinueSwarmTasksInput {
+    pub task_ids: Vec<String>,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ContinueSwarmTasksResponse {
+    pub task_results: Vec<AutoRunSwarmTaskResult>,
+    pub skipped_task_ids: Vec<String>,
     pub status: String,
 }
 
@@ -82,6 +98,73 @@ pub fn auto_run_swarm_idea(
     Ok(AutoRunSwarmIdeaResponse {
         plan,
         task_results,
+        status,
+    })
+}
+
+pub fn continue_swarm_tasks(
+    connection: &mut Connection,
+    input: ContinueSwarmTasksInput,
+) -> Result<ContinueSwarmTasksResponse, String> {
+    let project_id = current_project_id(connection)?;
+    let requested_by = input
+        .requested_by
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "swarm_continue".to_string());
+
+    let mut task_ids = Vec::new();
+    let mut seen = HashSet::new();
+    for task_id in input.task_ids {
+        let normalized = normalize_id(task_id, "task_id")?;
+        if seen.insert(normalized.clone()) {
+            task_ids.push(normalized);
+        }
+    }
+    if task_ids.is_empty() {
+        return Err("invalid_input: task_ids must not be empty".to_string());
+    }
+
+    let mut skipped_task_ids = Vec::new();
+    let mut task_results = Vec::new();
+    for task_id in task_ids {
+        let Some(task_status) = task_status(connection, &project_id, &task_id)? else {
+            return Err(format!("not_found: task '{}' not found", task_id));
+        };
+        if task_status == "completed" || task_status == "cancelled" {
+            skipped_task_ids.push(task_id);
+            continue;
+        }
+
+        let Some(runner_request_id) =
+            runner_request_id_for_task(connection, &project_id, &task_id)?
+        else {
+            skipped_task_ids.push(task_id);
+            continue;
+        };
+
+        reset_failed_minimal_runs(connection, &project_id, &task_id)?;
+        task_results.push(run_one_runner_request(
+            connection,
+            &runner_request_id,
+            &requested_by,
+        ));
+    }
+
+    let status = if task_results.is_empty() {
+        "skipped"
+    } else if task_results.iter().all(|item| item.status == "succeeded") {
+        "succeeded"
+    } else if task_results.iter().any(|item| item.status == "succeeded") {
+        "partial"
+    } else {
+        "failed"
+    }
+    .to_string();
+
+    Ok(ContinueSwarmTasksResponse {
+        task_results,
+        skipped_task_ids,
         status,
     })
 }
@@ -173,6 +256,7 @@ fn run_one_runner_request(
     };
 
     let status = minimal_run.status.clone();
+    update_task_after_minimal_run(connection, &minimal_run);
     result.minimal_run = Some(minimal_run);
     result.status = if status == "succeeded" || status == "created" || status == "running" {
         "succeeded".to_string()
@@ -180,6 +264,104 @@ fn run_one_runner_request(
         status
     };
     result
+}
+
+fn current_project_id(connection: &Connection) -> Result<String, String> {
+    connection
+        .query_row(
+            "SELECT id FROM projects ORDER BY created_at LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("database_error: read current project failed: {error}"))?
+        .ok_or_else(|| "not_found: current project not found".to_string())
+}
+
+fn normalize_id(value: String, field: &str) -> Result<String, String> {
+    let normalized = value.trim().to_string();
+    let length = normalized.chars().count();
+    if length == 0 || length > 200 {
+        return Err(format!(
+            "invalid_input: {field} length must be between 1 and 200"
+        ));
+    }
+    Ok(normalized)
+}
+
+fn task_status(
+    connection: &Connection,
+    project_id: &str,
+    task_id: &str,
+) -> Result<Option<String>, String> {
+    connection
+        .query_row(
+            "SELECT status FROM tasks WHERE project_id = ?1 AND id = ?2",
+            params![project_id, task_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("database_error: read task status failed: {error}"))
+}
+
+fn runner_request_id_for_task(
+    connection: &Connection,
+    project_id: &str,
+    task_id: &str,
+) -> Result<Option<String>, String> {
+    connection
+        .query_row(
+            "SELECT id FROM runner_requests
+             WHERE project_id = ?1 AND task_id = ?2
+             ORDER BY created_at DESC, id DESC
+             LIMIT 1",
+            params![project_id, task_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| format!("database_error: read runner request failed: {error}"))
+}
+
+fn reset_failed_minimal_runs(
+    connection: &Connection,
+    project_id: &str,
+    task_id: &str,
+) -> Result<(), String> {
+    connection
+        .execute(
+            "DELETE FROM runner_minimal_runs
+             WHERE project_id = ?1
+               AND task_id = ?2
+               AND status IN ('failed', 'failed_scope_violation', 'aborted')",
+            params![project_id, task_id],
+        )
+        .map(|_| ())
+        .map_err(|error| format!("database_error: reset failed minimal runs failed: {error}"))
+}
+
+fn update_task_after_minimal_run(connection: &Connection, minimal_run: &RunnerMinimalRunSummary) {
+    let next_status = match minimal_run.status.as_str() {
+        "succeeded" => "completed",
+        "failed" | "failed_scope_violation" | "aborted" => "failed",
+        _ => return,
+    };
+    let now = now_str();
+    if let Err(error) = connection.execute(
+        "UPDATE tasks
+         SET status = ?1, updated_at = ?2
+         WHERE project_id = ?3 AND id = ?4",
+        params![
+            next_status,
+            now.as_str(),
+            minimal_run.project_id.as_str(),
+            minimal_run.task_id.as_str()
+        ],
+    ) {
+        eprintln!(
+            "agent-swarm: failed to sync task {} after minimal run {}: {}",
+            minimal_run.task_id, minimal_run.id, error
+        );
+    }
 }
 
 fn auto_approve_preflight(connection: &mut Connection, approval_id: &str) -> Result<(), String> {
@@ -265,13 +447,13 @@ mod tests {
             )
             .expect("auto swarm should run");
 
-            assert_eq!(response.plan.created_runner_request_ids.len(), 5);
-            assert_eq!(response.task_results.len(), 5);
-            assert_eq!(count_rows(&connection, "runner_preflight_reviews"), 5);
-            assert_eq!(count_rows(&connection, "runner_execution_gates"), 5);
-            assert_eq!(count_rows(&connection, "runner_dry_runs"), 5);
-            assert_eq!(count_rows(&connection, "runner_execution_locks"), 5);
-            assert_eq!(count_rows(&connection, "runner_minimal_runs"), 5);
+            assert_eq!(response.plan.created_runner_request_ids.len(), 2);
+            assert_eq!(response.task_results.len(), 2);
+            assert_eq!(count_rows(&connection, "runner_preflight_reviews"), 2);
+            assert_eq!(count_rows(&connection, "runner_execution_gates"), 2);
+            assert_eq!(count_rows(&connection, "runner_dry_runs"), 2);
+            assert_eq!(count_rows(&connection, "runner_execution_locks"), 2);
+            assert_eq!(count_rows(&connection, "runner_minimal_runs"), 2);
             assert!(response
                 .task_results
                 .iter()

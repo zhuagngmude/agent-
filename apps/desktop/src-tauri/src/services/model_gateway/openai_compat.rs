@@ -31,6 +31,8 @@ pub enum ProviderError {
     Timeout,
     NetworkError,
     ProviderError,
+    AuthError,
+    RateLimited,
     ResponseTooLarge, // 与阶段 21 错误分类 response_too_large 对齐
     InvalidResponse,
 }
@@ -65,6 +67,10 @@ impl OpenAiCompatProvider {
         let base_url = std::env::var("AGENT_SWARM_OPENAI_COMPAT_BASE_URL")
             .map_err(|_| "AGENT_SWARM_OPENAI_COMPAT_BASE_URL 环境变量未设置")?;
         Ok(Self { api_key, base_url })
+    }
+
+    pub fn from_values(api_key: String, base_url: String) -> Self {
+        Self { api_key, base_url }
     }
 }
 
@@ -104,7 +110,11 @@ impl ModelProvider for OpenAiCompatProvider {
             .timeout(std::time::Duration::from_secs(timeout_secs))
             .send_string(&body_string)
             .map_err(|e| match &e {
-                ureq::Error::Status(_status_code, _response) => ProviderError::ProviderError,
+                ureq::Error::Status(status_code, _response) => match *status_code {
+                    401 | 403 => ProviderError::AuthError,
+                    429 => ProviderError::RateLimited,
+                    _ => ProviderError::ProviderError,
+                },
                 ureq::Error::Transport(_transport) => {
                     let msg = e.to_string().to_lowercase();
                     if msg.contains("timeout") || msg.contains("timed out") {
@@ -117,7 +127,11 @@ impl ModelProvider for OpenAiCompatProvider {
 
         // 检查 HTTP 状态码：非 200 只返回粗粒度错误，不读取/返回 provider error body
         if response.status() != 200 {
-            return Err(ProviderError::ProviderError);
+            return Err(match response.status() {
+                401 | 403 => ProviderError::AuthError,
+                429 => ProviderError::RateLimited,
+                _ => ProviderError::ProviderError,
+            });
         }
 
         // 限长读取响应体（max_response_bytes + 1 用于检测超限）
@@ -186,6 +200,8 @@ impl ModelProvider for FakeModelProvider {
             Some(ProviderError::Timeout) => Err(ProviderError::Timeout),
             Some(ProviderError::NetworkError) => Err(ProviderError::NetworkError),
             Some(ProviderError::ProviderError) => Err(ProviderError::ProviderError),
+            Some(ProviderError::AuthError) => Err(ProviderError::AuthError),
+            Some(ProviderError::RateLimited) => Err(ProviderError::RateLimited),
             Some(ProviderError::ResponseTooLarge) => Err(ProviderError::ResponseTooLarge),
             Some(ProviderError::InvalidResponse) => Err(ProviderError::InvalidResponse),
             None => Ok(ModelResponse {

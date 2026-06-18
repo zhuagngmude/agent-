@@ -2,7 +2,7 @@
 
 Date: 2026-06-12
 
-Stage: MVP-0.4 accepted; Stage 2 real-model admission design has started. This document explains which parts of the repository are stable anchors, which parts may be refactored, and which parts are runtime/local artifacts. It is a guide for future cleanup, deletion, and extension work.
+Stage: historical MVP-0.4 baseline. 2026-06-17 update: the current product line has moved to the desktop full-auto Runner flow. Use this document only for repository stability hints; use `dev-docs/当前项目导航.md` for current product state.
 
 This document is documentation only. It does not enable real Runner execution, real model calls, cloud sync, full permissions, or secret access.
 
@@ -26,6 +26,7 @@ These files and modules are the current stability backbone.
 AGENTS.md
 README.md
 dev-docs/AI开发维护手册.md
+dev-docs/当前项目导航.md
 dev-docs/下一步开发路线.md
 dev-docs/新窗口交接说明.md
 docs/api-draft.md

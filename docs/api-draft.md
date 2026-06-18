@@ -2,16 +2,18 @@
 
 日期：2026-06-11
 
+> 2026-06-17 更新：本文是旧 API / 状态契约草案，仍可作为字段和历史迁移参考，但不再完整代表当前产品状态。当前主线以 Tauri/Rust commands、Rust services、`data/migrations/`、`docs/Agent宪法.md`、`docs/AI开发细则.md` 和 `dev-docs/当前项目导航.md` 为准。真实模型调用和 Runner 主链路已经在受控入口中开放。
+
 这是一份当前态 API 草案，只保留现在真的在用、或者已经作为 helper/禁用态契约存在的路由和边界。实现细节和更完整的 route 说明放在 [services/api/README.md](../services/api/README.md)。
 
 ## 当前边界
 
-- 仍然是 Mock / SQLite 优先。
-- 不开放真实 Runner 执行。
-- 不开放真实模型调用。
-- 不做云同步。
-- 不做完整权限系统。
-- 所有本地写入、审批、Runner 请求、Agent 配置变化都必须先经过 Approval Service。
+- 桌面端 Tauri/Rust 是当前主入口，旧 Node.js HTTP route 仅作历史参考。
+- Runner 主链路允许在应用受控服务层内全自动执行，产物写入 `workspace/generated`。
+- 真实模型调用允许经 Model Gateway 和系统设置中的模型配置发起。
+- 不做云同步，不做完整权限系统。
+- 禁止自由 shell、Git commit/push、文件删除、保护路径写入和提交密钥。
+- 密钥、raw prompt、raw response、raw provider error 不得写入文档、SQLite 或日志。
 
 ## 共享状态码
 
@@ -40,10 +42,10 @@
 
 行为要点：
 
-- `create_project_plan_draft` 只生成本地确定性 `project_plan` 草案和 pending 审批，不创建任务，不创建 Runner request，不调用模型。
-- `approve_project_plan` 是 project_plan 的唯一实例化入口，必须二次确认；审批通过后确定性创建 5 个 queued 任务和 5 条只读 `runner_requests`。
+- 早期 `create_project_plan_draft` / `approve_project_plan` 的审批链路保留为历史参考；当前主控台全自动路径会自动生成/推进任务。
+- 当前任务数量、模板和 Runner request 结构以 Rust service 与数据库迁移为准，不再以“固定 5 个任务 + 5 条只读 request”为当前真相。
 - 通用 `approve_approval` 不得自动实例化 project plan，也不得通过 `project_plan` 审批；真正批准只能走 `approve_project_plan`。
-- `runner_requests` 只表示只读队列记录，不是可执行 Runner job，不能执行命令、写文件、改 Git、发网络请求、调用模型或触发 Agent。
+- 历史 `runner_requests` 曾是只读队列；当前 Runner 主链路已经能进入受控执行。
 
 ### 项目计划闭环
 

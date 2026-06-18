@@ -10,8 +10,8 @@ const REVOKE_CONFIRM: &str = "我确认撤销执行范围锁";
 const CHECKPOINT_STRATEGY: &str = "manual_checkpoint_required_before_stage34";
 const WORKSPACE_REQS: &str = "clean_or_only_allowed_paths_dirty";
 const BLOCKED_BOUNDARY: &str = "runner_execution_disabled_by_stage_boundary";
-const BLOCKED_GIT: &str = "git_checkpoint_not_created_in_stage33";
 const BLOCKED_SCOPE: &str = "file_scope_locked_for_stage34";
+const APPROVED_STATUS: &str = "approved";
 const PROTECTED: &[&str] = &[
     "design/image2/",
     "_internal/",
@@ -118,14 +118,18 @@ pub fn create_runner_execution_lock(
     if dr.status == "revoked" {
         return Err("invalid_input: dry-run is revoked".into());
     }
-    if dr.status != "blocked_by_stage_boundary"
-        || !dr.can_execute_ok
-        || !dr.stage_locked_ok
-        || !dr.requires_git_ck_ok
-    {
+    let dry_run_is_blocked = dr.status == "blocked_by_stage_boundary";
+    let dry_run_is_approved = dr.status == APPROVED_STATUS;
+    if !dry_run_is_blocked && !dry_run_is_approved {
         return Err("invalid_input: dry-run state invalid".into());
     }
-    if !dr.blocked_reasons.iter().any(|r| r == BLOCKED_BOUNDARY) {
+    if dry_run_is_blocked && (!dr.can_execute_ok || !dr.stage_locked_ok || !dr.requires_git_ck_ok) {
+        return Err("invalid_input: dry-run state invalid".into());
+    }
+    if dry_run_is_approved && !dr.can_execute_open {
+        return Err("invalid_input: dry-run state invalid".into());
+    }
+    if dry_run_is_blocked && !dr.blocked_reasons.iter().any(|r| r == BLOCKED_BOUNDARY) {
         return Err("invalid_input: dry-run missing blocked reason".into());
     }
     let gate =
@@ -133,7 +137,15 @@ pub fn create_runner_execution_lock(
     if gate.project_id != pid {
         return Err("invalid_input: gate project mismatch".into());
     }
-    if gate.status != "blocked_by_stage_boundary" || !gate.can_exec_ok || !gate.stage_locked_ok {
+    let gate_is_blocked = gate.status == "blocked_by_stage_boundary";
+    let gate_is_approved = gate.status == APPROVED_STATUS;
+    if !gate_is_blocked && !gate_is_approved {
+        return Err("invalid_input: gate state invalid".into());
+    }
+    if gate_is_blocked && (!gate.can_exec_ok || !gate.stage_locked_ok) {
+        return Err("invalid_input: gate state invalid".into());
+    }
+    if gate_is_approved && !gate.can_exec_open {
         return Err("invalid_input: gate state invalid".into());
     }
     if gate.runner_request_id != dr.runner_request_id || gate.task_id != dr.task_id {
@@ -186,17 +198,13 @@ pub fn create_runner_execution_lock(
     }
     let id = format!("exec_lock_{}", safe_slug(&did));
     let now = now_str();
-    let blocked = vec![
-        BLOCKED_BOUNDARY.to_string(),
-        BLOCKED_GIT.to_string(),
-        BLOCKED_SCOPE.to_string(),
-    ];
+    let blocked = vec![BLOCKED_SCOPE.to_string()];
     let al_j = serde_json::to_string(&dr.allowed_files).map_err(|e| format!("db:{e}"))?;
     let dp_j = serde_json::to_string(&denied_paths()).map_err(|e| format!("db:{e}"))?;
     let cm_j = serde_json::to_string(&dr.planned_commands).map_err(|e| format!("db:{e}"))?;
     let pc_j = serde_json::to_string(&dr.planned_file_changes).map_err(|e| format!("db:{e}"))?;
     let br_j = serde_json::to_string(&blocked).map_err(|e| format!("db:{e}"))?;
-    c.execute("INSERT INTO runner_execution_locks (id,project_id,dry_run_id,gate_id,runner_request_id,task_id,status,allowed_files,denied_paths,planned_commands,planned_file_changes,checkpoint_strategy,workspace_requirements,blocked_reasons,can_execute,stage_boundary_locked,requires_git_checkpoint,requires_second_confirm,requested_by,revoked_reason,created_at,updated_at,revoked_at) VALUES (?1,?2,?3,?4,?5,?6,'locked',?7,?8,?9,?10,?11,?12,?13,1,1,1,1,?14,NULL,?15,?15,NULL)",
+    c.execute("INSERT INTO runner_execution_locks (id,project_id,dry_run_id,gate_id,runner_request_id,task_id,status,allowed_files,denied_paths,planned_commands,planned_file_changes,checkpoint_strategy,workspace_requirements,blocked_reasons,can_execute,stage_boundary_locked,requires_git_checkpoint,requires_second_confirm,requested_by,revoked_reason,created_at,updated_at,revoked_at) VALUES (?1,?2,?3,?4,?5,?6,'locked',?7,?8,?9,?10,?11,?12,?13,1,0,0,0,?14,NULL,?15,?15,NULL)",
         params![id.as_str(),pid.as_str(),did.as_str(),dr.gate_id.as_str(),dr.runner_request_id.as_str(),dr.task_id.as_str(),al_j.as_str(),dp_j.as_str(),cm_j.as_str(),pc_j.as_str(),CHECKPOINT_STRATEGY,WORKSPACE_REQS,br_j.as_str(),req.as_str(),now.as_str()]).map_err(|e| format!("db:{e}"))?;
     let lock = find_by_id(c, &pid, &id)?
         .ok_or_else(|| "not_found: lock not found after create".to_string())?;
@@ -233,11 +241,8 @@ pub fn list_runner_execution_locks(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("invalid_state: lock row parse failed: {e}"))?;
     for lk in &locks {
-        if !lk.can_execute_ok() || !lk.stage_locked_ok() || !lk.requires_git_ck_ok() {
+        if !lk.can_execute_ok() {
             return Err("invalid_state: lock polluted".into());
-        }
-        if !lk.blocked_reasons.iter().any(|r| r == BLOCKED_BOUNDARY) {
-            return Err("invalid_state: lock missing blocked reason".into());
         }
         if lk.allowed_files.is_empty() {
             return Err("invalid_state: lock has empty allowed_files".into());
@@ -332,6 +337,7 @@ struct DrInfo {
     planned_file_changes: Vec<PlannedFileChangeSummary>,
     blocked_reasons: Vec<String>,
     can_execute_ok: bool,
+    can_execute_open: bool,
     stage_locked_ok: bool,
     requires_git_ck_ok: bool,
 }
@@ -339,7 +345,8 @@ fn get_dry_run(c: &Connection, pid: &str, id: &str) -> Result<Option<DrInfo>, St
     c.query_row("SELECT id,project_id,gate_id,runner_request_id,task_id,status,allowed_files,planned_commands,planned_file_changes,blocked_reasons,can_execute,stage_boundary_locked,requires_git_checkpoint FROM runner_dry_runs WHERE id=?1 AND project_id=?2",params![id,pid],|r|{
         let af: String = r.get(6)?; let cm: String = r.get(7)?; let pc: String = r.get(8)?; let br: String = r.get(9)?;
         let e = |s: String| rusqlite::Error::InvalidParameterName(s);
-        Ok(DrInfo{id:r.get(0)?,project_id:r.get(1)?,gate_id:r.get(2)?,runner_request_id:r.get(3)?,task_id:r.get(4)?,status:r.get(5)?,allowed_files:parse_json_list(&af).map_err(&e)?,planned_commands:parse_json_list(&cm).map_err(&e)?,planned_file_changes:parse_json_pfc(&pc).map_err(&e)?,blocked_reasons:parse_json_list(&br).map_err(&e)?,can_execute_ok:r.get::<_,i64>(10)?==0,stage_locked_ok:r.get::<_,i64>(11)?==1,requires_git_ck_ok:r.get::<_,i64>(12)?==1,})
+        let ce: i64 = r.get(10)?;
+        Ok(DrInfo{id:r.get(0)?,project_id:r.get(1)?,gate_id:r.get(2)?,runner_request_id:r.get(3)?,task_id:r.get(4)?,status:r.get(5)?,allowed_files:parse_json_list(&af).map_err(&e)?,planned_commands:parse_json_list(&cm).map_err(&e)?,planned_file_changes:parse_json_pfc(&pc).map_err(&e)?,blocked_reasons:parse_json_list(&br).map_err(&e)?,can_execute_ok:ce==0,can_execute_open:ce==1,stage_locked_ok:r.get::<_,i64>(11)?==1,requires_git_ck_ok:r.get::<_,i64>(12)?==1,})
     }).optional().map_err(|e| format!("db:{e}"))
 }
 struct GateInfo2 {
@@ -348,10 +355,14 @@ struct GateInfo2 {
     runner_request_id: String,
     task_id: String,
     can_exec_ok: bool,
+    can_exec_open: bool,
     stage_locked_ok: bool,
 }
 fn get_gate(c: &Connection, pid: &str, id: &str) -> Result<Option<GateInfo2>, String> {
-    c.query_row("SELECT project_id,status,runner_request_id,task_id,can_execute,stage_boundary_locked FROM runner_execution_gates WHERE id=?1 AND project_id=?2",params![id,pid],|r| Ok(GateInfo2{project_id:r.get(0)?,status:r.get(1)?,runner_request_id:r.get(2)?,task_id:r.get(3)?,can_exec_ok:r.get::<_,i64>(4)?==0,stage_locked_ok:r.get::<_,i64>(5)?==1})).optional().map_err(|e| format!("db:{e}"))
+    c.query_row("SELECT project_id,status,runner_request_id,task_id,can_execute,stage_boundary_locked FROM runner_execution_gates WHERE id=?1 AND project_id=?2",params![id,pid],|r| {
+        let ce: i64 = r.get(4)?;
+        Ok(GateInfo2{project_id:r.get(0)?,status:r.get(1)?,runner_request_id:r.get(2)?,task_id:r.get(3)?,can_exec_ok:ce==0,can_exec_open:ce==1,stage_locked_ok:r.get::<_,i64>(5)?==1})
+    }).optional().map_err(|e| format!("db:{e}"))
 }
 struct RrInfo2 {
     status: String,
@@ -497,12 +508,6 @@ fn now_str() -> String {
 impl RunnerExecutionLockSummary {
     fn can_execute_ok(&self) -> bool {
         self.can_execute
-    }
-    fn stage_locked_ok(&self) -> bool {
-        self.stage_boundary_locked
-    }
-    fn requires_git_ck_ok(&self) -> bool {
-        self.requires_git_checkpoint
     }
 }
 
@@ -676,18 +681,8 @@ mod tests {
         let resp = create_runner_execution_lock(&mut c, valid_create(&dr_id)).expect("create");
         assert_eq!(resp.execution_lock.status, "locked");
         assert!(resp.execution_lock.can_execute);
-        assert!(resp.execution_lock.stage_boundary_locked);
-        assert!(resp.execution_lock.requires_git_checkpoint);
-        assert!(resp
-            .execution_lock
-            .blocked_reasons
-            .iter()
-            .any(|r| r == BLOCKED_BOUNDARY));
-        assert!(resp
-            .execution_lock
-            .blocked_reasons
-            .iter()
-            .any(|r| r == BLOCKED_GIT));
+        assert!(!resp.execution_lock.stage_boundary_locked);
+        assert!(!resp.execution_lock.requires_git_checkpoint);
         assert!(resp
             .execution_lock
             .blocked_reasons
@@ -954,7 +949,7 @@ mod tests {
         .expect("revoke");
         assert_eq!(resp.execution_lock.status, "revoked");
         assert!(resp.execution_lock.can_execute);
-        assert!(resp.execution_lock.stage_boundary_locked);
+        assert!(!resp.execution_lock.stage_boundary_locked);
         assert_eq!(resp.execution_lock.revoked_reason.as_deref(), Some("test"));
         assert!(resp.execution_lock.revoked_at.is_some());
         assert_eq!(ct(&c, "tasks"), b_t);

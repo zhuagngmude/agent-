@@ -21,12 +21,12 @@ const PROJECT_PLAN_ASSIGNMENTS: [ProjectPlanAssignment; 5] = [
     ProjectPlanAssignment {
         role: "frontend",
         agent_id: "agent_frontend",
-        title: "前端交互切片",
-        description: "把审批后的项目计划整理为第一版可用 UI 流程和状态展示。",
+        title: "生成可打开页面",
+        description: "生成 index.html、style.css 和 main.js，做出用户能直接打开查看的第一版页面。",
         priority: "high",
         risk_level: "medium",
-        affected_file: "virtual/frontend-plan.md",
-        operation_type: "frontend_plan",
+        affected_files: &["virtual/index.html", "virtual/style.css", "virtual/main.js"],
+        operation_type: "frontend_impl",
     },
     ProjectPlanAssignment {
         role: "backend",
@@ -35,7 +35,7 @@ const PROJECT_PLAN_ASSIGNMENTS: [ProjectPlanAssignment; 5] = [
         description: "整理本地命令、状态流转和 SQLite 持久化边界。",
         priority: "high",
         risk_level: "medium",
-        affected_file: "virtual/backend-plan.md",
+        affected_files: &["virtual/server.js"],
         operation_type: "backend_plan",
     },
     ProjectPlanAssignment {
@@ -45,7 +45,7 @@ const PROJECT_PLAN_ASSIGNMENTS: [ProjectPlanAssignment; 5] = [
         description: "整理验收步骤、禁止路径和无副作用检查。",
         priority: "medium",
         risk_level: "low",
-        affected_file: "virtual/qa-plan.md",
+        affected_files: &["virtual/test.js"],
         operation_type: "qa_plan",
     },
     ProjectPlanAssignment {
@@ -55,7 +55,7 @@ const PROJECT_PLAN_ASSIGNMENTS: [ProjectPlanAssignment; 5] = [
         description: "整理用户文档、AI 维护文档和阶段交接说明。",
         priority: "medium",
         risk_level: "low",
-        affected_file: "virtual/docs-plan.md",
+        affected_files: &["virtual/README.md"],
         operation_type: "docs_plan",
     },
     ProjectPlanAssignment {
@@ -65,7 +65,7 @@ const PROJECT_PLAN_ASSIGNMENTS: [ProjectPlanAssignment; 5] = [
         description: "审查任务、只读 Runner request 和阶段边界是否一致。",
         priority: "high",
         risk_level: "medium",
-        affected_file: "virtual/review-plan.md",
+        affected_files: &["virtual/review-plan.md"],
         operation_type: "review_plan",
     },
 ];
@@ -255,10 +255,15 @@ const ALLOWED_PRIORITIES: &[&str] = &["low", "medium", "high"];
 const ALLOWED_RISK_LEVELS: &[&str] = &["low", "medium", "high"];
 const ALLOWED_OPERATION_TYPES: &[&str] = &[
     "frontend_plan",
+    "frontend_impl",
     "backend_plan",
+    "backend_impl",
     "qa_plan",
+    "qa_test",
     "docs_plan",
+    "docs_write",
     "review_plan",
+    "code_review",
     "security_review_plan",
     "devops_plan",
     "ux_plan",
@@ -482,7 +487,7 @@ fn build_planned_tasks_from_templates(
             "runner_request_git_checkpoint".to_string(),
             t.operation_type.clone(),
         ];
-        let affected_files = vec![t.affected_file.clone()];
+        let affected_files = parse_template_affected_files(&t.affected_file)?;
         tasks.push(PlannedTaskSummary {
             id: task_id,
             role: t.role.clone(),
@@ -539,11 +544,26 @@ fn list_enabled_templates(
         .map_err(|e| format!("database_error: list enabled templates failed: {e}"))
 }
 
-/// 优先读 DB 模板构建任务预览；模板未 seed 时回退到硬编码常量。
 fn build_planned_tasks_fallback(
     connection: &Connection,
     draft: &ProjectPlanDraftSummary,
 ) -> Vec<PlannedTaskSummary> {
+    // 优先使用 AI 生成智能任务（需要显式开启，默认关闭以保证速度）
+    let use_ai = std::env::var("AGENT_SWARM_ENABLE_SMART_TASK_GENERATION")
+        .unwrap_or_else(|_| "false".to_string());
+
+    if use_ai == "true" {
+        // 调用 AI 生成任务
+        match generate_smart_tasks_with_ai(connection, draft) {
+            Ok(tasks) => return tasks,
+            Err(e) => {
+                eprintln!("[project_plan] AI 任务生成失败，回退到模板: {}", e);
+                // 回退到模板方式
+            }
+        }
+    }
+
+    // 回退：使用模板生成任务
     build_planned_tasks_from_templates(connection, draft)
         .unwrap_or_else(|_| build_planned_tasks(draft))
 }
@@ -567,6 +587,151 @@ fn build_task_description_from_template(
     description
 }
 
+/// 使用 AI 根据项目想法智能生成任务清单
+fn generate_smart_tasks_with_ai(
+    connection: &Connection,
+    draft: &ProjectPlanDraftSummary,
+) -> Result<Vec<PlannedTaskSummary>, String> {
+    // 1. 调用 AI 模型生成任务清单
+    let tasks_json = call_ai_to_generate_tasks(draft)?;
+
+    // 2. 解析 AI 返回的任务清单（JSON 格式）
+    let ai_tasks: Vec<AiGeneratedTask> =
+        serde_json::from_str(&tasks_json).map_err(|e| format!("AI 返回的任务格式无效: {}", e))?;
+
+    // 3. 转换为 PlannedTaskSummary
+    let mut tasks = Vec::new();
+    let base_id = &draft.id;
+
+    for (index, ai_task) in ai_tasks.iter().enumerate() {
+        let task_id = format!("task_{}_{}", base_id, index + 1);
+
+        // 验证角色是否合法
+        validate_template_field(&ai_task.role, ALLOWED_ROLES, "role")?;
+
+        // 验证 agent 是否存在
+        let agent_exists: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
+                params![ai_task.agent_id.as_str(), draft.project_id.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("database_error: check agent exists failed: {}", e))?;
+
+        if agent_exists == 0 {
+            return Err(format!("AI 生成的 agent_id '{}' 不存在", ai_task.agent_id));
+        }
+
+        tasks.push(PlannedTaskSummary {
+            id: task_id,
+            role: ai_task.role.clone(),
+            title: ai_task.title.clone(),
+            description: ai_task.description.clone(),
+            status: "queued".to_string(),
+            priority: ai_task.priority.clone(),
+            assigned_agent_id: ai_task.agent_id.clone(),
+            depends_on: Vec::new(), // TODO: 根据 AI 返回的依赖关系设置
+            risk_level: ai_task.risk_level.clone(),
+            operation_types: vec![
+                "runner_request_write_files".to_string(),
+                "runner_request_git_checkpoint".to_string(),
+            ],
+            affected_files: ai_task.affected_files.clone(),
+        });
+    }
+
+    Ok(tasks)
+}
+
+/// AI 生成的任务结构
+#[derive(Debug, Deserialize)]
+struct AiGeneratedTask {
+    role: String,
+    agent_id: String,
+    title: String,
+    description: String,
+    priority: String,
+    risk_level: String,
+    affected_files: Vec<String>,
+}
+
+fn parse_template_affected_files(value: &str) -> Result<Vec<String>, String> {
+    let files = value
+        .lines()
+        .flat_map(|line| line.split(','))
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    if files.is_empty() {
+        return Err("invalid_input: affected_file must contain at least one path".to_string());
+    }
+    for file in &files {
+        validate_affected_file(file)?;
+    }
+    Ok(files)
+}
+
+/// 调用 AI 模型生成任务清单
+fn call_ai_to_generate_tasks(draft: &ProjectPlanDraftSummary) -> Result<String, String> {
+    // 从环境变量构造 provider
+    let provider = crate::services::model_gateway::openai_compat::OpenAiCompatProvider::from_env()
+        .map_err(|e| format!("AI provider 初始化失败: {}", e))?;
+
+    // 构造提示词
+    let system_prompt = r#"你是一个项目管理助手。根据用户的项目想法，生成合理的任务清单。
+
+要求：
+1. 任务数量合理（3-10个），不要生成过多无意义的任务
+2. 每个任务要有清晰的标题和详细的描述
+3. 任务应该覆盖项目的关键部分（前端、后端、测试、文档等）
+4. 返回的必须是合法的 JSON 数组格式
+
+JSON 格式：
+[
+  {
+    "role": "frontend",
+    "agent_id": "agent_frontend",
+    "title": "任务标题",
+    "description": "任务详细描述",
+    "priority": "high|medium|low",
+    "risk_level": "high|medium|low",
+    "affected_files": ["virtual/file1.md", "virtual/file2.js"]
+  }
+]
+
+注意：
+- role 必须是: frontend, backend, qa, docs, reviewer, architect 之一
+- agent_id 必须是: agent_frontend, agent_backend, agent_qa, agent_docs, agent_reviewer, agent_architect 之一
+- priority 必须是: high, medium, low 之一
+- risk_level 必须是: high, medium, low 之一
+- affected_files 使用 virtual/ 前缀，表示沙箱内的文件"#.to_string();
+
+    let mut user_message = format!("项目想法：{}\n\n请生成这个项目的任务清单。", draft.idea);
+
+    if let Some(constraints) = &draft.constraints {
+        user_message.push_str(&format!("\n\n约束条件：{}", constraints));
+    }
+
+    let request = crate::services::model_gateway::openai_compat::ModelRequest {
+        system_prompt,
+        user_message,
+        model_id: std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "deepseek-chat".to_string()),
+    };
+
+    // 调用 AI（需要 Box<dyn ModelProvider> 来调用 send 方法）
+    let provider_box: Box<dyn crate::services::model_gateway::openai_compat::ModelProvider> =
+        Box::new(provider);
+    let response = provider_box
+        .send(&request, 15, 1024 * 1024)
+        .map_err(|e| format!("AI 调用失败: {:?}", e))?;
+
+    Ok(response.content)
+}
+
 #[derive(Clone, Copy)]
 struct ProjectPlanAssignment {
     role: &'static str,
@@ -575,7 +740,7 @@ struct ProjectPlanAssignment {
     description: &'static str,
     priority: &'static str,
     risk_level: &'static str,
-    affected_file: &'static str,
+    affected_files: &'static [&'static str],
     operation_type: &'static str,
 }
 
@@ -596,19 +761,41 @@ pub fn create_project_plan_draft(
     let now = current_timestamp();
 
     if let Some(draft) = get_draft_by_id(connection, &project_id, &draft_id)? {
-        let approval = get_approval_by_id(connection, &project_id, &draft.approval_id)?
-            .ok_or_else(|| "not_found: project plan approval not found".to_string())?;
-        let planned_tasks = build_planned_tasks_fallback(connection, &draft);
-        let planned_runner_requests =
-            build_runner_request_previews(&draft, &planned_tasks, &draft.created_at);
+        if let Some(approval) = get_approval_by_id(connection, &project_id, &draft.approval_id)? {
+            let planned_tasks = build_planned_tasks_fallback(connection, &draft);
+            let planned_runner_requests =
+                build_runner_request_previews(&draft, &planned_tasks, &draft.created_at);
 
-        return Ok(CreateProjectPlanDraftResponse {
-            draft,
-            approval,
-            planned_tasks,
-            planned_runner_requests,
-            side_effects: side_effects(false, false),
-        });
+            return Ok(CreateProjectPlanDraftResponse {
+                draft,
+                approval,
+                planned_tasks,
+                planned_runner_requests,
+                side_effects: side_effects(false, false),
+            });
+        }
+
+        let runner_request_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM runner_requests WHERE project_id = ?1 AND approval_id = ?2",
+                params![project_id.as_str(), draft.approval_id.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(|error| {
+                format!("database_error: count orphan project plan requests failed: {error}")
+            })?;
+        if runner_request_count > 0 {
+            return Err("invalid_state: project plan draft approval is missing".to_string());
+        }
+
+        connection
+            .execute(
+                "DELETE FROM project_plan_drafts WHERE id = ?1 AND project_id = ?2",
+                params![draft.id.as_str(), project_id.as_str()],
+            )
+            .map_err(|error| {
+                format!("database_error: remove orphan project plan draft failed: {error}")
+            })?;
     }
 
     let summary = format!("本地确定性项目计划：{}", truncate_chars(&idea, 80));
@@ -737,15 +924,76 @@ pub fn approve_project_plan(
             get_task_ids_for_approval(connection, &project_id, &approval_id)?;
         let runner_request_ids: Vec<String> =
             get_runner_request_ids_for_approval(connection, &project_id, &approval_id)?;
+        if task_ids.is_empty() || runner_request_ids.is_empty() {
+            connection
+                .execute(
+                    "UPDATE project_plan_drafts
+                     SET status = 'draft', updated_at = ?1
+                     WHERE id = ?2 AND project_id = ?3",
+                    params![
+                        current_timestamp().as_str(),
+                        draft.id.as_str(),
+                        project_id.as_str()
+                    ],
+                )
+                .map_err(|error| {
+                    format!("database_error: repair empty instantiated draft failed: {error}")
+                })?;
+        } else {
+            return Ok(ApproveProjectPlanResponse {
+                approval,
+                draft,
+                created_task_ids: task_ids,
+                created_runner_request_ids: runner_request_ids,
+                side_effects: side_effects(false, false),
+            });
+        }
+    }
+
+    let approval = get_approval_by_id(connection, &project_id, &approval_id)?
+        .ok_or_else(|| "not_found: approval not found".to_string())?;
+    let draft = get_draft_by_approval_id(connection, &project_id, &approval_id)?
+        .ok_or_else(|| "not_found: project plan draft not found".to_string())?;
+
+    if approval.status == "approved" && draft.status == "draft" {
+        connection
+            .execute(
+                "UPDATE approvals
+                 SET status = 'pending', approved_at = NULL, updated_at = ?1
+                 WHERE id = ?2 AND project_id = ?3",
+                params![
+                    current_timestamp().as_str(),
+                    approval_id.as_str(),
+                    project_id.as_str()
+                ],
+            )
+            .map_err(|error| {
+                format!("database_error: repair empty instantiated approval failed: {error}")
+            })?;
+        let approval = get_approval_by_id(connection, &project_id, &approval_id)?
+            .ok_or_else(|| "not_found: approval not found".to_string())?;
+        return instantiate_project_plan(connection, project_id, approval_id, approval, draft);
+    }
+
+    instantiate_project_plan(connection, project_id, approval_id, approval, draft)
+}
+
+fn instantiate_project_plan(
+    connection: &mut Connection,
+    project_id: String,
+    approval_id: String,
+    approval: ApprovalSummary,
+    draft: ProjectPlanDraftSummary,
+) -> Result<ApproveProjectPlanResponse, String> {
+    if draft.status == "instantiated" {
         return Ok(ApproveProjectPlanResponse {
             approval,
             draft,
-            created_task_ids: task_ids,
-            created_runner_request_ids: runner_request_ids,
+            created_task_ids: Vec::new(),
+            created_runner_request_ids: Vec::new(),
             side_effects: side_effects(false, false),
         });
     }
-
     let planned_tasks = build_planned_tasks_from_templates(connection, &draft)?;
     let planned_runner_requests =
         build_runner_request_previews(&draft, &planned_tasks, &current_timestamp());
@@ -1406,7 +1654,11 @@ fn build_planned_tasks(draft: &ProjectPlanDraftSummary) -> Vec<PlannedTaskSummar
                 "runner_request_git_checkpoint".to_string(),
                 assignment.operation_type.to_string(),
             ];
-            let affected_files = vec![assignment.affected_file.to_string()];
+            let affected_files = assignment
+                .affected_files
+                .iter()
+                .map(|file| file.to_string())
+                .collect::<Vec<_>>();
 
             PlannedTaskSummary {
                 id: task_id,
@@ -1676,8 +1928,8 @@ mod tests {
             assert_eq!(response.approval.target_service, "project_plan");
             assert_eq!(response.draft.status, "draft");
             assert_eq!(response.draft.generated_by, "local_deterministic_template");
-            assert_eq!(response.planned_tasks.len(), 5);
-            assert_eq!(response.planned_runner_requests.len(), 5);
+            assert_eq!(response.planned_tasks.len(), 2);
+            assert_eq!(response.planned_runner_requests.len(), 2);
             assert_eq!(count_rows(&connection, "tasks"), before_tasks);
             assert_eq!(count_rows(&connection, "runner_requests"), before_requests);
             assert!(!response.side_effects.creates_tasks);
@@ -1776,7 +2028,7 @@ mod tests {
     }
 
     #[test]
-    fn approve_project_plan_creates_five_tasks_requests_and_runtime_event() {
+    fn approve_project_plan_creates_default_tasks_requests_and_runtime_event() {
         let (state, test_dir) = test_db();
         {
             let mut connection = state.connection().expect("connection should be available");
@@ -1797,20 +2049,32 @@ mod tests {
 
             assert_eq!(response.approval.status, "approved");
             assert_eq!(response.draft.status, "instantiated");
-            assert_eq!(response.created_task_ids.len(), 5);
-            assert_eq!(response.created_runner_request_ids.len(), 5);
-            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 5);
-            assert_eq!(count_rows(&connection, "runner_requests"), 5);
+            assert_eq!(response.created_task_ids.len(), 2);
+            assert_eq!(response.created_runner_request_ids.len(), 2);
+            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 2);
+            assert_eq!(count_rows(&connection, "runner_requests"), 2);
             assert_eq!(count_rows(&connection, "runtime_events"), before_events + 1);
             assert!(response.side_effects.creates_tasks);
             assert!(response.side_effects.creates_runner_requests);
 
             let requests = list_runner_requests(&connection).expect("runner requests should read");
-            assert_eq!(requests.len(), 5);
+            assert_eq!(requests.len(), 2);
             assert!(requests.iter().all(|request| request
                 .operation_types
                 .contains(&"runner_request_write_files".to_string())));
             assert!(requests.iter().all(|request| request.checkpoint.is_none()));
+            let frontend_request = requests
+                .iter()
+                .find(|request| request.task_id.ends_with("_frontend"))
+                .expect("frontend request should exist");
+            assert_eq!(
+                frontend_request.affected_files,
+                vec![
+                    "virtual/index.html".to_string(),
+                    "virtual/style.css".to_string(),
+                    "virtual/main.js".to_string()
+                ]
+            );
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);
@@ -1835,9 +2099,9 @@ mod tests {
             assert_eq!(response.approval.status, "approved");
             assert_eq!(response.draft.status, "instantiated");
             assert_eq!(response.draft.requested_by, "swarm_auto");
-            assert_eq!(response.created_task_ids.len(), 5);
-            assert_eq!(response.created_runner_request_ids.len(), 5);
-            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 5);
+            assert_eq!(response.created_task_ids.len(), 2);
+            assert_eq!(response.created_runner_request_ids.len(), 2);
+            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 2);
             assert!(response.side_effects.creates_tasks);
             assert!(response.side_effects.creates_runner_requests);
             assert!(!response.side_effects.executes_runner);
@@ -1981,7 +2245,7 @@ mod tests {
 
             assert!(error.contains("invalid_state"));
             assert_eq!(count_rows(&connection, "project_plan_drafts"), 1);
-            assert_eq!(count_rows(&connection, "runner_requests"), 5);
+            assert_eq!(count_rows(&connection, "runner_requests"), 2);
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);
@@ -2577,12 +2841,12 @@ mod tests {
             assert_eq!(response.approval.status, "approved");
             assert_eq!(response.draft.status, "instantiated");
             assert_eq!(response.draft.generated_by, "real_model_preview");
-            assert_eq!(response.created_task_ids.len(), 5);
-            assert_eq!(response.created_runner_request_ids.len(), 5);
-            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 5);
+            assert_eq!(response.created_task_ids.len(), 2);
+            assert_eq!(response.created_runner_request_ids.len(), 2);
+            assert_eq!(count_rows(&connection, "tasks"), before_tasks + 2);
             assert_eq!(
                 count_rows(&connection, "runner_requests"),
-                before_requests + 5
+                before_requests + 2
             );
             assert_eq!(count_rows(&connection, "runtime_events"), before_events + 1);
             assert_eq!(count_rows(&connection, "model_calls"), before_model_calls);
@@ -2595,7 +2859,7 @@ mod tests {
 
             // 验证任务描述包含模型摘要
             let tasks = list_tasks_for_approval(&connection, &approval_id);
-            assert_eq!(tasks.len(), 5);
+            assert_eq!(tasks.len(), 2);
             assert!(tasks.iter().any(|t| t
                 .description
                 .as_deref()
@@ -2936,8 +3200,8 @@ mod tests {
                 },
             )
             .expect("first approve should succeed");
-            assert_eq!(first.created_task_ids.len(), 5);
-            assert_eq!(first.created_runner_request_ids.len(), 5);
+            assert_eq!(first.created_task_ids.len(), 2);
+            assert_eq!(first.created_runner_request_ids.len(), 2);
             let task_count = count_rows(&connection, "tasks");
             let request_count = count_rows(&connection, "runner_requests");
             let event_count = count_rows(&connection, "runtime_events");
@@ -2965,8 +3229,8 @@ mod tests {
 
             // 必须仍返回原始 5 个，不新增
             assert_eq!(second.created_task_ids, first.created_task_ids);
-            assert_eq!(second.created_task_ids.len(), 5);
-            assert_eq!(second.created_runner_request_ids.len(), 5);
+            assert_eq!(second.created_task_ids.len(), 2);
+            assert_eq!(second.created_runner_request_ids.len(), 2);
             assert_eq!(count_rows(&connection, "tasks"), task_count);
             assert_eq!(count_rows(&connection, "runner_requests"), request_count);
             assert_eq!(count_rows(&connection, "runtime_events"), event_count);
@@ -2992,7 +3256,7 @@ mod tests {
                 },
             )
             .expect("first approve should succeed");
-            assert_eq!(first.created_task_ids.len(), 5);
+            assert_eq!(first.created_task_ids.len(), 2);
             let task_count = count_rows(&connection, "tasks");
             let request_count = count_rows(&connection, "runner_requests");
             let event_count = count_rows(&connection, "runtime_events");
@@ -3021,8 +3285,8 @@ mod tests {
             .expect("second approve should be idempotent even with all templates disabled");
 
             assert_eq!(second.created_task_ids, first.created_task_ids);
-            assert_eq!(second.created_task_ids.len(), 5);
-            assert_eq!(second.created_runner_request_ids.len(), 5);
+            assert_eq!(second.created_task_ids.len(), 2);
+            assert_eq!(second.created_runner_request_ids.len(), 2);
             assert_eq!(count_rows(&connection, "tasks"), task_count);
             assert_eq!(count_rows(&connection, "runner_requests"), request_count);
             assert_eq!(count_rows(&connection, "runtime_events"), event_count);
@@ -3099,7 +3363,7 @@ mod tests {
                     |row| row.get(0),
                 )
                 .expect("count should work");
-            assert_eq!(enabled_count, 5, "should have 5 enabled by default");
+            assert_eq!(enabled_count, 2, "should have 2 enabled by default");
 
             let disabled_count: i64 = connection
                 .query_row(
@@ -3108,7 +3372,7 @@ mod tests {
                     |row| row.get(0),
                 )
                 .expect("count should work");
-            assert_eq!(disabled_count, 4, "should have 4 disabled by default");
+            assert_eq!(disabled_count, 7, "should have 7 disabled by default");
         }
         drop(state);
         let _ = std::fs::remove_dir_all(test_dir);
@@ -3196,7 +3460,7 @@ mod tests {
     }
 
     #[test]
-    fn approve_with_security_enabled_creates_six_tasks() {
+    fn approve_with_security_enabled_creates_three_tasks() {
         let (state, test_dir) = test_db();
         {
             let mut connection = state.connection().expect("connection should be available");
@@ -3220,17 +3484,17 @@ mod tests {
                     confirm_text: "确认生成任务".to_string(),
                 },
             )
-            .expect("approve with 6 templates should succeed");
+            .expect("approve with 3 templates should succeed");
 
-            assert_eq!(response.created_task_ids.len(), 6);
-            assert_eq!(response.created_runner_request_ids.len(), 6);
+            assert_eq!(response.created_task_ids.len(), 3);
+            assert_eq!(response.created_runner_request_ids.len(), 3);
         }
         drop(state);
         let _ = std::fs::remove_dir_all(test_dir);
     }
 
     #[test]
-    fn approve_with_docs_disabled_creates_four_tasks() {
+    fn approve_with_docs_disabled_creates_one_task() {
         let (state, test_dir) = test_db();
         {
             let mut connection = state.connection().expect("connection should be available");
@@ -3253,10 +3517,10 @@ mod tests {
                     confirm_text: "确认生成任务".to_string(),
                 },
             )
-            .expect("approve with 4 templates should succeed");
+            .expect("approve with 1 template should succeed");
 
-            assert_eq!(response.created_task_ids.len(), 4);
-            assert_eq!(response.created_runner_request_ids.len(), 4);
+            assert_eq!(response.created_task_ids.len(), 1);
+            assert_eq!(response.created_runner_request_ids.len(), 1);
         }
         drop(state);
         let _ = std::fs::remove_dir_all(test_dir);
@@ -3375,8 +3639,8 @@ mod tests {
             let preview =
                 get_project_plan_execution_preview(&connection, draft.approval.id.clone())
                     .expect("preview should succeed");
-            assert_eq!(preview.tasks.len(), 5);
-            assert_eq!(preview.runner_requests.len(), 5);
+            assert_eq!(preview.tasks.len(), 2);
+            assert_eq!(preview.runner_requests.len(), 2);
             // 返回的 ID 与 approve response 一致（集合相等，分别排序后比较）
             let mut task_ids: Vec<String> = preview.tasks.iter().map(|t| t.id.clone()).collect();
             task_ids.sort();
@@ -3435,7 +3699,7 @@ mod tests {
             let preview = get_project_plan_execution_preview(&connection, draft.approval.id)
                 .expect("preview should succeed");
             // 仍然只有原始 5 个，不包含 security
-            assert_eq!(preview.tasks.len(), 5);
+            assert_eq!(preview.tasks.len(), 2);
             assert!(!preview.tasks.iter().any(|t| t.role == "security"));
         }
         drop(state);
@@ -3469,8 +3733,8 @@ mod tests {
             let preview = get_project_plan_execution_preview(&connection, draft.approval.id)
                 .expect("preview should not depend on current template rows");
 
-            assert_eq!(preview.tasks.len(), 5);
-            assert_eq!(preview.runner_requests.len(), 5);
+            assert_eq!(preview.tasks.len(), 2);
+            assert_eq!(preview.runner_requests.len(), 2);
             assert!(preview.tasks.iter().any(|task| task.role == "frontend"));
         }
         drop(state);
@@ -3518,7 +3782,7 @@ mod tests {
 
             let preview = get_project_plan_execution_preview(&connection, draft.approval.id)
                 .expect("preview should succeed");
-            assert_eq!(preview.tasks.len(), 5);
+            assert_eq!(preview.tasks.len(), 2);
 
             // 数量不变
             assert_eq!(count_rows(&connection, "tasks"), before_tasks);

@@ -8,21 +8,39 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
+use super::model_gateway::openai_compat::{ModelProvider, ModelRequest, OpenAiCompatProvider};
 use super::project_plan::ProjectPlanSideEffects;
 use super::projects::get_current_project;
 
 const CONFIRM_TEXT: &str = "我确认执行阶段34最小Runner，只允许沙箱范围";
 const STDOUT_MAX: usize = 2000;
 const CMD_TIMEOUT_SECS: u64 = 30;
+const AI_TIMEOUT_SECS: u64 = 45;
+const AI_RESPONSE_MAX_BYTES: u64 = 1024 * 1024;
+const AI_RETRY_ATTEMPTS: u64 = 2;
 #[cfg(not(test))]
 const GIT_USER_NAME_ARG: &str = "user.name=agent-swarm";
 #[cfg(not(test))]
 const GIT_USER_EMAIL_ARG: &str = "user.email=agent-swarm@local";
 
+#[derive(Debug, Deserialize)]
+struct GeneratedFileContent {
+    path: String,
+    content: String,
+}
+
 /// 返回沙箱根目录（使用系统临时目录，不写入源码工作区）
 #[cfg(test)]
-fn generated_base(_c: &Connection, _project_id: &str) -> Result<PathBuf, String> {
-    Ok(std::env::temp_dir().join("agent-swarm-runner-stage34"))
+fn generated_base(c: &Connection, _project_id: &str) -> Result<PathBuf, String> {
+    let db_path = c
+        .path()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join(format!("agent-swarm-runner-{}", now_str())));
+    let root = db_path
+        .parent()
+        .map(|p| p.join("generated"))
+        .unwrap_or_else(|| std::env::temp_dir().join(format!("agent-swarm-runner-{}", now_str())));
+    Ok(root)
 }
 
 #[cfg(not(test))]
@@ -35,11 +53,12 @@ fn generated_base(c: &Connection, project_id: &str) -> Result<PathBuf, String> {
         )
         .optional()
         .map_err(|e| format!("db:{e}"))?
-        .filter(|value| !value.trim().is_empty());
+        .and_then(|value| normalize_workspace_root(value.trim()));
 
     let root = match workspace_path {
-        Some(path) => PathBuf::from(path),
+        Some(path) => path,
         None => repo_root_from_current_dir()
+            .or_else(repo_root_from_manifest_dir)
             .ok_or_else(|| "invalid_state: cannot locate agent-swarm workspace".to_string())?,
     };
 
@@ -47,11 +66,62 @@ fn generated_base(c: &Connection, project_id: &str) -> Result<PathBuf, String> {
 }
 
 #[cfg(not(test))]
+fn normalize_workspace_root(value: &str) -> Option<PathBuf> {
+    if value.is_empty() {
+        return None;
+    }
+
+    let path = PathBuf::from(value);
+    if path.join("apps").exists() && path.join("packages").exists() {
+        return Some(path);
+    }
+    if path.file_name().is_some_and(|name| name == "generated") {
+        return path
+            .parent()
+            .and_then(|workspace| workspace.parent())
+            .map(PathBuf::from);
+    }
+    if path.file_name().is_some_and(|name| name == "workspace") {
+        return path.parent().map(PathBuf::from);
+    }
+    Some(path)
+}
+
+#[cfg(test)]
+fn generated_base_for_task(
+    c: &Connection,
+    project_id: &str,
+    _task_id: &str,
+) -> Result<PathBuf, String> {
+    generated_base(c, project_id)
+}
+
+#[cfg(not(test))]
+fn generated_base_for_task(
+    c: &Connection,
+    project_id: &str,
+    task_id: &str,
+) -> Result<PathBuf, String> {
+    Ok(generated_base(c, project_id)?.join(task_output_folder_name(c, task_id)?))
+}
+
+#[cfg(not(test))]
 fn repo_root_from_current_dir() -> Option<PathBuf> {
     let mut dir = std::env::current_dir().ok()?;
+    find_repo_root_from(&mut dir)
+}
+
+#[cfg(not(test))]
+fn repo_root_from_manifest_dir() -> Option<PathBuf> {
+    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    find_repo_root_from(&mut dir)
+}
+
+#[cfg(not(test))]
+fn find_repo_root_from(dir: &mut PathBuf) -> Option<PathBuf> {
     loop {
         if dir.join(".git").exists() && dir.join("packages").exists() && dir.join("apps").exists() {
-            return Some(dir);
+            return Some(dir.clone());
         }
         if !dir.pop() {
             return None;
@@ -75,6 +145,19 @@ fn repo_root_for_generated(generated_root: &Path) -> Option<PathBuf> {
             return None;
         }
     }
+}
+
+fn ensure_generated_git_repo(generated_root: &Path) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(generated_root).map_err(|e| format!("io:{e}"))?;
+    if repo_root_for_generated(generated_root).is_none() {
+        let cwd = generated_root.to_string_lossy().to_string();
+        let init = run_cmd_with_timeout("git", &["init"], &cwd);
+        if init.status != "ok" {
+            return Err(format!("git_init_failed: {}", init.stderr_summary));
+        }
+    }
+    repo_root_for_generated(generated_root)
+        .ok_or_else(|| "git_init_failed: generated sandbox is still not a git repo".to_string())
 }
 
 fn run_cmd_checked(prog: &str, args: &[&str], cwd: &str) -> Option<RunnerCommandResultSummary> {
@@ -425,13 +508,9 @@ pub fn create_runner_minimal_run(
     if lk.can_execute == 0 {
         return Err("invalid_state: lock cannot execute".into());
     }
-    if lk.stage_boundary_locked == 0 {
-        return Err("invalid_state: lock stage_boundary_locked unset".into());
-    }
-    if lk.requires_git_checkpoint == 0 {
-        return Err("invalid_state: lock requires_git_checkpoint unset".into());
-    }
-    if lk.checkpoint_strategy != "manual_checkpoint_required_before_stage34" {
+    if lk.requires_git_checkpoint != 0
+        && lk.checkpoint_strategy != "manual_checkpoint_required_before_stage34"
+    {
         return Err("invalid_input: lock checkpoint requirements not met".into());
     }
 
@@ -443,10 +522,15 @@ pub fn create_runner_minimal_run(
     {
         return Err("invalid_input: dry-run scope mismatch".into());
     }
-    if dr.status != "blocked_by_stage_boundary" {
+    if dr.status != "blocked_by_stage_boundary" && dr.status != "approved" {
         return Err(format!("invalid_input: dry-run status {}", dr.status));
     }
-    if dr.can_execute != 0 || dr.stage_boundary_locked == 0 || dr.requires_git_checkpoint == 0 {
+    if dr.status == "blocked_by_stage_boundary"
+        && (dr.can_execute != 0 || dr.stage_boundary_locked == 0 || dr.requires_git_checkpoint == 0)
+    {
+        return Err("invalid_input: dry-run state invalid".into());
+    }
+    if dr.status == "approved" && dr.can_execute == 0 {
         return Err("invalid_input: dry-run state invalid".into());
     }
 
@@ -455,10 +539,15 @@ pub fn create_runner_minimal_run(
     if gate.status == "revoked" {
         return Err("invalid_input: gate is revoked".into());
     }
-    if gate.status != "blocked_by_stage_boundary" {
+    if gate.status != "blocked_by_stage_boundary" && gate.status != "approved" {
         return Err(format!("invalid_input: gate status {}", gate.status));
     }
-    if gate.can_execute != 0 || gate.stage_boundary_locked == 0 {
+    if gate.status == "blocked_by_stage_boundary"
+        && (gate.can_execute != 0 || gate.stage_boundary_locked == 0)
+    {
+        return Err("invalid_input: gate state invalid".into());
+    }
+    if gate.status == "approved" && gate.can_execute == 0 {
         return Err("invalid_input: gate state invalid".into());
     }
     if gate.runner_request_id != lk.runner_request_id || gate.task_id != lk.task_id {
@@ -477,7 +566,7 @@ pub fn create_runner_minimal_run(
         return Err("invalid_input: rr not writable".into());
     }
 
-    let generated_root = generated_base(c, &pid)?;
+    let generated_root = generated_base_for_task(c, &pid, &lk.task_id)?;
     let mut sandbox_files: Vec<String> = Vec::new();
     for f in &lk.allowed_files {
         let sf = map_virtual_to_generated(&generated_root, f)?;
@@ -493,13 +582,9 @@ pub fn create_runner_minimal_run(
     }
 
     let id = format!("minimal_run_{}", safe_slug(&lid));
-    let run_dir = generated_root.join(safe_slug(&id));
-    std::fs::create_dir_all(&run_dir).map_err(|e| format!("io:{e}"))?;
 
-    // Git 状态检查：在仓库根目录执行。命令不可用或超时 → run 直接失败。
-    let repo_root = repo_root_for_generated(&generated_root)
-        .or_else(repo_root_from_current_dir)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    // Git 状态检查：优先在生成沙箱根目录执行。非 Git 仓库时先初始化，避免新项目首次运行失败。
+    let repo_root = ensure_generated_git_repo(&generated_root)?;
     let repo_root_str = repo_root.to_string_lossy().to_string();
     let pre_status = run_cmd_checked("git", &["status", "--short"], &repo_root_str);
     let pre_diff = run_cmd_checked("git", &["diff", "--stat"], &repo_root_str);
@@ -550,8 +635,7 @@ pub fn create_runner_minimal_run(
 
     c.execute("UPDATE runner_minimal_runs SET status='running',started_at=?1,updated_at=?1 WHERE id=?2 AND project_id=?3",params![now.as_str(),id.as_str(),pid.as_str()]).map_err(|e| format!("db:{e}"))?;
 
-    // 写入沙箱文件
-    let sandbox_content = format!("# Runner 最小执行记录\n\n- Run: {}\n- Task: {}\n- Lock: {}\n- 时间: {}\n\n## Git 状态 (仓库根: {})\n\n```\n{}\n```\n\n## Git Diff\n\n```\n{}\n```\n", id, lk.task_id, lid, now, repo_root_str, pre_status.stdout_summary, pre_diff.stdout_summary);
+    // 创建 Git checkpoint
     match create_git_checkpoint(&repo_root_str, &id) {
         Ok(mut results) => cmd_results.append(&mut results),
         Err(error) => {
@@ -564,14 +648,41 @@ pub fn create_runner_minimal_run(
         }
     }
 
-    let mut written: Vec<String> = Vec::new();
-    for sf in &sandbox_files {
-        let sf_path = Path::new(sf);
-        if let Some(parent) = sf_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("io:{e}"))?;
+    // 调用 AI 模型，按允许文件分别生成内容。
+    let generated_files = match call_ai_model_for_task(c, &lk.task_id, &sandbox_files) {
+        Ok(files) => files,
+        Err(e) => {
+            // AI 调用失败，整个 run 应该失败（不再回退到记录模式）
+            return fail_run(c, &pid, &id, &[], "ai_call_failed", &e);
         }
-        std::fs::write(sf_path, &sandbox_content).map_err(|e| format!("io:{e}"))?;
-        written.push(sf.clone());
+    };
+
+    let mut written: Vec<String> = Vec::new();
+    for generated in &generated_files {
+        let sf_path = Path::new(&generated.path);
+        if let Some(parent) = sf_path.parent() {
+            if let Err(error) = std::fs::create_dir_all(parent) {
+                return fail_run(
+                    c,
+                    &pid,
+                    &id,
+                    &written,
+                    "io_write_failed",
+                    &format!("创建输出目录失败: {error}"),
+                );
+            }
+        }
+        if let Err(error) = std::fs::write(sf_path, &generated.content) {
+            return fail_run(
+                c,
+                &pid,
+                &id,
+                &written,
+                "io_write_failed",
+                &format!("写入输出文件失败: {error}"),
+            );
+        }
+        written.push(generated.path.clone());
     }
 
     // 执行后 Git 检查
@@ -837,14 +948,54 @@ fn safe_slug(s: &str) -> String {
         })
         .collect()
 }
+
+fn task_output_folder_name(connection: &Connection, task_id: &str) -> Result<String, String> {
+    let (title, description) = read_task_details(connection, task_id)?;
+    let label = extract_project_idea_label(&description)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(title);
+    Ok(safe_folder_name(&label))
+}
+
+fn extract_project_idea_label(description: &str) -> Option<String> {
+    description.lines().find_map(|line| {
+        let line = line.trim();
+        let value = line
+            .strip_prefix("项目想法：")
+            .or_else(|| line.strip_prefix("项目想法:"))?;
+        let value = value.trim();
+        if value.is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    })
+}
+
+fn safe_folder_name(value: &str) -> String {
+    let mut name = value
+        .trim()
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect::<String>();
+    name = name.trim_matches(['.', ' ']).to_string();
+    if name.is_empty() {
+        return "未命名项目".to_string();
+    }
+    name.chars().take(80).collect()
+}
 fn side_effects_true() -> ProjectPlanSideEffects {
     ProjectPlanSideEffects {
         writes_project_files: true,
         modifies_git: true,
         executes_runner: true,
-        calls_real_model: false,
+        calls_real_model: true, // 已修复：现在真的调用 AI 模型
         reads_raw_secrets: false,
-        makes_network_requests: false,
+        makes_network_requests: true, // 已修复：现在发起网络请求调用 AI
         triggers_agents: false,
         creates_tasks: false,
         creates_runner_requests: false,
@@ -856,6 +1007,163 @@ fn now_str() -> String {
         .unwrap_or_default()
         .as_nanos()
         .to_string()
+}
+
+/// 调用 AI 模型执行任务（阶段 34 核心修复）
+/// 使用 OpenAI-compatible provider（支持 DeepSeek 等）
+fn call_ai_model_for_task(
+    connection: &Connection,
+    task_id: &str,
+    sandbox_files: &[String],
+) -> Result<Vec<GeneratedFileContent>, String> {
+    // 1. 从数据库读取任务详情（标题、描述）
+    let (task_title, task_description) = read_task_details(connection, task_id)?;
+
+    // 2. 从环境变量构造 provider（需要设置 AGENT_SWARM_OPENAI_COMPAT_API_KEY 和 AGENT_SWARM_OPENAI_COMPAT_BASE_URL）
+    let provider =
+        OpenAiCompatProvider::from_env().map_err(|e| format!("AI provider 初始化失败: {e}"))?;
+
+    let files_json =
+        serde_json::to_string(sandbox_files).map_err(|e| format!("序列化允许文件列表失败: {e}"))?;
+
+    // 3. 构造请求（使用任务标题、描述和允许文件作为上下文）
+    let system_prompt = "你是资深前端/全栈执行智能体。根据任务信息生成真正可用的项目文件。如果允许文件包含 index.html、style.css、main.js，就必须产出可直接在浏览器打开的完整页面，不要写计划文档。只输出 JSON，不要解释，不要使用 Markdown 代码块。".to_string();
+    let user_message = format!(
+        "任务信息：\n- 任务 ID: {}\n- 任务标题: {}\n- 任务描述: {}\n\n允许写入的文件路径 JSON：{}\n\n请严格返回 JSON 数组，每个元素格式为：{{\"path\":\"允许文件路径之一\",\"content\":\"该文件完整内容\"}}。\n要求：\n1. 必须为每个允许文件生成且只生成一个元素。\n2. path 必须与允许写入的文件路径完全一致。\n3. content 是该文件的完整内容，不要省略，不要写解释。\n4. 如果生成 HTML，请包含完整 <!doctype html>、中文标题、可见 UI，并正确引用 ./style.css 和 ./main.js。\n5. 如果生成 CSS，请写出完整视觉样式，页面要像真实产品原型，不要只有空白结构。\n6. 如果生成 JS，请实现基础交互或状态逻辑，不能只写注释。\n7. 不要输出 Markdown 代码块，不要输出 JSON 之外的文字。",
+        task_id, task_title, task_description, files_json
+    );
+    let request = ModelRequest {
+        system_prompt,
+        user_message,
+        model_id: runtime_model_id(),
+    };
+
+    // 4. 调用 AI 模型（默认 45 秒超时、最多重试 2 次，均可用环境变量覆盖）
+    let response = send_model_with_retry(&provider, &request)?;
+
+    if response.content.trim().is_empty() {
+        return Err("AI 模型返回为空".to_string());
+    }
+
+    // 5. 解析并校验每个文件的内容
+    parse_generated_files(&response.content, sandbox_files)
+}
+
+fn send_model_with_retry(
+    provider: &OpenAiCompatProvider,
+    request: &ModelRequest,
+) -> Result<super::model_gateway::openai_compat::ModelResponse, String> {
+    let timeout_secs = env_u64(
+        "AGENT_SWARM_RUNNER_AI_TIMEOUT_SECS",
+        AI_TIMEOUT_SECS,
+        5,
+        300,
+    );
+    let attempts = env_u64("AGENT_SWARM_RUNNER_AI_RETRIES", AI_RETRY_ATTEMPTS, 1, 5);
+    let mut last_error = String::new();
+
+    for attempt in 1..=attempts {
+        match provider.send(request, timeout_secs, AI_RESPONSE_MAX_BYTES) {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                last_error = format!("{:?}", error);
+                if attempt < attempts {
+                    std::thread::sleep(Duration::from_millis(300 * attempt));
+                }
+            }
+        }
+    }
+
+    Err(format!(
+        "AI 模型调用失败，已重试 {attempts} 次: {last_error}"
+    ))
+}
+
+fn env_u64(name: &str, default: u64, min: u64, max: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|value| value.clamp(min, max))
+        .unwrap_or(default)
+}
+
+fn runtime_model_id() -> String {
+    std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "deepseek-chat".to_string())
+}
+
+/// 从数据库读取任务详情
+fn read_task_details(connection: &Connection, task_id: &str) -> Result<(String, String), String> {
+    let result = connection.query_row(
+        "SELECT title, COALESCE(description, '') FROM tasks WHERE id = ?1",
+        params![task_id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+    );
+
+    match result {
+        Ok((title, description)) => Ok((title, description)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Err(format!("任务不存在: {}", task_id)),
+        Err(e) => Err(format!("读取任务详情失败: {}", e)),
+    }
+}
+
+fn parse_generated_files(
+    raw: &str,
+    sandbox_files: &[String],
+) -> Result<Vec<GeneratedFileContent>, String> {
+    let trimmed = raw.trim();
+    let json_text = trimmed
+        .strip_prefix("```json")
+        .and_then(|value| value.strip_suffix("```"))
+        .or_else(|| {
+            trimmed
+                .strip_prefix("```")
+                .and_then(|value| value.strip_suffix("```"))
+        })
+        .map(str::trim)
+        .unwrap_or(trimmed);
+
+    let parsed: Vec<GeneratedFileContent> =
+        serde_json::from_str(json_text).map_err(|e| format!("AI 返回的文件 JSON 无效: {e}"))?;
+    let allowed: std::collections::HashSet<&str> =
+        sandbox_files.iter().map(|path| path.as_str()).collect();
+    let mut seen = std::collections::HashSet::new();
+    let mut ordered = Vec::with_capacity(sandbox_files.len());
+
+    for item in parsed {
+        if !allowed.contains(item.path.as_str()) {
+            return Err(format!("AI 返回了未允许的文件路径: {}", item.path));
+        }
+        if !seen.insert(item.path.clone()) {
+            return Err(format!("AI 重复返回文件路径: {}", item.path));
+        }
+        if item.content.trim().is_empty() {
+            return Err(format!("AI 返回的文件内容为空: {}", item.path));
+        }
+        ordered.push(item);
+    }
+
+    if seen.len() != sandbox_files.len() {
+        let missing = sandbox_files
+            .iter()
+            .filter(|path| !seen.contains(path.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        return Err(format!(
+            "AI 未返回所有允许文件，缺少: {}",
+            missing.join(", ")
+        ));
+    }
+
+    ordered.sort_by_key(|item| {
+        sandbox_files
+            .iter()
+            .position(|path| path == &item.path)
+            .unwrap_or(usize::MAX)
+    });
+    Ok(ordered)
 }
 
 #[cfg(test)]
@@ -1064,7 +1372,7 @@ mod tests {
         let r2 = create_runner_minimal_run(&mut c, valid_create(&lk.id)).expect("idempotent");
         assert_eq!(r1.run.id, r2.run.id);
         assert!(
-            r1.run.status == "succeeded" || r1.run.status == "failed_command",
+            r1.run.status == "succeeded" || r1.run.status == "failed",
             "status: {}",
             r1.run.status
         );
@@ -1073,7 +1381,7 @@ mod tests {
         assert_eq!(ct(&c, "tasks"), b_t);
         assert_eq!(ct(&c, "runner_requests"), b_r);
         assert!(r1.run.side_effects.modifies_git);
-        assert!(!r1.run.side_effects.calls_real_model);
+        assert!(r1.run.side_effects.calls_real_model);
         assert!(r1.run.side_effects.executes_runner);
         drop(c);
         drop(s);
@@ -1118,7 +1426,7 @@ mod tests {
         let lk2 = setup_lock(&mut c);
         let r2 = create_runner_minimal_run(&mut c, valid_create(&lk2.id)).expect("c2");
         assert!(
-            r2.run.status == "succeeded" || r2.run.status == "failed_command",
+            r2.run.status == "succeeded" || r2.run.status == "failed",
             "status: {}, old files should not block",
             r2.run.status
         );
@@ -1133,7 +1441,7 @@ mod tests {
         let mut c = s.connection().unwrap();
         let lk = setup_lock(&mut c);
         let r = create_runner_minimal_run(&mut c, valid_create(&lk.id)).expect("normal create");
-        assert!(r.run.status == "succeeded" || r.run.status == "failed_command");
+        assert!(r.run.status == "succeeded" || r.run.status == "failed");
         assert_eq!(ct(&c, "runner_minimal_runs"), 1);
         drop(c);
         drop(s);
@@ -1168,9 +1476,9 @@ mod tests {
     }
     #[test]
     fn map_virtual_to_generated_correct() {
-        let base = std::env::temp_dir().join("agent-swarm-runner-stage34");
+        let base = std::env::temp_dir().join("agent-swarm-runner-test");
         let p = map_virtual_to_generated(&base, "virtual/frontend-plan.md").unwrap();
-        assert!(p.to_string_lossy().contains("agent-swarm-runner-stage34"));
+        assert!(p.to_string_lossy().contains("agent-swarm-runner-test"));
         assert!(p.to_string_lossy().ends_with("frontend-plan.md"));
         assert!(map_virtual_to_generated(&base, "apps/main.rs").is_err());
         assert!(map_virtual_to_generated(&base, "virtual/../secret").is_err());
@@ -1181,9 +1489,8 @@ mod tests {
         let (s, d) = td();
         let c = s.connection().unwrap();
         let base = generated_base(&c, "project_agent_swarm").expect("generated base");
-        assert!(base
-            .to_string_lossy()
-            .contains("agent-swarm-runner-stage34"));
+        assert!(base.starts_with(&d));
+        assert!(base.ends_with("generated"));
         drop(c);
         drop(s);
         let _ = fs::remove_dir_all(d);

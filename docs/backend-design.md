@@ -3,6 +3,8 @@
 日期：2026-06-13
 阶段：新架构后端边界界定
 
+> 2026-06-17 更新：本文是新架构早期后端边界设计，仍可参考分层原则和 Tauri/Rust 方向，但“第一版”“审批边界”等描述不再完整代表当前产品状态。当前 Runner 全自动主链路、模型配置入口和任务页行为以当前源码、`docs/Agent宪法.md`、`docs/AI开发细则.md` 和 `dev-docs/当前项目导航.md` 为准。
+
 本文是教材 #8 的产出文档，定义新架构下后端的业务边界、规则、数据流转和 command 清单。后续所有后端开发以此为准。
 
 ---
@@ -144,8 +146,8 @@ invoke("create_task",{...})
 
 ## 七、约束与禁区
 
-- Runner 不得自动执行命令、写文件、删文件、发网络请求或修改 Git
-- 真实模型调用默认关闭
+- Runner 当前允许在受控 service 链路内自动执行并写入 `workspace/generated`；不得退化成自由命令、任意文件写入、文件删除或 Git push/commit
+- 真实模型调用已通过 Model Gateway 和系统设置模型配置开放；不得绕过受控入口
 - 禁止 UI/Agent/Runner 绕过 services 层直接访问 db 层
 - 禁止导入 provider SDK、读取 raw key
 - `AGENT_SWARM_ENABLE_MODEL_CONNECTIVITY_TEST` 不可复用为真实业务模型调用开关
