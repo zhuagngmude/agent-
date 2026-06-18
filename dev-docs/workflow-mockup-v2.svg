@@ -1,0 +1,154 @@
+<svg width="1600" height="1000" viewBox="0 0 1600 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1000" fill="#F2F5F8"/>
+
+  <rect x="24" y="24" width="1552" height="952" rx="28" fill="#0B1220"/>
+
+  <rect x="24" y="24" width="288" height="952" rx="28" fill="#08111D"/>
+  <text x="52" y="78" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" fill="#FBBF24" font-weight="700">Hiveward</text>
+  <text x="52" y="106" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">多 Agent 组织工作台</text>
+
+  <rect x="40" y="148" width="256" height="60" rx="16" fill="#111B2C" stroke="#22324A"/>
+  <text x="58" y="184" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E2E8F0">公司</text>
+
+  <rect x="40" y="220" width="256" height="60" rx="16" fill="#191B25" stroke="#2B3342"/>
+  <text x="58" y="256" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E2E8F0">聊天</text>
+
+  <rect x="40" y="292" width="256" height="60" rx="16" fill="#3A2B13" stroke="#5A451C"/>
+  <text x="58" y="328" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#FDE68A">编排</text>
+
+  <rect x="40" y="364" width="256" height="60" rx="16" fill="#111B2C" stroke="#22324A"/>
+  <text x="58" y="400" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E2E8F0">运行</text>
+
+  <rect x="40" y="436" width="256" height="60" rx="16" fill="#111B2C" stroke="#22324A"/>
+  <text x="58" y="472" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E2E8F0">收件箱</text>
+
+  <rect x="40" y="508" width="256" height="60" rx="16" fill="#111B2C" stroke="#22324A"/>
+  <text x="58" y="544" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#E2E8F0">历史</text>
+
+  <text x="48" y="632" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#64748B" font-weight="700">MODELS</text>
+  <rect x="40" y="648" width="256" height="84" rx="18" fill="#101826" stroke="#23324A"/>
+  <text x="58" y="680" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" fill="#E2E8F0">Claude Code</text>
+  <text x="58" y="706" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">主控 / 编排</text>
+
+  <rect x="40" y="744" width="256" height="84" rx="18" fill="#101826" stroke="#23324A"/>
+  <text x="58" y="776" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" fill="#E2E8F0">Codex</text>
+  <text x="58" y="802" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">执行 / 生成</text>
+
+  <rect x="40" y="840" width="256" height="112" rx="18" fill="#101826" stroke="#23324A"/>
+  <text x="58" y="874" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="15" fill="#E2E8F0">OpenClaw</text>
+  <text x="58" y="900" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">工具 / Skill / MCP</text>
+  <text x="58" y="926" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#64748B">v0.1.0 beta</text>
+
+  <rect x="328" y="24" width="1248" height="952" rx="28" fill="#0B1220"/>
+
+  <rect x="352" y="44" width="820" height="88" rx="22" fill="#0E1726" stroke="#203049"/>
+  <text x="380" y="80" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">工作流面板</text>
+  <text x="380" y="110" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" fill="#E5E7EB" font-weight="700">一人公司 · 多 Agent 协同编排</text>
+
+  <rect x="1200" y="44" width="168" height="88" rx="22" fill="#0E1726" stroke="#203049"/>
+  <text x="1284" y="78" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">状态</text>
+  <text x="1284" y="108" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#34D399" font-weight="700">在线</text>
+
+  <rect x="1382" y="44" width="170" height="88" rx="22" fill="#0E1726" stroke="#203049"/>
+  <text x="1467" y="78" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">任务</text>
+  <text x="1467" y="108" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#E5E7EB" font-weight="700">13</text>
+
+  <rect x="352" y="148" width="420" height="740" rx="24" fill="#0E1726" stroke="#203049"/>
+  <text x="378" y="182" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#E5E7EB" font-weight="700">总控节点</text>
+
+  <rect x="380" y="208" width="364" height="90" rx="18" fill="#122033" stroke="#2C3E5B"/>
+  <circle cx="416" cy="253" r="20" fill="#1D4ED8"/>
+  <text x="416" y="259" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#FFFFFF" font-weight="700">你</text>
+  <text x="452" y="242" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#E5E7EB" font-weight="700">我想做一个登录页面</text>
+  <text x="452" y="266" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">总控识别目标 -> 拆任务 -> 调用执行链</text>
+
+  <rect x="380" y="320" width="364" height="140" rx="18" fill="#101826" stroke="#2C3E5B"/>
+  <text x="404" y="350" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">当前项目</text>
+  <text x="404" y="384" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="26" fill="#F8FAFC" font-weight="700">登录页面</text>
+  <text x="404" y="414" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#94A3B8">任务 13 · 智能体 6 · 待确认 0</text>
+
+  <rect x="380" y="484" width="364" height="156" rx="18" fill="#101826" stroke="#2C3E5B"/>
+  <text x="404" y="516" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">执行链路</text>
+  <rect x="404" y="538" width="84" height="34" rx="12" fill="#13253E" stroke="#2C3E5B"/>
+  <text x="446" y="560" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#E5E7EB">听懂目标</text>
+  <rect x="500" y="538" width="84" height="34" rx="12" fill="#13253E" stroke="#2C3E5B"/>
+  <text x="542" y="560" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#E5E7EB">识别类型</text>
+  <rect x="596" y="538" width="84" height="34" rx="12" fill="#13253E" stroke="#2C3E5B"/>
+  <text x="638" y="560" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#E5E7EB">分配</text>
+  <rect x="404" y="582" width="276" height="34" rx="12" fill="#13253E" stroke="#2C3E5B"/>
+  <text x="542" y="604" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#34D399">全自动执行</text>
+
+  <rect x="380" y="662" width="364" height="202" rx="18" fill="#101826" stroke="#2C3E5B"/>
+  <text x="404" y="694" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">执行日志</text>
+  <text x="404" y="730" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#E5E7EB">1. 已识别目标</text>
+  <text x="404" y="756" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#E5E7EB">2. 已生成任务</text>
+  <text x="404" y="782" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#E5E7EB">3. 前端 Agent 处理中</text>
+  <text x="404" y="808" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#E5E7EB">4. 正在写入 workspace/generated</text>
+
+  <rect x="792" y="148" width="732" height="740" rx="24" fill="#0A0F19" stroke="#203049"/>
+  <text x="820" y="182" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#E5E7EB" font-weight="700">工作流画布</text>
+
+  <defs>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M 922 282 C 1000 282, 1004 282, 1068 282" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+  <path d="M 922 356 C 998 356, 1004 356, 1068 356" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+  <path d="M 922 430 C 998 430, 1004 430, 1068 430" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+  <path d="M 922 504 C 998 504, 1004 504, 1068 504" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+  <path d="M 922 578 C 998 578, 1004 578, 1068 578" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+  <path d="M 922 652 C 998 652, 1004 652, 1068 652" stroke="url(#glow)" stroke-width="3" stroke-dasharray="6 8"/>
+
+  <rect x="836" y="240" width="170" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="860" y="270" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">总控智能体</text>
+  <text x="860" y="298" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">Claude Code</text>
+
+  <rect x="1068" y="240" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="270" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">前端 Agent</text>
+  <text x="1092" y="298" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">UI 实现</text>
+
+  <rect x="1068" y="314" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="344" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">后端 Agent</text>
+  <text x="1092" y="372" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">数据 / API</text>
+
+  <rect x="1068" y="388" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="418" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">测试 Agent</text>
+  <text x="1092" y="446" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">验收检查</text>
+
+  <rect x="1068" y="462" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="492" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">文档 Agent</text>
+  <text x="1092" y="520" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">说明 / 交接</text>
+
+  <rect x="1068" y="536" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="566" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">审查 Agent</text>
+  <text x="1092" y="594" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">风险审核</text>
+
+  <rect x="1068" y="610" width="186" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1092" y="640" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">Runner</text>
+  <text x="1092" y="668" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#34D399" font-weight="700">全自动</text>
+
+  <rect x="1290" y="240" width="176" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1314" y="270" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">MCP</text>
+  <text x="1314" y="298" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">filesystem</text>
+
+  <rect x="1290" y="338" width="176" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1314" y="368" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">MCP</text>
+  <text x="1314" y="396" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">playwright</text>
+
+  <rect x="1290" y="436" width="176" height="84" rx="18" fill="#111B2C" stroke="#27364D"/>
+  <text x="1314" y="466" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">MCP</text>
+  <text x="1314" y="494" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#F8FAFC" font-weight="700">git status</text>
+
+  <path d="M 1238 282 C 1260 282, 1260 282, 1290 282" stroke="url(#glow)" stroke-width="2" stroke-dasharray="6 8"/>
+  <path d="M 1254 356 C 1276 356, 1276 356, 1290 380" stroke="url(#glow)" stroke-width="2" stroke-dasharray="6 8"/>
+  <path d="M 1254 430 C 1276 430, 1276 430, 1290 478" stroke="url(#glow)" stroke-width="2" stroke-dasharray="6 8"/>
+
+  <rect x="820" y="740" width="640" height="120" rx="20" fill="#0E1726" stroke="#203049"/>
+  <text x="844" y="774" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="13" fill="#94A3B8">底部输入</text>
+  <text x="844" y="810" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="20" fill="#E5E7EB">告诉总控智能体你要做什么</text>
+  <rect x="1248" y="772" width="180" height="48" rx="24" fill="#1D4ED8"/>
+  <text x="1338" y="802" text-anchor="middle" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#FFFFFF" font-weight="700">一键生成架构</text>
+</svg>

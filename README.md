@@ -1,64 +1,79 @@
 # agent蜂群
 
-单人自用的本地桌面工具。桌面端主入口，Web 只做辅助预览。当前处于重新立项讨论中。
+单人自用的本地多模型 Agent 调度系统。当前主入口是 Tauri 桌面端，前端 UI 来自 `packages/ui`，本地状态使用 SQLite。
+
+## 核心目标
+
+`agent-swarm` 的长期目标是实现一个本地多模型 Agent 调度系统：
+
+- 用户只对总控 Agent 描述项目目标。
+- 总控 Agent 判断项目类型、技术栈、风险和当前阶段。
+- 系统从固定员工池和项目专家 Agent 中选择合适角色。
+- 每个 Agent 只在自己的职责模块内工作，跨模块任务必须交回总控拆分或转派。
+- 每个 Agent 可以绑定不同模型或执行器，例如 Codex、Claude、DeepSeek、Gemini、Cursor、OpenCode。
+- 模型调用统一经过模型网关，写代码和高风险动作统一经过 Runner、审批和运行记录。
+- 产物按项目归档到 `workspace/generated`。
+
+后续开发不能偏离这个目标，也不要绕远路做与该目标无关的功能。
 
 ## 当前状态
 
-- 当前阶段：MVP-0.4 已验收；阶段 2 真实模型调用准入设计已收口；阶段 3 Agent Run 记录链已收口为本地 Mock / SQLite 流程。
-- 目录架构已确认：`packages/ui` 作为唯一 UI 源，`apps/desktop` 作为主入口，`apps/web` 作为辅助预览入口。
-- 明确不做：真实 Runner 执行、真实模型调用、云同步、完整权限系统。
+- 已打通主链路：主控台输入目标 -> 自动生成任务 -> Runner 推进执行 -> 产物写入 `workspace/generated`。
+- 当前 UI 已扩展为多模块入口：`主控台`、`任务拆解`、`流程蓝图`、`运行输出`、`AI 员工`、`审批与安全`、`系统设置`。
+- `AI 员工` 页已开始承载全技术栈固定员工池、项目专家推荐、职责边界和执行器/模型选择。
+- 模型服务可在系统设置里配置 API Key、Base URL 和模型 ID；密钥只写入当前桌面进程环境变量，不写入文档或数据库。
+- `apps/web`、`services/api` 和旧设计稿只作为历史参考，不再作为正式主线扩展。
 
 ## 先读这些
 
 - [AGENTS.md](./AGENTS.md)
 - [docs/README.md](./docs/README.md)
+- [docs/project-expert-agent-system.md](./docs/project-expert-agent-system.md)
+- [docs/user-facing-multi-model-agent-explainer.md](./docs/user-facing-multi-model-agent-explainer.md)
 - [dev-docs/README.md](./dev-docs/README.md)
-
-## 当前 MVP-0.3 / MVP-0.4
-
-用户输入项目想法后，工作流页会生成本地确定性 `project_plan` 审批草案。审批通过后，系统会自动拆成五个 queued 任务，分别分配给 `agent_frontend`、`agent_backend`、`agent_qa`、`agent_docs`、`agent_reviewer`，并生成五条只读 Runner request queue 记录。
-
-在 MVP-0.4 中，execution request 审查视图、生命周期流转和 runtime events 审计闭环已经完成。Mock / SQLite flow 都覆盖该链路。
-
-阶段 2 已完成准入设计和 helper-only 写入 / 迁移草案：`model_calls` 记录结构、Model Gateway 未来正式入口、provider config resolver、redaction helper 和禁用态 route 草案均已实现，但仍不建表、不写 `model_calls`、不接 provider、不调用真实模型。
-
-这些链路仍然不调用真实模型，不执行真实 Runner，不写本地项目文件，不改 Git。
+- [dev-docs/当前项目导航.md](./dev-docs/当前项目导航.md)
+- [dev-docs/新窗口交接说明.md](./dev-docs/新窗口交接说明.md)
 
 ## 本地运行
 
-SQLite 本地试用：
+桌面端开发启动：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1
+cd F:\Projects\agent-swarm\apps\desktop\src-tauri
+cargo tauri dev
 ```
 
-状态：
+前端类型检查：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/status-local.ps1
+cd F:\Projects\agent-swarm\packages\ui
+npm run typecheck
 ```
 
-停止：
+Rust 相关快速检查：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/stop-local.ps1
+cd F:\Projects\agent-swarm\apps\desktop\src-tauri
+cargo test project_plan --lib
+cargo test runner_minimal_run --lib
+cargo test auto_swarm --lib
 ```
 
-开发 Mock：
+## 产物位置
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1
+用户项目输出统一在：
+
+```text
+F:\Projects\agent-swarm\workspace\generated
 ```
 
-## 验证
+任务页的“打开文件夹”按钮会打开对应项目/任务输出目录。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/verify-project-plan-flow.ps1
-powershell -ExecutionPolicy Bypass -File scripts/verify-mock-flows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/verify-sqlite-flows.ps1
-powershell -ExecutionPolicy Bypass -File scripts/verify-agent-config-safety-loop.ps1
-powershell -ExecutionPolicy Bypass -File scripts/verify-model-gateway.ps1
-powershell -ExecutionPolicy Bypass -File scripts/verify-real-model-admission.ps1
-```
+## 文档口径
 
-更多验收入口见 [docs/README.md](./docs/README.md) 和 [scripts/README.md](./scripts/README.md)。
+历史阶段文档保留当时设计，不一定代表当前能力边界。当前事实优先级：
+
+1. 当前源码、测试、运行结果
+2. `AGENTS.md`、`docs/Agent宪法.md`、`docs/AI开发细则.md`
+3. `dev-docs/当前项目导航.md`、`dev-docs/新窗口交接说明.md`
+4. 其他 `docs/` 和 `dev-docs/` 历史文档
