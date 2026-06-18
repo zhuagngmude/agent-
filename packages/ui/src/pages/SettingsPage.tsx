@@ -119,7 +119,11 @@ export function SettingsPage({ project }: SettingsPageProps) {
             <Form.Item
               label="API Key"
               name="apiKey"
-              extra="保存到本机系统凭据，不写入 SQLite、日志或前端存储；保存后输入框会清空。"
+              extra={
+                providerStatus?.has_api_key
+                  ? "已保存过 Key；输入框为空是正常的。只有要更换 Key 时才需要重新输入。"
+                  : "保存到本机系统凭据，不写入 SQLite、日志或前端存储；保存后输入框会清空。"
+              }
               rules={[{ required: !providerStatus?.has_api_key, message: "首次配置请输入 API Key" }]}
             >
               <Input.Password placeholder="sk-..." autoComplete="off" />

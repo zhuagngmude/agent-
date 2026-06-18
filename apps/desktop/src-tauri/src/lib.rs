@@ -9,6 +9,7 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
+            commands::model_catalog::hydrate_runtime_provider_from_credentials();
             let db_state = db::initialize(app_data_dir)?;
             app.manage(db_state);
             Ok(())
