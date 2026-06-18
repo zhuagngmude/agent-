@@ -40,6 +40,8 @@ const AUTO_RUNNER_LOCKS_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/015_enable_auto_runner_execution_locks.sql");
 const OPEN_RUNNER_FULL_AUTO_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/016_open_runner_full_auto.sql");
+const AGENT_CONFIG_CORE_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/017_add_agent_config_core.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -80,9 +82,11 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     run_project_intake_migration(&connection)?;
     run_auto_runner_locks_migration(&connection)?;
     run_open_runner_full_auto_migration(&connection)?;
+    run_agent_config_core_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
     seed_builtin_task_templates(&connection)?;
     seed_builtin_models(&connection)?;
+    seed_agent_config_core(&connection)?;
 
     Ok(DbState {
         connection: Mutex::new(connection),
@@ -182,6 +186,33 @@ fn run_open_runner_full_auto_migration(connection: &Connection) -> InitResult<()
     Ok(())
 }
 
+fn run_agent_config_core_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(AGENT_CONFIG_CORE_MIGRATION_SQL)?;
+
+    let mut stmt = connection.prepare("PRAGMA table_info('model_catalog')")?;
+    let has_executor_key = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| format!("database_error: pragma table_info failed: {e}"))?
+        .filter_map(|r| r.ok())
+        .any(|col| col == "executor_key");
+
+    if !has_executor_key {
+        connection.execute_batch(
+            "ALTER TABLE model_catalog ADD COLUMN executor_key TEXT DEFAULT 'model_gateway_default';",
+        )?;
+    }
+
+    connection.execute_batch(
+        "UPDATE model_catalog
+         SET executor_key = 'model_gateway_default'
+         WHERE executor_key IS NULL OR TRIM(executor_key) = '';
+
+         CREATE INDEX IF NOT EXISTS idx_model_catalog_executor
+           ON model_catalog (project_id, executor_key, enabled);",
+    )?;
+    Ok(())
+}
+
 pub(crate) fn seed_builtin_task_templates(connection: &Connection) -> InitResult<()> {
     seed_builtin_task_templates_inner(connection)
 }
@@ -189,6 +220,388 @@ pub(crate) fn seed_builtin_task_templates(connection: &Connection) -> InitResult
 pub(crate) fn seed_builtin_models(connection: &Connection) -> InitResult<()> {
     crate::services::model_catalog::seed_builtin_models(connection)
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)) as Box<dyn Error>)
+}
+
+pub(crate) fn seed_agent_config_core(connection: &Connection) -> InitResult<()> {
+    seed_agent_config_core_inner(connection)
+}
+
+fn seed_agent_config_core_inner(connection: &Connection) -> InitResult<()> {
+    let project_id: String = connection
+        .query_row("SELECT id FROM projects LIMIT 1", [], |row| row.get(0))
+        .unwrap_or_else(|_| "project_agent_swarm".into());
+    let now = "2026-06-19T00:00:00Z";
+
+    connection.execute(
+        "INSERT INTO executor_configs (
+            id, key, label, kind, provider, base_url_status, executable_path,
+            status, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8, ?8)
+        ON CONFLICT(key) DO UPDATE SET
+            label = excluded.label,
+            kind = excluded.kind,
+            provider = excluded.provider,
+            status = excluded.status,
+            updated_at = excluded.updated_at",
+        params![
+            "executor_model_gateway_default",
+            "model_gateway_default",
+            "默认模型网关",
+            "model_gateway",
+            "openai_compat",
+            "configured_by_system_settings",
+            "active",
+            now,
+        ],
+    )?;
+
+    let templates: &[BuiltinAgentTemplate] = &[
+        BuiltinAgentTemplate {
+            id: "agent_template_controller",
+            name: "总控 Agent",
+            role: "controller",
+            category: "core",
+            specialty: "理解目标、拆解任务、选择员工、控制风险",
+            stack: "orchestration",
+            module_scope: "controller",
+            allowed_task_types: &[
+                "project_intake",
+                "task_breakdown",
+                "agent_assignment",
+                "risk_routing",
+            ],
+            allowed_paths: &["workspace/generated/**"],
+            forbidden_actions: &[
+                "free_shell",
+                "git_push",
+                "delete_protected_path",
+                "read_raw_secret",
+            ],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_frontend",
+            name: "前端工程 Agent",
+            role: "frontend",
+            category: "core",
+            specialty: "页面、组件、交互、样式和前端构建",
+            stack: "typescript/react/css",
+            module_scope: "frontend",
+            allowed_task_types: &["frontend_impl", "ux_plan", "ui_refine"],
+            allowed_paths: &["packages/ui/**", "workspace/generated/**"],
+            forbidden_actions: &["database_migration", "backend_secret_config", "git_push"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_backend",
+            name: "后端工程 Agent",
+            role: "backend",
+            category: "core",
+            specialty: "接口、服务、业务逻辑和模型调用封装",
+            stack: "rust/tauri/sqlite",
+            module_scope: "backend",
+            allowed_task_types: &["backend_impl", "tauri_command", "service_logic"],
+            allowed_paths: &["apps/desktop/src-tauri/src/**", "workspace/generated/**"],
+            forbidden_actions: &["frontend_visual_redesign", "git_push", "read_raw_secret"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_database",
+            name: "数据库 Agent",
+            role: "database",
+            category: "core",
+            specialty: "SQLite schema、migration、索引和数据边界",
+            stack: "sqlite/rusqlite",
+            module_scope: "database",
+            allowed_task_types: &["database_migration", "schema_review", "seed_data"],
+            allowed_paths: &["data/migrations/**", "apps/desktop/src-tauri/src/db/**"],
+            forbidden_actions: &["frontend_style_edit", "free_shell", "read_raw_secret"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_desktop",
+            name: "桌面端 Agent",
+            role: "desktop",
+            category: "core",
+            specialty: "Tauri 桌面能力、系统凭据、本机路径和宿主集成",
+            stack: "tauri/windows",
+            module_scope: "desktop",
+            allowed_task_types: &["desktop_integration", "credential_status", "host_bridge"],
+            allowed_paths: &["apps/desktop/**", "packages/ui/src/utils/desktopHost.ts"],
+            forbidden_actions: &["store_api_key_in_db", "log_secret", "git_push"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_qa",
+            name: "测试 Agent",
+            role: "qa",
+            category: "core",
+            specialty: "测试、验收、回归和构建检查",
+            stack: "cargo/npm/playwright",
+            module_scope: "qa",
+            allowed_task_types: &["qa_test", "regression_check", "acceptance_check"],
+            allowed_paths: &["apps/desktop/src-tauri/src/**", "packages/ui/src/**"],
+            forbidden_actions: &["product_behavior_change", "delete_files", "git_push"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_security",
+            name: "安全 Agent",
+            role: "security",
+            category: "core",
+            specialty: "密钥边界、危险动作、保护路径和越界审查",
+            stack: "security-review",
+            module_scope: "security",
+            allowed_task_types: &["security_review_plan", "boundary_check", "secret_scan"],
+            allowed_paths: &["docs/**", "dev-docs/**", "apps/desktop/src-tauri/src/**"],
+            forbidden_actions: &["approve_high_risk_action", "read_raw_secret", "git_push"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_docs",
+            name: "文档 Agent",
+            role: "docs",
+            category: "core",
+            specialty: "用户说明、开发文档和交接记录",
+            stack: "markdown",
+            module_scope: "docs",
+            allowed_task_types: &["docs_write", "handover_update", "api_doc"],
+            allowed_paths: &["docs/**", "dev-docs/**", "README.md"],
+            forbidden_actions: &["change_product_behavior", "write_secret", "git_push"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_devops",
+            name: "DevOps Agent",
+            role: "devops",
+            category: "core",
+            specialty: "脚本、运行命令、构建和本地验证流程",
+            stack: "powershell/npm/cargo",
+            module_scope: "devops",
+            allowed_task_types: &["devops_plan", "build_check", "script_review"],
+            allowed_paths: &["scripts/**", "apps/desktop/src-tauri/**", "packages/ui/**"],
+            forbidden_actions: &["unapproved_shell", "git_push", "delete_protected_path"],
+            enabled: true,
+        },
+        BuiltinAgentTemplate {
+            id: "agent_template_ux",
+            name: "UX Agent",
+            role: "ux",
+            category: "core",
+            specialty: "用户流程、交互状态、可用性和界面信息架构",
+            stack: "ux/product-ui",
+            module_scope: "ux",
+            allowed_task_types: &["ux_plan", "interaction_review", "copy_refine"],
+            allowed_paths: &[
+                "packages/ui/src/pages/**",
+                "packages/ui/src/theme/**",
+                "dev-docs/**",
+            ],
+            forbidden_actions: &["database_migration", "backend_secret_config", "git_push"],
+            enabled: true,
+        },
+    ];
+
+    for template in templates {
+        connection.execute(
+            "INSERT INTO agent_templates (
+                id, name, role, category, specialty, stack, module_scope,
+                allowed_task_types, allowed_paths, forbidden_actions,
+                default_executor_key, default_model_id, enabled, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                'model_gateway_default', NULL, ?11, ?12, ?12)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                specialty = excluded.specialty,
+                stack = excluded.stack,
+                module_scope = excluded.module_scope,
+                allowed_task_types = excluded.allowed_task_types,
+                allowed_paths = excluded.allowed_paths,
+                forbidden_actions = excluded.forbidden_actions,
+                default_executor_key = excluded.default_executor_key,
+                enabled = excluded.enabled,
+                updated_at = excluded.updated_at",
+            params![
+                template.id,
+                template.name,
+                template.role,
+                template.category,
+                template.specialty,
+                template.stack,
+                template.module_scope,
+                json_list(template.allowed_task_types)?,
+                json_list(template.allowed_paths)?,
+                json_list(template.forbidden_actions)?,
+                template.enabled as i64,
+                now,
+            ],
+        )?;
+    }
+
+    let project_agents: &[BuiltinProjectAgent] = &[
+        BuiltinProjectAgent {
+            id: "project_agent_controller",
+            template_id: "agent_template_controller",
+            name: "项目总控",
+            role: "controller",
+            module_scope: "controller",
+            status: "active",
+        },
+        BuiltinProjectAgent {
+            id: "project_agent_frontend",
+            template_id: "agent_template_frontend",
+            name: "前端执行员",
+            role: "frontend",
+            module_scope: "frontend",
+            status: "idle",
+        },
+        BuiltinProjectAgent {
+            id: "project_agent_backend",
+            template_id: "agent_template_backend",
+            name: "后端执行员",
+            role: "backend",
+            module_scope: "backend",
+            status: "idle",
+        },
+        BuiltinProjectAgent {
+            id: "project_agent_docs",
+            template_id: "agent_template_docs",
+            name: "文档记录员",
+            role: "docs",
+            module_scope: "docs",
+            status: "idle",
+        },
+    ];
+
+    for agent in project_agents {
+        connection.execute(
+            "INSERT INTO project_agents (
+                id, project_id, agent_template_id, name, role, source,
+                executor_key, model_id, module_scope, status,
+                joined_at, removed_at, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, 'core',
+                'model_gateway_default', NULL, ?6, ?7, ?8, NULL, ?8, ?8)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                role = excluded.role,
+                executor_key = excluded.executor_key,
+                module_scope = excluded.module_scope,
+                status = excluded.status,
+                removed_at = NULL,
+                updated_at = excluded.updated_at",
+            params![
+                agent.id,
+                project_id.as_str(),
+                agent.template_id,
+                agent.name,
+                agent.role,
+                agent.module_scope,
+                agent.status,
+                now,
+            ],
+        )?;
+    }
+
+    let skills: &[BuiltinExecutorSkill] = &[
+        BuiltinExecutorSkill {
+            id: "skill_controller_task_breakdown",
+            template_id: "agent_template_controller",
+            name: "task_breakdown",
+            scope: "controller",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_controller_agent_assignment",
+            template_id: "agent_template_controller",
+            name: "agent_assignment",
+            scope: "controller",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_frontend_ui_impl",
+            template_id: "agent_template_frontend",
+            name: "frontend_ui_impl",
+            scope: "frontend",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_backend_tauri_command",
+            template_id: "agent_template_backend",
+            name: "tauri_command_impl",
+            scope: "backend",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_database_schema_review",
+            template_id: "agent_template_database",
+            name: "schema_review",
+            scope: "database",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_security_boundary_check",
+            template_id: "agent_template_security",
+            name: "boundary_check",
+            scope: "security",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_docs_handover",
+            template_id: "agent_template_docs",
+            name: "handover_update",
+            scope: "docs",
+        },
+        BuiltinExecutorSkill {
+            id: "skill_qa_regression",
+            template_id: "agent_template_qa",
+            name: "regression_check",
+            scope: "qa",
+        },
+    ];
+
+    for skill in skills {
+        connection.execute(
+            "INSERT INTO executor_skills (
+                id, executor_key, agent_template_id, skill_name, skill_scope,
+                enabled, created_at, updated_at
+            ) VALUES (?1, 'model_gateway_default', ?2, ?3, ?4, 1, ?5, ?5)
+            ON CONFLICT(id) DO UPDATE SET
+                skill_scope = excluded.skill_scope,
+                enabled = 1,
+                updated_at = excluded.updated_at",
+            params![skill.id, skill.template_id, skill.name, skill.scope, now],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn json_list(items: &[&str]) -> InitResult<String> {
+    serde_json::to_string(items).map_err(|error| Box::new(error) as Box<dyn Error>)
+}
+
+struct BuiltinAgentTemplate {
+    id: &'static str,
+    name: &'static str,
+    role: &'static str,
+    category: &'static str,
+    specialty: &'static str,
+    stack: &'static str,
+    module_scope: &'static str,
+    allowed_task_types: &'static [&'static str],
+    allowed_paths: &'static [&'static str],
+    forbidden_actions: &'static [&'static str],
+    enabled: bool,
+}
+
+struct BuiltinProjectAgent {
+    id: &'static str,
+    template_id: &'static str,
+    name: &'static str,
+    role: &'static str,
+    module_scope: &'static str,
+    status: &'static str,
+}
+
+struct BuiltinExecutorSkill {
+    id: &'static str,
+    template_id: &'static str,
+    name: &'static str,
+    scope: &'static str,
 }
 
 fn seed_builtin_task_templates_inner(connection: &Connection) -> InitResult<()> {
@@ -584,6 +997,11 @@ mod tests {
             assert_eq!(count_rows(&connection, "model_calls"), 0);
             assert_eq!(count_rows(&connection, "project_plan_drafts"), 0);
             assert_eq!(count_rows(&connection, "runner_requests"), 0);
+            assert_eq!(count_rows(&connection, "executor_configs"), 1);
+            assert_eq!(count_rows(&connection, "agent_templates"), 10);
+            assert_eq!(count_rows(&connection, "project_agents"), 4);
+            assert_eq!(count_rows(&connection, "executor_skills"), 8);
+            assert_eq!(count_rows(&connection, "agent_boundary_checks"), 0);
 
             let agents = list_agents(&connection).expect("agents should be readable");
             assert_eq!(agents.len(), 6);
@@ -606,6 +1024,26 @@ mod tests {
                         .operation_types
                         .contains(&"git_checkpoint".to_string())
             }));
+
+            let executor_key: String = connection
+                .query_row("SELECT key FROM executor_configs LIMIT 1", [], |row| {
+                    row.get(0)
+                })
+                .expect("default executor should exist");
+            assert_eq!(executor_key, "model_gateway_default");
+
+            let controller_count: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM project_agents
+                     WHERE project_id = 'project_agent_swarm'
+                       AND role = 'controller'
+                       AND executor_key = 'model_gateway_default'
+                       AND removed_at IS NULL",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("controller project agent should be queryable");
+            assert_eq!(controller_count, 1);
         }
         drop(state);
 
@@ -621,9 +1059,48 @@ mod tests {
             assert_eq!(count_rows(&connection, "model_calls"), 0);
             assert_eq!(count_rows(&connection, "project_plan_drafts"), 0);
             assert_eq!(count_rows(&connection, "runner_requests"), 0);
+            assert_eq!(count_rows(&connection, "executor_configs"), 1);
+            assert_eq!(count_rows(&connection, "agent_templates"), 10);
+            assert_eq!(count_rows(&connection, "project_agents"), 4);
+            assert_eq!(count_rows(&connection, "executor_skills"), 8);
         }
         drop(state);
 
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn agent_config_core_tables_and_model_executor_key_exist() {
+        let (state, test_dir) = test_db();
+        {
+            let connection = state.connection().expect("connection should be available");
+            for table in [
+                "executor_configs",
+                "agent_templates",
+                "project_agents",
+                "executor_skills",
+                "agent_boundary_checks",
+            ] {
+                assert_eq!(table_exists(&connection, table), 1, "{table} should exist");
+            }
+
+            let model_columns = table_columns(&connection, "model_catalog");
+            assert!(
+                model_columns.contains(&"executor_key".to_string()),
+                "model_catalog.executor_key should exist"
+            );
+
+            let enabled_model_count: i64 = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM model_catalog
+                     WHERE executor_key = 'model_gateway_default' AND enabled = 1",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("model catalog should be queryable");
+            assert!(enabled_model_count >= 1);
+        }
+        drop(state);
         let _ = fs::remove_dir_all(test_dir);
     }
 
@@ -785,5 +1262,25 @@ mod tests {
                 row.get(0)
             })
             .expect("table should be queryable")
+    }
+
+    fn table_exists(connection: &Connection, table: &str) -> i64 {
+        connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .expect("sqlite_master should be queryable")
+    }
+
+    fn table_columns(connection: &Connection, table: &str) -> Vec<String> {
+        let mut stmt = connection
+            .prepare(&format!("PRAGMA table_info('{table}')"))
+            .expect("table_info should be queryable");
+        stmt.query_map([], |row| row.get::<_, String>(1))
+            .expect("columns should map")
+            .filter_map(|row| row.ok())
+            .collect()
     }
 }

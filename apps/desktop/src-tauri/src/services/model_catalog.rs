@@ -487,6 +487,7 @@ mod tests {
                 "is_builtin",
                 "created_at",
                 "updated_at",
+                "executor_key",
             ];
             for col in &expected {
                 assert!(
@@ -496,8 +497,8 @@ mod tests {
             }
             assert_eq!(
                 columns.len(),
-                10,
-                "model_catalog should have exactly 10 columns"
+                11,
+                "model_catalog should have exactly 11 columns"
             );
         }
         drop(state);

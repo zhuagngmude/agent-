@@ -362,8 +362,13 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 10. `010_add_runner_execution_locks` — Runner 执行范围锁表（阶段 33 已完成）。
 11. `011_add_runner_minimal_runs` — 最小真实 Runner 执行表（阶段 34 已完成）。
 12. `012_add_model_catalog` — 受控模型目录表（阶段 35 已完成）。
-13. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
-14. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
+13. `013_add_idea_guidance` — 想法引导和项目种子表（阶段 37 已完成）。
+14. `014_add_project_intake` — 项目类型分流入口表（阶段 38 已完成）。
+15. `015_enable_auto_runner_execution_locks` — 全自动 Runner 范围锁扩展。
+16. `016_open_runner_full_auto` — Runner 全自动主链路开放字段重建。
+17. `017_add_agent_config_core` — P0 AI 员工 / 执行器 / Skill / 边界检查核心配置表。
+18. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
+19. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
 
 ## 已定稿的几条规则
 

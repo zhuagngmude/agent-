@@ -289,6 +289,8 @@ list_agent_boundary_checks
 
 ### 阶段 2：新增 SQLite migration
 
+状态：已完成，新增 `017_add_agent_config_core.sql`，并在初始化时 seed 默认执行器、员工模板、项目成员和基础 skill。
+
 目标：
 
 - 新增或扩展 P0 表。
