@@ -1923,10 +1923,22 @@ button {
 }
 
 .blueprint-node--starter {
-  top: 22%;
-  left: 10%;
   width: 320px;
   padding: 14px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.blueprint-node--starter:active {
+  cursor: grabbing;
+}
+
+.blueprint-node--starter.is-dragging {
+  z-index: 18;
+  border-color: rgba(43, 131, 255, 0.58);
+  box-shadow: 0 22px 46px rgba(31, 54, 82, 0.24);
+  cursor: grabbing;
 }
 
 .blueprint-node__badge {

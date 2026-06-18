@@ -69,6 +69,7 @@ type BlueprintCustomModule = {
   subtitle: string;
   x: number;
   y: number;
+  width?: number;
 };
 
 type BlueprintPortSide = "left" | "right";
@@ -132,6 +133,19 @@ const BASIC_WORKFLOW_TEMPLATE = [
   BLUEPRINT_MODULE_OPTIONS[4],
   BLUEPRINT_MODULE_OPTIONS[5],
 ];
+
+const STARTER_MODULE_ID = "starter-basic-workflow";
+const STARTER_NODE_WIDTH = 320;
+
+const STARTER_MODULE: BlueprintCustomModule = {
+  id: STARTER_MODULE_ID,
+  kind: "manager",
+  title: "基础工作流",
+  subtitle: "开始到汇总的最小闭环",
+  x: 118,
+  y: 150,
+  width: STARTER_NODE_WIDTH,
+};
 
 const DEFAULT_WORKFLOW_MODULES: BlueprintCustomModule[] = BASIC_WORKFLOW_TEMPLATE.map((option, index) => ({
   id: `default-${option.kind}`,
@@ -274,10 +288,18 @@ function getBlueprintModuleIcon(kind: BlueprintModuleKind) {
 }
 
 function getModulePortPosition(module: BlueprintCustomModule, side: BlueprintPortSide) {
+  const width = module.width ?? BLUEPRINT_NODE_WIDTH;
   return {
-    x: module.x + (side === "left" ? -12 : BLUEPRINT_NODE_WIDTH - 12),
+    x: module.x + (side === "left" ? -12 : width - 12),
     y: module.y + 32,
   };
+}
+
+function shouldChatCreateWorkflow(text: string): boolean {
+  const normalized = text.trim();
+  return /^(生成|创建|添加|新建).{0,8}(基础)?(工作流|流程)$/.test(normalized)
+    || /^(帮我|给我|替我).{0,8}(生成|创建|添加).{0,8}(基础)?(工作流|流程)$/.test(normalized)
+    || /^(添加|生成)整套流程$/.test(normalized);
 }
 
 function getConnectionPath(from: BlueprintCustomModule, to: BlueprintCustomModule): string {
@@ -344,6 +366,7 @@ export function ConsoleDashboardPage({
     },
   ]);
   const [blueprintMenu, setBlueprintMenu] = useState<BlueprintMenuState | null>(null);
+  const [starterModule, setStarterModule] = useState<BlueprintCustomModule>(() => STARTER_MODULE);
   const [customModules, setCustomModules] = useState<BlueprintCustomModule[]>(() => DEFAULT_WORKFLOW_MODULES);
   const [customConnections, setCustomConnections] = useState<BlueprintConnection[]>(() => DEFAULT_WORKFLOW_CONNECTIONS);
   const [selectedPort, setSelectedPort] = useState<BlueprintSelectedPort | null>(null);
@@ -429,7 +452,7 @@ export function ConsoleDashboardPage({
       return;
     }
 
-    const shouldCreateWorkflow = /添加|生成|创建|流程|工作流/.test(idea);
+    const shouldCreateWorkflow = shouldChatCreateWorkflow(idea);
     setControllerMessages((current) => [
       ...current,
       { id: `user-${Date.now()}`, role: "user", text: idea },
@@ -553,6 +576,11 @@ export function ConsoleDashboardPage({
   };
 
   const handleCanvasWheel = (event: WheelEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest(".blueprint-command, .blueprint-chat-panel, input, textarea, select")) {
+      return;
+    }
+
     event.preventDefault();
     const direction = event.deltaY > 0 ? -1 : 1;
     zoomBlueprint(blueprintViewport.scale + direction * 0.08, event.clientX, event.clientY);
@@ -647,6 +675,11 @@ export function ConsoleDashboardPage({
       return;
     }
 
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input, textarea, select, a")) {
+      return;
+    }
+
     event.stopPropagation();
     setBlueprintMenu(null);
     const { worldX, worldY } = screenToWorld(event.clientX, event.clientY);
@@ -670,12 +703,18 @@ export function ConsoleDashboardPage({
 
     event.preventDefault();
     const { worldX, worldY } = screenToWorld(event.clientX, event.clientY);
-    const nextX = clamp(worldX - dragState.offsetX, 12, BLUEPRINT_WORLD_WIDTH - BLUEPRINT_NODE_WIDTH);
+    const draggingStarter = dragState.id === STARTER_MODULE_ID;
+    const nodeWidth = draggingStarter ? STARTER_NODE_WIDTH : BLUEPRINT_NODE_WIDTH;
+    const nextX = clamp(worldX - dragState.offsetX, 12, BLUEPRINT_WORLD_WIDTH - nodeWidth);
     const nextY = clamp(worldY - dragState.offsetY, 12, BLUEPRINT_WORLD_HEIGHT - BLUEPRINT_NODE_HEIGHT);
 
-    setCustomModules((current) =>
-      current.map((module) => (module.id === dragState.id ? { ...module, x: nextX, y: nextY } : module)),
-    );
+    if (draggingStarter) {
+      setStarterModule((current) => ({ ...current, x: nextX, y: nextY }));
+    } else {
+      setCustomModules((current) =>
+        current.map((module) => (module.id === dragState.id ? { ...module, x: nextX, y: nextY } : module)),
+      );
+    }
   };
 
   const endModulePointer = (event: PointerEvent<HTMLElement>) => {
@@ -693,7 +732,7 @@ export function ConsoleDashboardPage({
     }
 
     const target = event.target as HTMLElement;
-    if (target.closest("button, input, textarea, select, a, .blueprint-custom-node")) {
+    if (target.closest("button, input, textarea, select, a, .blueprint-custom-node, .blueprint-node")) {
       return;
     }
 
@@ -804,8 +843,9 @@ export function ConsoleDashboardPage({
         >
           <svg className="blueprint-canvas__wires" viewBox="0 0 1180 680" aria-hidden="true">
             {customConnections.map((connection) => {
-              const from = customModules.find((module) => module.id === connection.fromId);
-              const to = customModules.find((module) => module.id === connection.toId);
+              const modules = [starterModule, ...customModules];
+              const from = modules.find((module) => module.id === connection.fromId);
+              const to = modules.find((module) => module.id === connection.toId);
               if (!from || !to) {
                 return null;
               }
@@ -814,11 +854,21 @@ export function ConsoleDashboardPage({
             })}
           </svg>
 
-          <article className="blueprint-node blueprint-node--starter">
-          <div className="blueprint-node__ports is-left">
-            <i className="port port-blue" />
-            <i className="port port-amber" />
-          </div>
+          <article
+            className={`blueprint-node blueprint-node--starter${draggingModuleId === STARTER_MODULE_ID ? " is-dragging" : ""}`}
+            style={{ left: starterModule.x, top: starterModule.y }}
+            onPointerDown={(event) => startModulePointer(event, starterModule)}
+            onPointerMove={moveModulePointer}
+            onPointerUp={endModulePointer}
+            onPointerCancel={endModulePointer}
+          >
+          <button
+            type="button"
+            className={`port-button port-button--left${selectedPort?.moduleId === STARTER_MODULE_ID && selectedPort.side === "left" ? " is-selected" : ""}`}
+            aria-label="基础工作流输入端口"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => toggleBlueprintPort(event, STARTER_MODULE_ID, "left")}
+          />
           <div className="blueprint-node__badge">Basic</div>
           <div className="blueprint-node__head">
             <span className="blueprint-node__icon">
@@ -831,7 +881,12 @@ export function ConsoleDashboardPage({
           </div>
           <div className="blueprint-basic-flow">
             {BASIC_WORKFLOW_TEMPLATE.map((option, index) => (
-              <button type="button" key={option.kind} onClick={() => addBlueprintModuleFromLibrary(option, index)}>
+              <button
+                type="button"
+                key={option.kind}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => addBlueprintModuleFromLibrary(option, index)}
+              >
                 <span>{getBlueprintModuleIcon(option.kind)}</span>
                 <div>
                   <strong>{index + 1}. {option.title}</strong>
@@ -841,14 +896,16 @@ export function ConsoleDashboardPage({
             ))}
           </div>
           <div className="blueprint-starter-actions">
-            <button type="button" onClick={addBasicWorkflowTemplate}>添加整套流程</button>
+            <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={addBasicWorkflowTemplate}>添加整套流程</button>
             <span>单点可加一个节点，按钮可加整条最小工作流。</span>
           </div>
-          <div className="blueprint-node__ports is-right">
-            <i className="port port-blue" />
-            <i className="port port-amber" />
-            <i className="port port-slate" />
-          </div>
+          <button
+            type="button"
+            className={`port-button port-button--right${selectedPort?.moduleId === STARTER_MODULE_ID && selectedPort.side === "right" ? " is-selected" : ""}`}
+            aria-label="基础工作流输出端口"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => toggleBlueprintPort(event, STARTER_MODULE_ID, "right")}
+          />
           </article>
 
           {customModules.map((module, index) => (
@@ -905,7 +962,12 @@ export function ConsoleDashboardPage({
         </aside>
 
         <div className="blueprint-command" aria-label="主控输入区">
-          <div className="blueprint-chat-panel" aria-label="总控对话记录">
+          <div
+            className="blueprint-chat-panel"
+            aria-label="总控对话记录"
+            onWheel={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             {controllerMessages.slice(-4).map((message) => (
               <div className={`blueprint-chat-bubble is-${message.role}`} key={message.id}>
                 <span>{message.role === "user" ? "你" : "总控"}</span>
