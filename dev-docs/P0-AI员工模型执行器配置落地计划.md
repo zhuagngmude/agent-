@@ -307,6 +307,8 @@ cargo test model_catalog --lib
 
 ### 阶段 3：Rust service 和 Tauri commands
 
+状态：已完成第一批真实配置链路，新增 `agent_config` Rust service 和 Tauri commands，覆盖执行器、模型目录、Agent 模板、项目 Agent、Skill 和边界检查查询。API Key 不参与这些普通 CRUD。
+
 目标：
 
 - 增加配置 CRUD service。

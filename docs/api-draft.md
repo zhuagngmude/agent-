@@ -40,6 +40,34 @@
 - `list_project_plan_drafts`
 - `list_runner_requests`
 
+### 新 Tauri/Rust agent_config commands（P0 阶段 3 已实现）
+
+AI 员工、执行器、模型目录和 Skill 配置通过 Tauri invoke 暴露，不走旧 Node.js HTTP route：
+
+- `list_executor_configs`
+- `upsert_executor_config`
+- `delete_executor_config`
+- `list_executor_models`
+- `upsert_executor_model`
+- `delete_executor_model`
+- `list_agent_templates`
+- `upsert_agent_template`
+- `delete_agent_template`
+- `list_project_agents`
+- `upsert_project_agent`
+- `remove_project_agent`
+- `list_executor_skills`
+- `upsert_executor_skill`
+- `delete_executor_skill`
+- `list_agent_boundary_checks`
+
+行为要点：
+
+- 普通 CRUD 只保存非敏感配置，API Key、Token、raw prompt、raw response 不进入 SQLite。
+- 内置执行器和内置模型不能删除；被项目 Agent 或其他配置引用的记录会被依赖保护挡住。
+- 项目 Agent 删除是软移除，保留历史链路，不直接断掉运行记录。
+- `list_agent_boundary_checks` 只读，用来展示后端越界判断记录；真正的边界校验会在后续 Runner 调度阶段继续接入。
+
 行为要点：
 
 - 早期 `create_project_plan_draft` / `approve_project_plan` 的审批链路保留为历史参考；当前主控台全自动路径会自动生成/推进任务。
