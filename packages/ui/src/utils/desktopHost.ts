@@ -412,6 +412,22 @@ export async function testRuntimeModelProvider(): Promise<TestRuntimeModelProvid
   return invoke("test_runtime_model_provider");
 }
 
+export type ChatWithControllerInput = {
+  message: string;
+};
+
+export type ChatWithControllerResponse = {
+  reply: string;
+  model_id: string;
+};
+
+export async function chatWithController(
+  input: ChatWithControllerInput,
+): Promise<ChatWithControllerResponse> {
+  requireTauri();
+  return invoke("chat_with_controller", { input });
+}
+
 // ---------------------------------------------------------------------------
 // 阶段 37：想法引导官
 // ---------------------------------------------------------------------------

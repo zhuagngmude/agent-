@@ -59,6 +59,7 @@ pub fn run() {
             commands::model_catalog::get_runtime_model_provider_status,
             commands::model_catalog::update_runtime_model_provider,
             commands::model_catalog::test_runtime_model_provider,
+            commands::model_catalog::chat_with_controller,
             commands::idea_guidance::create_idea_guidance_questions,
             commands::idea_guidance::generate_project_seed,
             commands::idea_guidance::save_guidance_answers,

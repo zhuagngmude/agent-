@@ -54,13 +54,13 @@ export function SettingsPage({ project }: SettingsPageProps) {
     setTestResult(null);
     try {
       const status = await updateRuntimeModelProvider({
-        api_key: values.apiKey,
+        api_key: values.apiKey ?? "",
         base_url: values.baseUrl,
         model_id: values.modelId,
       });
       setProviderStatus(status);
       form.setFieldValue("apiKey", "");
-      message.success("模型服务已切换，当前桌面进程立即生效");
+      message.success("模型服务已保存到本机系统凭据，后续打开会自动恢复");
     } catch (error) {
       message.error(error instanceof Error ? error.message : "保存模型服务失败");
     } finally {
@@ -109,7 +109,7 @@ export function SettingsPage({ project }: SettingsPageProps) {
             showIcon
             message={
               providerStatus?.has_api_key
-                ? `当前已配置 Key：${providerStatus.api_key_hint ?? "****"}`
+                ? "当前已配置 API Key"
                 : "当前没有可用 API Key"
             }
             description={`Base URL：${providerStatus?.base_url ?? "未配置"}；模型：${providerStatus?.model_id ?? "deepseek-chat"}`}
@@ -119,8 +119,8 @@ export function SettingsPage({ project }: SettingsPageProps) {
             <Form.Item
               label="API Key"
               name="apiKey"
-              extra="只写入当前桌面进程环境变量，不保存到数据库；保存后输入框会清空。"
-              rules={[{ required: true, message: "请输入新的 API Key" }]}
+              extra="保存到本机系统凭据，不写入 SQLite、日志或前端存储；保存后输入框会清空。"
+              rules={[{ required: !providerStatus?.has_api_key, message: "首次配置请输入 API Key" }]}
             >
               <Input.Password placeholder="sk-..." autoComplete="off" />
             </Form.Item>

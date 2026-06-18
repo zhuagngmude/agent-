@@ -41,6 +41,7 @@ export type DeleteTasksInput = {
 
 export type DeleteTasksResponse = {
   deleted_task_ids: string[];
+  deleted_output_paths: string[];
 };
 
 export type OpenTaskOutputFolderInput = {

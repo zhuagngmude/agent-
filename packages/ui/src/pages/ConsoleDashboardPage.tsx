@@ -30,7 +30,7 @@ import type {
 } from "@agent-swarm/shared";
 import type { PageKey } from "../routes/mainNavItems";
 import { statusLabel } from "../utils/labels";
-import { autoGenerateProjectPlanTasks, autoRunSwarmIdea, classifyProjectIntake, isTauriHost } from "../utils/desktopHost";
+import { autoGenerateProjectPlanTasks, autoRunSwarmIdea, chatWithController, classifyProjectIntake, isTauriHost } from "../utils/desktopHost";
 import { userErrorLabel } from "../utils/userError";
 
 type ConsoleDashboardPageProps = {
@@ -335,6 +335,7 @@ export function ConsoleDashboardPage({
   const [intakeIdea, setIntakeIdea] = useState("");
   const [intakeError, setIntakeError] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
+  const [controllerThinking, setControllerThinking] = useState(false);
   const [controllerMessages, setControllerMessages] = useState<ControllerChatMessage[]>([
     {
       id: "controller-welcome",
@@ -421,7 +422,7 @@ export function ConsoleDashboardPage({
     }
   };
 
-  const handleControllerChat = () => {
+  const handleControllerChat = async () => {
     const idea = intakeIdea.trim();
     if (!idea) {
       setIntakeError("先写一句你想问什么，或者想让总控做什么。");
@@ -432,7 +433,6 @@ export function ConsoleDashboardPage({
     setControllerMessages((current) => [
       ...current,
       { id: `user-${Date.now()}`, role: "user", text: idea },
-      { id: `controller-${Date.now()}`, role: "controller", text: getControllerReply(idea) },
     ]);
 
     if (shouldCreateWorkflow) {
@@ -441,6 +441,34 @@ export function ConsoleDashboardPage({
 
     setIntakeIdea("");
     setIntakeError(null);
+
+    if (!isTauriHost()) {
+      setControllerMessages((current) => [
+        ...current,
+        { id: `controller-${Date.now()}`, role: "controller", text: getControllerReply(idea) },
+      ]);
+      return;
+    }
+
+    setControllerThinking(true);
+    try {
+      const response = await chatWithController({ message: idea });
+      setControllerMessages((current) => [
+        ...current,
+        { id: `controller-${Date.now()}`, role: "controller", text: response.reply },
+      ]);
+    } catch (error) {
+      setControllerMessages((current) => [
+        ...current,
+        {
+          id: `controller-${Date.now()}`,
+          role: "controller",
+          text: `${getControllerReply(idea)}\n\n真实总控对话暂时没接通：${userErrorLabel(error)}`,
+        },
+      ]);
+    } finally {
+      setControllerThinking(false);
+    }
   };
 
   const addBlueprintModuleFromLibrary = (option: (typeof BLUEPRINT_MODULE_OPTIONS)[number], index: number) => {
@@ -894,12 +922,12 @@ export function ConsoleDashboardPage({
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                handleControllerChat();
+                void handleControllerChat();
               }
             }}
           />
-          <button type="button" onClick={handleControllerChat}>
-            问总控
+          <button type="button" disabled={controllerThinking} onClick={() => void handleControllerChat()}>
+            {controllerThinking ? "思考中" : "问总控"}
           </button>
           <button type="button" disabled={autoRunning} onClick={() => void handleAutoRunIntake()}>
             {autoRunning ? "蜂群执行中" : "全自动执行"}

@@ -6,6 +6,11 @@ use crate::services::model_gateway::openai_compat::{
     ModelProvider, ModelRequest, OpenAiCompatProvider, ProviderError,
 };
 
+const PROVIDER_CREDENTIAL_SERVICE: &str = "agent-swarm";
+const PROVIDER_API_KEY_ACCOUNT: &str = "openai_compat_api_key";
+const PROVIDER_BASE_URL_ACCOUNT: &str = "openai_compat_base_url";
+const PROVIDER_MODEL_ID_ACCOUNT: &str = "openai_compat_model_id";
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateModelEnabledCmdInput {
@@ -38,6 +43,18 @@ pub struct TestRuntimeModelProviderResponse {
     pub message: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChatWithControllerInput {
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ChatWithControllerResponse {
+    pub reply: String,
+    pub model_id: String,
+}
+
 #[tauri::command]
 pub fn list_project_plan_models(
     state: tauri::State<'_, DbState>,
@@ -65,6 +82,7 @@ pub fn update_project_plan_model_enabled(
 
 #[tauri::command]
 pub fn get_runtime_model_provider_status() -> Result<RuntimeModelProviderStatus, String> {
+    hydrate_runtime_provider_from_credentials();
     Ok(runtime_status())
 }
 
@@ -76,15 +94,27 @@ pub fn update_runtime_model_provider(
     let base_url = input.base_url.trim().trim_end_matches('/').to_string();
     let model_id = input.model_id.trim().to_string();
 
-    if api_key.len() < 8 {
-        return Err("invalid_input: API Key 太短".into());
-    }
     if !base_url.starts_with("https://") {
         return Err("invalid_input: Base URL 必须以 https:// 开头".into());
     }
     model_catalog::validate_model_id(&model_id)?;
 
-    std::env::set_var("AGENT_SWARM_OPENAI_COMPAT_API_KEY", api_key);
+    let effective_api_key = if api_key.is_empty() {
+        read_credential(PROVIDER_API_KEY_ACCOUNT)
+            .or_else(|| std::env::var("AGENT_SWARM_OPENAI_COMPAT_API_KEY").ok())
+            .ok_or_else(|| "invalid_input: 首次配置必须输入 API Key".to_string())?
+    } else {
+        if api_key.len() < 8 {
+            return Err("invalid_input: API Key 太短".into());
+        }
+        write_credential(PROVIDER_API_KEY_ACCOUNT, &api_key)?;
+        api_key
+    };
+
+    write_credential(PROVIDER_BASE_URL_ACCOUNT, &base_url)?;
+    write_credential(PROVIDER_MODEL_ID_ACCOUNT, &model_id)?;
+
+    std::env::set_var("AGENT_SWARM_OPENAI_COMPAT_API_KEY", effective_api_key);
     std::env::set_var("AGENT_SWARM_OPENAI_COMPAT_BASE_URL", base_url);
     std::env::set_var("AGENT_SWARM_RUNNER_MODEL_ID", model_id);
 
@@ -93,6 +123,7 @@ pub fn update_runtime_model_provider(
 
 #[tauri::command]
 pub fn test_runtime_model_provider() -> Result<TestRuntimeModelProviderResponse, String> {
+    hydrate_runtime_provider_from_credentials();
     let status = runtime_status();
     if !status.has_api_key {
         return Ok(TestRuntimeModelProviderResponse {
@@ -134,7 +165,51 @@ pub fn test_runtime_model_provider() -> Result<TestRuntimeModelProviderResponse,
     }
 }
 
+#[tauri::command]
+pub fn chat_with_controller(
+    state: tauri::State<'_, DbState>,
+    input: ChatWithControllerInput,
+) -> Result<ChatWithControllerResponse, String> {
+    hydrate_runtime_provider_from_credentials();
+    let user_message = input.message.trim();
+    if user_message.is_empty() {
+        return Err("invalid_input: message must not be empty".into());
+    }
+    if user_message.chars().count() > 1000 {
+        return Err("invalid_input: message must be at most 1000 characters".into());
+    }
+
+    let connection = state.connection()?;
+    let model_id = std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| model_catalog::get_default_runner_model_id(&connection).ok())
+        .unwrap_or_else(|| "deepseek-chat".to_string());
+    model_catalog::validate_model_id(&model_id)?;
+
+    let provider = OpenAiCompatProvider::from_env()
+        .map_err(|_| "provider_config_error: 模型服务还没有配置完整".to_string())?;
+    let request = ModelRequest {
+        system_prompt: "你是 agent-swarm 桌面端的总控 Agent。用简洁中文回答用户，先解释概念，再给下一步建议。不要声称已经执行文件、命令、Git 或外部工具；如果用户要执行，提醒需要走 Runner 和审批链。".into(),
+        user_message: user_message.to_string(),
+        model_id: model_id.clone(),
+    };
+
+    let response = provider.send(&request, 45, 64 * 1024).map_err(|error| {
+        format!(
+            "controller_chat_error: {}",
+            provider_error_message(provider_error_category(&error))
+        )
+    })?;
+
+    Ok(ChatWithControllerResponse {
+        reply: response.content.trim().to_string(),
+        model_id,
+    })
+}
+
 fn runtime_status() -> RuntimeModelProviderStatus {
+    hydrate_runtime_provider_from_credentials();
     let api_key = std::env::var("AGENT_SWARM_OPENAI_COMPAT_API_KEY").ok();
     let base_url = std::env::var("AGENT_SWARM_OPENAI_COMPAT_BASE_URL").ok();
     let model_id = std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
@@ -145,23 +220,10 @@ fn runtime_status() -> RuntimeModelProviderStatus {
         has_api_key: api_key
             .as_ref()
             .is_some_and(|value| !value.trim().is_empty()),
-        api_key_hint: api_key.as_deref().map(mask_key),
+        api_key_hint: None,
         base_url,
         model_id,
     }
-}
-
-fn mask_key(value: &str) -> String {
-    let trimmed = value.trim();
-    let tail: String = trimmed
-        .chars()
-        .rev()
-        .take(4)
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect();
-    format!("****{tail}")
 }
 
 fn provider_error_category(error: &ProviderError) -> &'static str {
@@ -186,4 +248,52 @@ fn provider_error_message(category: &str) -> &'static str {
         "response_too_large" => "模型返回内容过大",
         _ => "模型服务返回错误",
     }
+}
+
+pub fn hydrate_runtime_provider_from_credentials() {
+    if std::env::var("AGENT_SWARM_OPENAI_COMPAT_API_KEY")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .is_none()
+    {
+        if let Some(api_key) = read_credential(PROVIDER_API_KEY_ACCOUNT) {
+            std::env::set_var("AGENT_SWARM_OPENAI_COMPAT_API_KEY", api_key);
+        }
+    }
+
+    if std::env::var("AGENT_SWARM_OPENAI_COMPAT_BASE_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .is_none()
+    {
+        if let Some(base_url) = read_credential(PROVIDER_BASE_URL_ACCOUNT) {
+            std::env::set_var("AGENT_SWARM_OPENAI_COMPAT_BASE_URL", base_url);
+        }
+    }
+
+    if std::env::var("AGENT_SWARM_RUNNER_MODEL_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .is_none()
+    {
+        if let Some(model_id) = read_credential(PROVIDER_MODEL_ID_ACCOUNT) {
+            std::env::set_var("AGENT_SWARM_RUNNER_MODEL_ID", model_id);
+        }
+    }
+}
+
+fn read_credential(account: &str) -> Option<String> {
+    keyring::Entry::new(PROVIDER_CREDENTIAL_SERVICE, account)
+        .ok()?
+        .get_password()
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn write_credential(account: &str, value: &str) -> Result<(), String> {
+    keyring::Entry::new(PROVIDER_CREDENTIAL_SERVICE, account)
+        .map_err(|_| "credential_error: 无法打开系统凭据存储".to_string())?
+        .set_password(value)
+        .map_err(|_| "credential_error: 无法保存到系统凭据存储".to_string())
 }

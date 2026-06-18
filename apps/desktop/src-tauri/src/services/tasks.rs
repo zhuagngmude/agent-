@@ -61,6 +61,7 @@ pub struct UpdateTaskStatusResponse {
 #[derive(Debug, Serialize)]
 pub struct DeleteTasksResponse {
     pub deleted_task_ids: Vec<String>,
+    pub deleted_output_paths: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,6 +222,8 @@ pub fn delete_tasks(
         return Err("invalid_input: task_ids must not be empty".to_string());
     }
 
+    let output_folders = task_output_folders(connection, &project_id, &task_ids)?;
+
     let tx = connection.transaction().map_err(|error| {
         format!("database_error: start delete task transaction failed: {error}")
     })?;
@@ -251,8 +254,11 @@ pub fn delete_tasks(
         format!("database_error: commit delete task transaction failed: {error}")
     })?;
 
+    let deleted_output_paths = remove_task_output_folders(output_folders)?;
+
     Ok(DeleteTasksResponse {
         deleted_task_ids: task_ids,
+        deleted_output_paths,
     })
 }
 
@@ -389,6 +395,62 @@ fn safe_folder_name(value: &str) -> String {
         return "未命名项目".to_string();
     }
     name.chars().take(80).collect()
+}
+
+fn task_output_folders(
+    connection: &Connection,
+    project_id: &str,
+    task_ids: &[String],
+) -> Result<Vec<PathBuf>, String> {
+    let base = generated_base(connection, project_id)?;
+    let mut folders = Vec::new();
+    let mut seen = HashSet::new();
+
+    for task_id in task_ids {
+        let task = get_task_by_id(connection, task_id)?;
+        if task.project_id != project_id {
+            return Err("not_found: task not found".to_string());
+        }
+
+        let folder = base.join(task_output_folder_name(&task));
+        if seen.insert(folder.clone()) {
+            folders.push(folder);
+        }
+    }
+
+    Ok(folders)
+}
+
+fn remove_task_output_folders(folders: Vec<PathBuf>) -> Result<Vec<String>, String> {
+    let mut deleted = Vec::new();
+
+    for folder in folders {
+        if !folder.exists() {
+            continue;
+        }
+
+        let Some(parent) = folder.parent() else {
+            return Err("io_error: invalid output folder".to_string());
+        };
+        let base = parent
+            .canonicalize()
+            .map_err(|error| format!("io_error: resolve generated base failed: {error}"))?;
+        let folder = folder
+            .canonicalize()
+            .map_err(|error| format!("io_error: resolve output folder failed: {error}"))?;
+
+        if !folder.starts_with(&base) || folder == base {
+            return Err(
+                "invalid_state: refused to delete outside generated task folder".to_string(),
+            );
+        }
+
+        std::fs::remove_dir_all(&folder)
+            .map_err(|error| format!("io_error: delete output folder failed: {error}"))?;
+        deleted.push(folder.to_string_lossy().to_string());
+    }
+
+    Ok(deleted)
 }
 
 fn open_folder_in_os(path: &PathBuf) -> Result<(), String> {
@@ -723,9 +785,14 @@ fn timestamp_nanos() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_task, parse_string_list, update_task_status, CreateTaskInput, UpdateTaskStatusInput,
+        create_task, delete_tasks, parse_string_list, task_output_folder_name, update_task_status,
+        CreateTaskInput, DeleteTasksInput, TaskSummary, UpdateTaskStatusInput,
     };
     use rusqlite::{params, Connection};
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     const INITIAL_MIGRATION_SQL: &str =
         include_str!("../../../../../data/migrations/001_initial_sqlite.sql");
@@ -940,6 +1007,73 @@ mod tests {
         .expect("status should update");
 
         assert_eq!(count_rows(&connection, "approvals"), 0);
+    }
+
+    #[test]
+    fn delete_tasks_removes_generated_task_folder() {
+        let mut connection = setup_connection();
+        connection
+            .execute_batch(
+                "CREATE TABLE runner_minimal_runs (project_id TEXT, task_id TEXT);
+                 CREATE TABLE runner_execution_locks (project_id TEXT, task_id TEXT);
+                 CREATE TABLE runner_dry_runs (project_id TEXT, task_id TEXT);
+                 CREATE TABLE runner_execution_gates (project_id TEXT, task_id TEXT);
+                 CREATE TABLE runner_preflight_reviews (project_id TEXT, task_id TEXT);
+                 CREATE TABLE runner_requests (project_id TEXT, task_id TEXT);",
+            )
+            .expect("create dependent cleanup tables");
+        let workspace_root = std::env::temp_dir().join(format!(
+            "agent-swarm-task-delete-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time")
+                .as_nanos()
+        ));
+        fs::create_dir_all(workspace_root.join("workspace").join("generated"))
+            .expect("create generated root");
+        connection
+            .execute(
+                "UPDATE projects SET workspace_path = ?1 WHERE id = ?2",
+                params![
+                    workspace_root.to_string_lossy().to_string(),
+                    "project_agent_swarm"
+                ],
+            )
+            .expect("update workspace path");
+
+        let task_folder =
+            workspace_root
+                .join("workspace")
+                .join("generated")
+                .join(task_output_folder_name(&TaskSummary {
+                    id: "task_existing".to_string(),
+                    project_id: "project_agent_swarm".to_string(),
+                    title: "Existing task".to_string(),
+                    description: None,
+                    status: "queued".to_string(),
+                    priority: "medium".to_string(),
+                    assigned_agent_id: None,
+                    depends_on: Vec::new(),
+                    risk_level: None,
+                    created_at: "1".to_string(),
+                    updated_at: "1".to_string(),
+                }));
+        fs::create_dir_all(&task_folder).expect("create task folder");
+        assert!(task_folder.exists());
+
+        let response = delete_tasks(
+            &mut connection,
+            DeleteTasksInput {
+                task_ids: vec!["task_existing".to_string()],
+            },
+        )
+        .expect("delete task should succeed");
+
+        assert_eq!(response.deleted_task_ids, vec!["task_existing".to_string()]);
+        assert_eq!(response.deleted_output_paths.len(), 1);
+        assert!(!task_folder.exists(), "task folder should be removed");
+
+        let _ = fs::remove_dir_all(workspace_root);
     }
 
     fn input_with_title(title: &str) -> CreateTaskInput {

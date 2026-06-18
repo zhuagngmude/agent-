@@ -67,7 +67,7 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
       setDeletingKey(row.key);
       try {
         await deleteTasks({ task_ids: taskIds });
-        message.success(row.children ? "任务组已删除" : "任务已删除");
+        message.success(row.children ? "任务组和产物文件夹已删除" : "任务和产物文件夹已删除");
         refresh();
       } catch (error) {
         showError(message, error);

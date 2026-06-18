@@ -31,7 +31,7 @@
 - 系统设置保存的模型 ID 写入当前桌面进程的 `AGENT_SWARM_RUNNER_MODEL_ID`，优先级最高。
 - 如果没有配置 `AGENT_SWARM_RUNNER_MODEL_ID`，Runner 会从 SQLite 的受控模型目录中读取默认启用模型。
 - 如果模型目录也不可用，才使用旧 fallback `deepseek-chat`。
-- API Key 和 Base URL 仍只存在当前桌面进程环境变量中，不落库、不写日志、不回显给前端。
+- API Key、Base URL 和模型 ID 保存到本机系统凭据，桌面端启动后恢复到当前进程环境变量；不落 SQLite、不写日志、不回显完整 key 给前端。
 - 这个 MVP 只证明“中控能通过默认模型推动 Runner 产出文件”，不代表完整员工池、专家推荐和越界强校验已经完成。
 
 验收方式：
@@ -255,7 +255,7 @@ list_agent_boundary_checks
 - 浏览器预览保留示例数据，但明确只读。
 - 桌面端从 Tauri commands 读取执行器、模型、Agent 模板、项目成员和 skill。
 - 新增、删除、编辑都走后端服务。
-- API Key 输入不保存，保存后清空，只显示“已配置 / 未配置 / 测试失败”等状态。
+- API Key 保存到本机系统凭据，保存后输入框清空，只显示“已配置 / 未配置 / 测试失败”等状态。
 
 ### 系统设置页
 
