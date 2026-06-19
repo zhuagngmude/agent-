@@ -52,8 +52,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   risk_level TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (project_id) REFERENCES projects(id),
-  FOREIGN KEY (assigned_agent_id) REFERENCES agents(id)
+  FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);

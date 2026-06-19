@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 
 import { isProjectPlanApprovalTarget } from "@agent-swarm/agent-core";
 import type { ApprovalSummary } from "@agent-swarm/shared";
+import type { PageKey } from "../routes/mainNavItems";
 import { approveApproval, patchOnlyApproval, rejectApproval } from "../utils/desktopHost";
 import { statusLabel, riskLabel, riskColor, targetServiceLabel, operationTypeLabel, approvalStatusColor } from "../utils/labels";
 import { userErrorLabel } from "../utils/userError";
@@ -72,13 +73,14 @@ type ApprovalsPageProps = {
   approvals: ApprovalSummary[];
   refresh: () => void;
   canWrite: boolean;
+  onNavigate?: (page: PageKey) => void;
 };
 
 // ---------------------------------------------------------------------------
 // ApprovalsPage
 // ---------------------------------------------------------------------------
 
-export function ApprovalsPage({ approvals, refresh, canWrite }: ApprovalsPageProps) {
+export function ApprovalsPage({ approvals, refresh, canWrite, onNavigate }: ApprovalsPageProps) {
   const { message } = AntdApp.useApp();
   const approvalRows = toApprovalRows(approvals);
 
@@ -130,7 +132,11 @@ export function ApprovalsPage({ approvals, refresh, canWrite }: ApprovalsPagePro
           render: (_: unknown, row: ApprovalRow) => {
             if (row.status !== "pending") return null;
             if (isProjectPlanApprovalTarget(row.service)) {
-              return <Typography.Text type="secondary">请到“项目计划”页二次确认</Typography.Text>;
+              return (
+                <Button size="small" onClick={() => onNavigate?.("projectPlan")}>
+                  去项目计划确认
+                </Button>
+              );
             }
 
             return (

@@ -1,6 +1,7 @@
 use crate::{
     db::DbState,
     services::agent_config::{
+        check_agent_boundary as check_agent_boundary_record,
         delete_agent_template as delete_agent_template_record,
         delete_executor_config as delete_executor_config_record,
         delete_executor_model as delete_executor_model_record,
@@ -11,18 +12,20 @@ use crate::{
         list_executor_models as list_executor_model_records,
         list_executor_skills as list_executor_skill_records,
         list_project_agents as list_project_agent_records,
+        recommend_project_agents as recommend_project_agents_record,
         remove_project_agent as remove_project_agent_record,
         upsert_agent_template as upsert_agent_template_record,
         upsert_executor_config as upsert_executor_config_record,
         upsert_executor_model as upsert_executor_model_record,
         upsert_executor_skill as upsert_executor_skill_record,
         upsert_project_agent as upsert_project_agent_record, AgentBoundaryCheckSummary,
-        AgentTemplateSummary, DeleteAgentTemplateInput, DeleteExecutorConfigInput,
-        DeleteExecutorModelInput, DeleteExecutorSkillInput, ExecutorConfigSummary,
-        ExecutorModelSummary, ExecutorSkillSummary, ListBoundaryChecksInput,
-        ListExecutorModelsInput, ProjectAgentSummary, RemoveProjectAgentInput,
-        UpsertAgentTemplateInput, UpsertExecutorConfigInput, UpsertExecutorModelInput,
-        UpsertExecutorSkillInput, UpsertProjectAgentInput,
+        AgentTemplateSummary, CheckAgentBoundaryInput, CheckAgentBoundaryOutput,
+        DeleteAgentTemplateInput, DeleteExecutorConfigInput, DeleteExecutorModelInput,
+        DeleteExecutorSkillInput, ExecutorConfigSummary, ExecutorModelSummary,
+        ExecutorSkillSummary, ListBoundaryChecksInput, ListExecutorModelsInput,
+        ProjectAgentSummary, RecommendProjectAgentsInput, RecommendProjectAgentsOutput,
+        RemoveProjectAgentInput, UpsertAgentTemplateInput, UpsertExecutorConfigInput,
+        UpsertExecutorModelInput, UpsertExecutorSkillInput, UpsertProjectAgentInput,
     },
 };
 
@@ -164,4 +167,22 @@ pub fn list_agent_boundary_checks(
 ) -> Result<Vec<AgentBoundaryCheckSummary>, String> {
     let connection = state.connection()?;
     list_agent_boundary_check_records(&connection, input)
+}
+
+#[tauri::command]
+pub fn recommend_project_agents(
+    state: tauri::State<'_, DbState>,
+    input: RecommendProjectAgentsInput,
+) -> Result<RecommendProjectAgentsOutput, String> {
+    let connection = state.connection()?;
+    recommend_project_agents_record(&connection, input)
+}
+
+#[tauri::command]
+pub fn check_agent_boundary(
+    state: tauri::State<'_, DbState>,
+    input: CheckAgentBoundaryInput,
+) -> Result<CheckAgentBoundaryOutput, String> {
+    let connection = state.connection()?;
+    check_agent_boundary_record(&connection, input)
 }

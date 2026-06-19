@@ -22,6 +22,143 @@ pub struct TaskSummary {
     pub updated_at: String,
 }
 
+/// 任务绑定的项目 Agent 信息（用于运行输出页展示 Agent/执行器/模型闭环）
+#[derive(Debug, Serialize, Clone)]
+pub struct TaskAgentInfo {
+    pub task_id: String,
+    pub project_agent_id: Option<String>,
+    pub agent_name: Option<String>,
+    pub agent_role: Option<String>,
+    pub executor_key: Option<String>,
+    pub model_id: Option<String>,
+    pub module_scope: Option<String>,
+    pub agent_status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssignProjectAgentsToTaskInput {
+    pub task_id: String,
+    pub project_agent_id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AssignProjectAgentsToTaskResponse {
+    pub task: TaskSummary,
+    pub agent: TaskAgentInfo,
+}
+
+/// 按任务 ID 查询绑定的项目 Agent 信息
+pub fn get_task_agent_info(
+    connection: &Connection,
+    task_id: &str,
+) -> Result<Option<TaskAgentInfo>, String> {
+    let project_id = get_current_project_id(connection)?;
+    let task = get_task_by_id(connection, task_id)?;
+    if task.project_id != project_id {
+        return Err("not_found: task not found".into());
+    }
+
+    let agent_id = match task.assigned_agent_id.as_deref() {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            return Ok(Some(TaskAgentInfo {
+                task_id: task_id.to_string(),
+                project_agent_id: None,
+                agent_name: None,
+                agent_role: None,
+                executor_key: None,
+                model_id: None,
+                module_scope: None,
+                agent_status: None,
+            }));
+        }
+    };
+
+    let info = connection
+        .query_row(
+            "SELECT pa.id, pa.name, pa.role, pa.executor_key, pa.model_id,
+                pa.module_scope, pa.status, 1
+             FROM project_agents pa
+             WHERE pa.id = ?1 AND pa.project_id = ?2 AND pa.removed_at IS NULL
+             UNION ALL
+             SELECT a.id, a.name, a.role, NULL, a.model, NULL, a.status, 0
+             FROM agents a
+             WHERE a.id = ?1 AND a.project_id = ?2
+               AND NOT EXISTS (
+                 SELECT 1 FROM project_agents pa2
+                 WHERE pa2.id = ?1 AND pa2.project_id = ?2
+               )
+             LIMIT 1",
+            params![agent_id, project_id.as_str()],
+            |row| {
+                let is_project_agent: i64 = row.get(7)?;
+                Ok(TaskAgentInfo {
+                    task_id: task_id.to_string(),
+                    project_agent_id: if is_project_agent == 1 {
+                        Some(row.get(0)?)
+                    } else {
+                        None
+                    },
+                    agent_name: Some(row.get(1)?),
+                    agent_role: Some(row.get(2)?),
+                    executor_key: row.get(3)?,
+                    model_id: row.get(4)?,
+                    module_scope: row.get(5)?,
+                    agent_status: Some(row.get(6)?),
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| format!("database_error: lookup agent info failed: {e}"))?;
+
+    Ok(info.or(Some(TaskAgentInfo {
+        task_id: task_id.to_string(),
+        project_agent_id: None,
+        agent_name: None,
+        agent_role: None,
+        executor_key: None,
+        model_id: None,
+        module_scope: None,
+        agent_status: None,
+    })))
+}
+
+pub fn assign_project_agents_to_task(
+    connection: &mut Connection,
+    input: AssignProjectAgentsToTaskInput,
+) -> Result<AssignProjectAgentsToTaskResponse, String> {
+    let project_id = get_current_project_id(connection)?;
+    let task_id = normalize_required_text(input.task_id, 1, 200, "task_id")?;
+    let project_agent_id =
+        normalize_required_text(input.project_agent_id, 1, 200, "project_agent_id")?;
+    let current_task = get_task_by_id(connection, &task_id)?;
+    if current_task.project_id != project_id {
+        return Err("not_found: task not found".to_string());
+    }
+    ensure_project_agent_belongs_to_project(connection, &project_id, &project_agent_id)?;
+
+    let now = current_timestamp();
+    connection
+        .execute(
+            "UPDATE tasks
+             SET assigned_agent_id = ?1, updated_at = ?2
+             WHERE id = ?3 AND project_id = ?4",
+            params![
+                project_agent_id.as_str(),
+                now.as_str(),
+                task_id.as_str(),
+                project_id.as_str()
+            ],
+        )
+        .map_err(|error| format!("database_error: assign task agent failed: {error}"))?;
+
+    let task = get_task_by_id(connection, &task_id)?;
+    let agent = get_task_agent_info(connection, &task_id)?
+        .ok_or_else(|| "not_found: assigned project agent not found".to_string())?;
+    Ok(AssignProjectAgentsToTaskResponse { task, agent })
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateTaskInput {
     pub title: String,
@@ -708,7 +845,8 @@ fn ensure_agent_belongs_to_project(
     project_id: &str,
     agent_id: &str,
 ) -> Result<(), String> {
-    let count: i64 = connection
+    // 先查旧 agents 表（向后兼容）
+    let old_count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
             params![agent_id, project_id],
@@ -716,11 +854,45 @@ fn ensure_agent_belongs_to_project(
         )
         .map_err(|error| format!("database_error: check agent failed: {error}"))?;
 
-    if count == 1 {
-        Ok(())
-    } else {
-        Err("not_found: assigned agent not found".to_string())
+    if old_count == 1 {
+        return Ok(());
     }
+
+    // 再查 project_agents 表（新 P0 数据源；表不存在时视为 0）
+    let pa_count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![agent_id, project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    if pa_count == 1 {
+        return Ok(());
+    }
+
+    Err("not_found: assigned agent not found".to_string())
+}
+
+fn ensure_project_agent_belongs_to_project(
+    connection: &Connection,
+    project_id: &str,
+    project_agent_id: &str,
+) -> Result<(), String> {
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents
+             WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![project_agent_id, project_id],
+            |row| row.get(0),
+        )
+        .map_err(|error| format!("database_error: check project agent failed: {error}"))?;
+
+    if count == 1 {
+        return Ok(());
+    }
+
+    Err("not_found: project agent not found".to_string())
 }
 
 fn ensure_task_belongs_to_project(
@@ -785,8 +957,10 @@ fn timestamp_nanos() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_task, delete_tasks, parse_string_list, task_output_folder_name, update_task_status,
-        CreateTaskInput, DeleteTasksInput, TaskSummary, UpdateTaskStatusInput,
+        assign_project_agents_to_task, create_task, delete_tasks, get_task_agent_info,
+        parse_string_list, task_output_folder_name, update_task_status,
+        AssignProjectAgentsToTaskInput, CreateTaskInput, DeleteTasksInput, TaskSummary,
+        UpdateTaskStatusInput,
     };
     use rusqlite::{params, Connection};
     use std::{
@@ -894,6 +1068,62 @@ mod tests {
         let error = create_task(&mut connection, input).expect_err("unknown agent should fail");
 
         assert!(error.contains("not_found"));
+    }
+
+    #[test]
+    fn assign_project_agent_to_task_updates_assigned_agent() {
+        let mut connection = setup_connection();
+        seed_project_agent(&connection);
+
+        let response = assign_project_agents_to_task(
+            &mut connection,
+            AssignProjectAgentsToTaskInput {
+                task_id: "task_existing".to_string(),
+                project_agent_id: "project_agent_frontend".to_string(),
+            },
+        )
+        .expect("project agent should assign");
+
+        assert_eq!(
+            response.task.assigned_agent_id.as_deref(),
+            Some("project_agent_frontend")
+        );
+        assert_eq!(
+            response.agent.project_agent_id.as_deref(),
+            Some("project_agent_frontend")
+        );
+        assert_eq!(
+            response.agent.executor_key.as_deref(),
+            Some("model_gateway_default")
+        );
+
+        let info = get_task_agent_info(&connection, "task_existing")
+            .expect("agent info should load")
+            .expect("agent info should exist");
+        assert_eq!(info.agent_name.as_deref(), Some("前端执行员"));
+        assert_eq!(info.model_id.as_deref(), Some("gpt-5.4-mini"));
+    }
+
+    #[test]
+    fn assign_project_agent_to_task_rejects_removed_agent() {
+        let mut connection = setup_connection();
+        seed_project_agent(&connection);
+        connection
+            .execute(
+                "UPDATE project_agents SET removed_at = '2' WHERE id = 'project_agent_frontend'",
+                [],
+            )
+            .expect("remove project agent");
+
+        let err = assign_project_agents_to_task(
+            &mut connection,
+            AssignProjectAgentsToTaskInput {
+                task_id: "task_existing".to_string(),
+                project_agent_id: "project_agent_frontend".to_string(),
+            },
+        )
+        .expect_err("removed project agent should be rejected");
+        assert!(err.contains("not_found"));
     }
 
     #[test]
@@ -1150,6 +1380,98 @@ mod tests {
             .expect("task should insert");
 
         connection
+    }
+
+    fn seed_project_agent(connection: &Connection) {
+        connection
+            .execute_batch(
+                "CREATE TABLE executor_configs (
+                    id TEXT PRIMARY KEY,
+                    key TEXT NOT NULL UNIQUE,
+                    label TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    provider TEXT,
+                    base_url_status TEXT NOT NULL,
+                    executable_path TEXT,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE agent_templates (
+                    id TEXT PRIMARY KEY,
+                    role TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    specialty TEXT,
+                    stack TEXT,
+                    module_scope TEXT NOT NULL,
+                    allowed_task_types TEXT NOT NULL DEFAULT '[]',
+                    allowed_paths TEXT NOT NULL DEFAULT '[]',
+                    forbidden_actions TEXT NOT NULL DEFAULT '[]',
+                    default_executor_key TEXT NOT NULL,
+                    default_model_id TEXT,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE project_agents (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    agent_template_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    executor_key TEXT NOT NULL,
+                    model_id TEXT,
+                    module_scope TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    joined_at TEXT NOT NULL,
+                    removed_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );",
+            )
+            .expect("create project agent tables");
+        connection
+            .execute(
+                "INSERT INTO executor_configs (
+                    id, key, label, kind, provider, base_url_status, status, created_at, updated_at
+                ) VALUES (
+                    'executor_model_gateway_default', 'model_gateway_default', '模型网关',
+                    'model_gateway', 'openai_compat', 'configured_by_system_settings',
+                    'active', '1', '1'
+                )",
+                [],
+            )
+            .expect("insert executor");
+        connection
+            .execute(
+                "INSERT INTO agent_templates (
+                    id, role, category, name, module_scope, allowed_task_types,
+                    allowed_paths, forbidden_actions, default_executor_key,
+                    default_model_id, created_at, updated_at
+                ) VALUES (
+                    'agent_template_frontend', 'frontend', 'core', '前端工程师',
+                    'frontend', '[\"runner_request_write_files\"]', '[\"packages/ui/**\"]',
+                    '[]', 'model_gateway_default', 'gpt-5.4-mini', '1', '1'
+                )",
+                [],
+            )
+            .expect("insert template");
+        connection
+            .execute(
+                "INSERT INTO project_agents (
+                    id, project_id, agent_template_id, name, role, source,
+                    executor_key, model_id, module_scope, status, joined_at,
+                    created_at, updated_at
+                ) VALUES (
+                    'project_agent_frontend', 'project_agent_swarm', 'agent_template_frontend',
+                    '前端执行员', 'frontend', 'core', 'model_gateway_default',
+                    'gpt-5.4-mini', 'frontend', 'active', '1', '1', '1'
+                )",
+                [],
+            )
+            .expect("insert project agent");
     }
 
     fn count_rows(connection: &Connection, table: &str) -> i64 {

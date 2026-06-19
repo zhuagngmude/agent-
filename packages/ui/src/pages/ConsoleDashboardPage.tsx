@@ -302,6 +302,23 @@ function shouldChatCreateWorkflow(text: string): boolean {
     || /^(添加|生成)整套流程$/.test(normalized);
 }
 
+function getRequestedPage(text: string): PageKey | null {
+  const normalized = text.trim().toLowerCase();
+  if (!/(切|切到|打开|进入|跳到|去|看|看看|显示|查看|回到|转到)/.test(normalized)) {
+    return null;
+  }
+
+  if (/任务|拆解|task/.test(normalized)) return "tasks";
+  if (/项目计划|计划|project.?plan/.test(normalized)) return "projectPlan";
+  if (/流程|蓝图|workflow/.test(normalized)) return "workflow";
+  if (/运行|输出|产物|日志|run/.test(normalized)) return "runs";
+  if (/员工|agent|智能体/.test(normalized)) return "agents";
+  if (/审批|安全|approval/.test(normalized)) return "approvals";
+  if (/设置|模型|key|api|配置/.test(normalized)) return "settings";
+  if (/主控|首页|控制台|overview/.test(normalized)) return "overview";
+  return null;
+}
+
 function getConnectionPath(from: BlueprintCustomModule, to: BlueprintCustomModule): string {
   const start = getModulePortPosition(from, "right");
   const end = getModulePortPosition(to, "left");
@@ -309,7 +326,7 @@ function getConnectionPath(from: BlueprintCustomModule, to: BlueprintCustomModul
   return `M ${start.x} ${start.y} C ${start.x + distance} ${start.y}, ${end.x - distance} ${end.y}, ${end.x} ${end.y}`;
 }
 
-function getControllerReply(idea: string): string {
+function getControllerReply(idea: string, isDesktop: boolean): string {
   const text = idea.trim();
   const normalized = text.toLowerCase();
 
@@ -326,11 +343,15 @@ function getControllerReply(idea: string): string {
   }
 
   if (/执行|runner|审批|确认|安全/.test(normalized)) {
-    return "真正执行代码、写文件、调用外部模型时，必须先经过审批和 Runner 安全链路。当前主控台还是前端预览版，只会改画布，不会直接执行危险动作。";
+    return isDesktop
+      ? "桌面端会通过受控 Runner 主链路推进任务；高风险动作仍会进入审批和边界检查。你可以随时切到任务拆解、运行输出或审批与安全查看进度。"
+      : "浏览器预览只会改画布，不会执行 Runner、写文件或调用真实模型。请打开桌面端使用全自动执行。";
   }
 
   if (/添加|生成|创建|流程|工作流/.test(text)) {
-    return "我可以先帮你生成一条最小工作流：开始 -> 管理器 -> 智能体 -> 槽位 -> 条件 -> 汇总。当前是前端预览，会把模块和连线放到画布上，后面再接真实总控 Agent。";
+    return isDesktop
+      ? "我可以帮你生成一条最小工作流，也可以直接用全自动执行把项目目标拆成任务并交给 Runner 主链路推进。"
+      : "我可以先帮你生成一条最小工作流：开始 -> 管理器 -> 智能体 -> 槽位 -> 条件 -> 汇总。浏览器预览只会把模块和连线放到画布上。";
   }
 
   if (/怎么|如何|为什么|是什么|啥|不懂|不会/.test(text)) {
@@ -452,6 +473,7 @@ export function ConsoleDashboardPage({
       return;
     }
 
+    const requestedPage = getRequestedPage(idea);
     const shouldCreateWorkflow = shouldChatCreateWorkflow(idea);
     setControllerMessages((current) => [
       ...current,
@@ -465,10 +487,34 @@ export function ConsoleDashboardPage({
     setIntakeIdea("");
     setIntakeError(null);
 
+    if (requestedPage) {
+      const targetLabel = requestedPage === "overview"
+        ? "主控台"
+        : requestedPage === "tasks"
+          ? "任务拆解"
+          : requestedPage === "projectPlan"
+            ? "项目计划"
+            : requestedPage === "workflow"
+              ? "流程蓝图"
+              : requestedPage === "runs"
+                ? "运行输出"
+                : requestedPage === "agents"
+                  ? "AI 员工"
+                  : requestedPage === "approvals"
+                    ? "审批与安全"
+                    : "系统设置";
+      setControllerMessages((current) => [
+        ...current,
+        { id: `controller-nav-${Date.now()}`, role: "controller", text: `已切到「${targetLabel}」。你也可以随时点左侧导航人工接管。` },
+      ]);
+      onNavigate(requestedPage);
+      return;
+    }
+
     if (!isTauriHost()) {
       setControllerMessages((current) => [
         ...current,
-        { id: `controller-${Date.now()}`, role: "controller", text: getControllerReply(idea) },
+        { id: `controller-${Date.now()}`, role: "controller", text: getControllerReply(idea, false) },
       ]);
       return;
     }
@@ -486,7 +532,7 @@ export function ConsoleDashboardPage({
         {
           id: `controller-${Date.now()}`,
           role: "controller",
-          text: `${getControllerReply(idea)}\n\n真实总控对话暂时没接通：${userErrorLabel(error)}`,
+          text: `${getControllerReply(idea, true)}\n\n真实总控对话暂时没接通：${userErrorLabel(error)}`,
         },
       ]);
     } finally {
@@ -930,7 +976,7 @@ export function ConsoleDashboardPage({
                 <h2>{index + 1}. {module.title}</h2>
                 <p>{module.subtitle}</p>
               </div>
-              <small>右键添加的临时模块</small>
+              <small>画布模块</small>
               <button
                 type="button"
                 className="blueprint-custom-node__delete"
@@ -968,7 +1014,7 @@ export function ConsoleDashboardPage({
             onWheel={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            {controllerMessages.slice(-4).map((message) => (
+            {controllerMessages.slice(-3).map((message) => (
               <div className={`blueprint-chat-bubble is-${message.role}`} key={message.id}>
                 <span>{message.role === "user" ? "你" : "总控"}</span>
                 <p>{message.text}</p>

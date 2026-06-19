@@ -7,6 +7,7 @@ import { AgentRunsPage } from "../pages/AgentRunsPage";
 import { AgentsPage } from "../pages/AgentsPage";
 import { ApprovalsPage } from "../pages/ApprovalsPage";
 import { OverviewPage } from "../pages/OverviewPage";
+import { ProjectPlanPage } from "../pages/ProjectPlanPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { TasksPage } from "../pages/TasksPage";
 import { WorkflowPage } from "../pages/WorkflowPage";
@@ -29,6 +30,8 @@ export function App() {
         return <OverviewPage {...data} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} onNavigate={setActivePage} onRefresh={refresh} />;
       case "tasks":
         return <TasksPage tasks={data.tasks} agents={data.agents} refresh={refresh} canWrite={canWrite} />;
+      case "projectPlan":
+        return <ProjectPlanPage approvals={data.approvals} refreshOverview={refresh} canWrite={canWrite} />;
       case "workflow":
         return <WorkflowPage {...data} connectionStatus={overviewState.status} message={"message" in overviewState ? overviewState.message : undefined} onRefresh={refresh} />;
       case "runs":
@@ -36,7 +39,7 @@ export function App() {
       case "agents":
         return <AgentsPage agents={data.agents} />;
       case "approvals":
-        return <ApprovalsPage approvals={data.approvals} refresh={refresh} canWrite={canWrite} />;
+        return <ApprovalsPage approvals={data.approvals} refresh={refresh} canWrite={canWrite} onNavigate={setActivePage} />;
       case "settings":
         return <SettingsPage project={data.project} />;
     }

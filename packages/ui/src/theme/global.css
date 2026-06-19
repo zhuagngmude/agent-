@@ -759,14 +759,13 @@ button {
 }
 
 .executor-tree-group__head,
-.executor-tree-group__items button {
+.executor-tree-group__items div {
   display: grid;
   width: 100%;
   min-width: 0;
   color: #334155;
   font: inherit;
   text-align: left;
-  cursor: pointer;
   background: transparent;
   border: 0;
 }
@@ -778,6 +777,7 @@ button {
   min-height: 38px;
   padding: 0 10px;
   color: #29405c;
+  cursor: pointer;
   border: 1px solid transparent;
   border-radius: 12px;
 }
@@ -817,7 +817,7 @@ button {
   padding: 2px 0 2px 10px;
 }
 
-.executor-tree-group__items button {
+.executor-tree-group__items div {
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
@@ -828,8 +828,7 @@ button {
   border-radius: 10px;
 }
 
-.executor-tree-group__items button:hover,
-.executor-tree-group__items button.is-selected {
+.executor-tree-group__items div.is-selected {
   color: #102033;
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(177, 196, 220, 0.52);
@@ -1236,8 +1235,7 @@ button {
   border-top: 1px solid var(--as-line);
 }
 
-.agent-model-card__footer span,
-.agent-model-card__footer button {
+.agent-model-card__footer span {
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -1256,11 +1254,10 @@ button {
   flex-shrink: 0;
 }
 
-.agent-model-card__footer button {
+.agent-model-card__config-state {
   flex-shrink: 0;
   height: 28px;
   padding: 0 8px;
-  cursor: default;
   background: #f4f7fb;
   border: 1px solid rgba(174, 196, 222, 0.56);
   border-radius: 9px;
@@ -2420,11 +2417,11 @@ button {
 
 .blueprint-chat-panel {
   position: absolute;
-  left: 0;
   right: 0;
   bottom: calc(100% + 10px);
   display: grid;
   gap: 8px;
+  width: min(520px, 100%);
   max-height: 210px;
   overflow: auto;
   pointer-events: auto;
@@ -2433,7 +2430,7 @@ button {
 .blueprint-chat-bubble {
   display: grid;
   gap: 4px;
-  max-width: min(680px, 86%);
+  max-width: 100%;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(174, 196, 222, 0.6);
@@ -2443,6 +2440,7 @@ button {
 
 .blueprint-chat-bubble.is-user {
   justify-self: end;
+  max-width: 82%;
   background: #edf7ff;
 }
 

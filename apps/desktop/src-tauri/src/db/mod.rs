@@ -42,6 +42,8 @@ const OPEN_RUNNER_FULL_AUTO_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/016_open_runner_full_auto.sql");
 const AGENT_CONFIG_CORE_MIGRATION_SQL: &str =
     include_str!("../../../../../data/migrations/017_add_agent_config_core.sql");
+const RELAX_TASK_AGENT_FK_MIGRATION_SQL: &str =
+    include_str!("../../../../../data/migrations/018_relax_tasks_assigned_agent_fk.sql");
 const INITIAL_SEED_JSON: &str =
     include_str!("../../../../../data/seed/project_agent_swarm.seed.json");
 
@@ -83,6 +85,7 @@ pub fn initialize(app_data_dir: PathBuf) -> InitResult<DbState> {
     run_auto_runner_locks_migration(&connection)?;
     run_open_runner_full_auto_migration(&connection)?;
     run_agent_config_core_migration(&connection)?;
+    run_relax_task_agent_fk_migration(&connection)?;
     seed_initial_data_if_needed(&mut connection)?;
     seed_builtin_task_templates(&connection)?;
     seed_builtin_models(&connection)?;
@@ -207,9 +210,19 @@ fn run_agent_config_core_migration(connection: &Connection) -> InitResult<()> {
          SET executor_key = 'model_gateway_default'
          WHERE executor_key IS NULL OR TRIM(executor_key) = '';
 
+         DROP INDEX IF EXISTS idx_model_catalog_unique;
+
+         CREATE UNIQUE INDEX IF NOT EXISTS idx_model_catalog_unique
+           ON model_catalog (project_id, executor_key, provider, model_id, purpose);
+
          CREATE INDEX IF NOT EXISTS idx_model_catalog_executor
            ON model_catalog (project_id, executor_key, enabled);",
     )?;
+    Ok(())
+}
+
+fn run_relax_task_agent_fk_migration(connection: &Connection) -> InitResult<()> {
+    connection.execute_batch(RELAX_TASK_AGENT_FK_MIGRATION_SQL)?;
     Ok(())
 }
 
@@ -237,12 +250,7 @@ fn seed_agent_config_core_inner(connection: &Connection) -> InitResult<()> {
             id, key, label, kind, provider, base_url_status, executable_path,
             status, created_at, updated_at
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8, ?8)
-        ON CONFLICT(key) DO UPDATE SET
-            label = excluded.label,
-            kind = excluded.kind,
-            provider = excluded.provider,
-            status = excluded.status,
-            updated_at = excluded.updated_at",
+        ON CONFLICT(key) DO NOTHING",
         params![
             "executor_model_gateway_default",
             "model_gateway_default",
@@ -410,17 +418,7 @@ fn seed_agent_config_core_inner(connection: &Connection) -> InitResult<()> {
                 default_executor_key, default_model_id, enabled, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
                 'model_gateway_default', NULL, ?11, ?12, ?12)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                specialty = excluded.specialty,
-                stack = excluded.stack,
-                module_scope = excluded.module_scope,
-                allowed_task_types = excluded.allowed_task_types,
-                allowed_paths = excluded.allowed_paths,
-                forbidden_actions = excluded.forbidden_actions,
-                default_executor_key = excluded.default_executor_key,
-                enabled = excluded.enabled,
-                updated_at = excluded.updated_at",
+            ON CONFLICT(id) DO NOTHING",
             params![
                 template.id,
                 template.name,
@@ -481,14 +479,7 @@ fn seed_agent_config_core_inner(connection: &Connection) -> InitResult<()> {
                 joined_at, removed_at, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, 'core',
                 'model_gateway_default', NULL, ?6, ?7, ?8, NULL, ?8, ?8)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                role = excluded.role,
-                executor_key = excluded.executor_key,
-                module_scope = excluded.module_scope,
-                status = excluded.status,
-                removed_at = NULL,
-                updated_at = excluded.updated_at",
+            ON CONFLICT(id) DO NOTHING",
             params![
                 agent.id,
                 project_id.as_str(),
@@ -559,10 +550,7 @@ fn seed_agent_config_core_inner(connection: &Connection) -> InitResult<()> {
                 id, executor_key, agent_template_id, skill_name, skill_scope,
                 enabled, created_at, updated_at
             ) VALUES (?1, 'model_gateway_default', ?2, ?3, ?4, 1, ?5, ?5)
-            ON CONFLICT(id) DO UPDATE SET
-                skill_scope = excluded.skill_scope,
-                enabled = 1,
-                updated_at = excluded.updated_at",
+            ON CONFLICT(id) DO NOTHING",
             params![skill.id, skill.template_id, skill.name, skill.scope, now],
         )?;
     }
@@ -1099,6 +1087,64 @@ mod tests {
                 )
                 .expect("model catalog should be queryable");
             assert!(enabled_model_count >= 1);
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn agent_config_seed_preserves_user_state_on_reinitialize() {
+        let test_dir = std::env::temp_dir().join(format!(
+            "agent-swarm-sqlite-agent-config-seed-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let state = initialize(test_dir.clone()).expect("sqlite should initialize");
+        {
+            let connection = state.connection().expect("connection should be available");
+            connection
+                .execute(
+                    "UPDATE project_agents
+                     SET status = 'removed',
+                         removed_at = '2026-06-19T01:00:00Z',
+                         updated_at = '2026-06-19T01:00:00Z'
+                     WHERE id = 'project_agent_frontend'",
+                    [],
+                )
+                .expect("project agent should update");
+            connection
+                .execute(
+                    "UPDATE agent_templates
+                     SET enabled = 0, updated_at = '2026-06-19T01:00:00Z'
+                     WHERE id = 'agent_template_frontend'",
+                    [],
+                )
+                .expect("agent template should update");
+        }
+        drop(state);
+
+        let state = initialize(test_dir.clone()).expect("sqlite should reinitialize");
+        {
+            let connection = state.connection().expect("connection should be available");
+            let removed_at: Option<String> = connection
+                .query_row(
+                    "SELECT removed_at FROM project_agents WHERE id = 'project_agent_frontend'",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("project agent should exist");
+            assert_eq!(removed_at.as_deref(), Some("2026-06-19T01:00:00Z"));
+
+            let enabled: i64 = connection
+                .query_row(
+                    "SELECT enabled FROM agent_templates WHERE id = 'agent_template_frontend'",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("agent template should exist");
+            assert_eq!(enabled, 0);
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);

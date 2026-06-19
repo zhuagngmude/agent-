@@ -408,7 +408,8 @@ fn ensure_agent_belongs_to_project(
     project_id: &str,
     agent_id: &str,
 ) -> Result<(), String> {
-    let count: i64 = connection
+    // 先查旧 agents 表（向后兼容）
+    let old_count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
             params![agent_id, project_id],
@@ -416,11 +417,24 @@ fn ensure_agent_belongs_to_project(
         )
         .map_err(|error| format!("database_error: check agent failed: {error}"))?;
 
-    if count == 1 {
-        Ok(())
-    } else {
-        Err("not_found: request agent not found".to_string())
+    if old_count == 1 {
+        return Ok(());
     }
+
+    // 再查 project_agents 表（新 P0 数据源；表不存在时视为 0）
+    let pa_count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![agent_id, project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    if pa_count == 1 {
+        return Ok(());
+    }
+
+    Err("not_found: request agent not found".to_string())
 }
 
 fn ensure_task_belongs_to_project(

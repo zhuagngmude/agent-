@@ -1,11 +1,19 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { App as AntdApp, Button, Popconfirm, Progress } from "antd";
 import { Bot, FolderOpen, Play, RefreshCw, Trash2 } from "lucide-react";
 
 import type { AgentSummary, TaskStatus, TaskSummary } from "@agent-swarm/shared";
+import { CreateTaskModal } from "../components/CreateTaskModal";
 import { StatusBadge } from "../components/StatusBadge";
-import { continueSwarmTasks, deleteTasks, openTaskOutputFolder } from "../utils/desktopHost";
-import { agentNameLabel, priorityColor, priorityLabel } from "../utils/labels";
+import {
+  continueSwarmTasks,
+  deleteTasks,
+  getTaskAgentInfo,
+  isTauriHost,
+  openTaskOutputFolder,
+  type TaskAgentInfo,
+} from "../utils/desktopHost";
+import { agentNameLabel, modelLabel, priorityColor, priorityLabel, roleLabel } from "../utils/labels";
 import { userErrorLabel } from "../utils/userError";
 
 type TaskRow = {
@@ -14,6 +22,7 @@ type TaskRow = {
   title: string;
   description: string | null;
   owner: string;
+  agentInfo?: TaskAgentInfo | null;
   status: TaskStatus;
   priority: string;
   children?: TaskRow[];
@@ -44,8 +53,38 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [continuingKey, setContinuingKey] = useState<string | null>(null);
   const [openingKey, setOpeningKey] = useState<string | null>(null);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [taskAgentInfo, setTaskAgentInfo] = useState<Record<string, TaskAgentInfo | null>>({});
 
-  const taskRows = useMemo(() => toTaskRows(tasks, agents), [tasks, agents]);
+  useEffect(() => {
+    if (!isTauriHost() || tasks.length === 0) {
+      setTaskAgentInfo({});
+      return;
+    }
+
+    let cancelled = false;
+    async function loadAgentInfo() {
+      try {
+        const entries = await Promise.all(
+          tasks.map(async (task) => [task.id, await getTaskAgentInfo(task.id)] as const),
+        );
+        if (!cancelled) {
+          setTaskAgentInfo(Object.fromEntries(entries));
+        }
+      } catch {
+        if (!cancelled) {
+          setTaskAgentInfo({});
+        }
+      }
+    }
+
+    void loadAgentInfo();
+    return () => {
+      cancelled = true;
+    };
+  }, [tasks]);
+
+  const taskRows = useMemo(() => toTaskRows(tasks, agents, taskAgentInfo), [tasks, agents, taskAgentInfo]);
 
   const totalTasks = taskRows.reduce((sum, row) => sum + (row.childCount ?? 1), 0);
   const completedTasks = taskRows.reduce((sum, row) => sum + (row.completedCount ?? (row.status === "completed" ? 1 : 0)), 0);
@@ -136,11 +175,26 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
           <Button icon={<RefreshCw size={14} />} onClick={refresh}>
             刷新
           </Button>
-          <Button type="primary" disabled={!canWrite}>
+          <Button
+            type="primary"
+            disabled={!canWrite}
+            title={canWrite ? "手动创建一个项目任务" : "浏览器预览模式不能写入，请打开桌面端创建任务"}
+            onClick={() => setCreateTaskOpen(true)}
+          >
             生成任务
           </Button>
         </div>
       </header>
+
+      <CreateTaskModal
+        open={createTaskOpen}
+        agents={agents}
+        onClose={() => setCreateTaskOpen(false)}
+        onCreated={() => {
+          setCreateTaskOpen(false);
+          refresh();
+        }}
+      />
 
       <section className="task-overview-grid" aria-label="任务执行总览">
         <article>
@@ -177,7 +231,11 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
 
           <div className="task-card-list">
             {taskRows.length === 0 ? (
-              <div className="task-empty-state">暂无任务。可以先从主控台生成基础工作流，再让总控拆解任务。</div>
+              <div className="task-empty-state">
+                {canWrite
+                  ? "暂无任务。可以从主控台全自动执行，也可以点右上角生成任务手动创建。"
+                  : "暂无真实任务。浏览器预览不能写入，请打开桌面端从主控台执行或手动创建任务。"}
+              </div>
             ) : (
               taskRows.map((row) => (
                 <article className="task-execution-card" key={row.key}>
@@ -219,11 +277,18 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
                         </div>
                         <div className="task-assignee-row__agent">
                           <strong>{agentNameLabel(child.owner)}</strong>
-                          <span>{child.owner === "未分配" ? "等待总控分配" : "已分配 AI 员工"}</span>
+                          <span>{agentDetailLine(child)}</span>
                         </div>
                         <div className="task-assignee-row__work">
                           <span>负责任务</span>
                           <strong>{child.title}</strong>
+                          {child.agentInfo?.executor_key || child.agentInfo?.model_id ? (
+                            <span>
+                              {child.agentInfo.executor_key ?? "未绑定执行器"}
+                              {" / "}
+                              {child.agentInfo.model_id ? modelLabel(child.agentInfo.model_id) : "未绑定模型"}
+                            </span>
+                          ) : null}
                         </div>
                         <StatusBadge status={child.status} />
                       </div>
@@ -276,20 +341,28 @@ export function TasksPage({ tasks, agents, refresh, canWrite }: TasksPageProps) 
   );
 }
 
-function toTaskRows(tasks: TaskSummary[], agents: AgentSummary[]): TaskRow[] {
+function toTaskRows(
+  tasks: TaskSummary[],
+  agents: AgentSummary[],
+  taskAgentInfo: Record<string, TaskAgentInfo | null>,
+): TaskRow[] {
   const agentNameById = new Map(agents.map((agent) => [agent.id, agent.name]));
 
-  const childRows = tasks.map((task) => ({
-    key: task.id,
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    owner: task.assigned_agent_id
-      ? (agentNameById.get(task.assigned_agent_id) ?? task.assigned_agent_id)
-      : "未分配",
-    status: task.status,
-    priority: task.priority,
-  }));
+  const childRows = tasks.map((task) => {
+    const agentInfo = taskAgentInfo[task.id] ?? null;
+    return {
+      key: task.id,
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      owner: agentInfo?.agent_name ?? (task.assigned_agent_id
+        ? (agentNameById.get(task.assigned_agent_id) ?? task.assigned_agent_id)
+        : "未分配"),
+      agentInfo,
+      status: task.status,
+      priority: task.priority,
+    };
+  });
 
   const groups = new Map<string, TaskRow[]>();
   for (const row of childRows) {
@@ -338,6 +411,19 @@ function toTaskRows(tasks: TaskSummary[], agents: AgentSummary[]): TaskRow[] {
         .map((row) => row.id),
     };
   });
+}
+
+function agentDetailLine(row: TaskRow): string {
+  if (row.owner === "未分配") {
+    return "等待总控分配";
+  }
+  const info = row.agentInfo;
+  if (!info) {
+    return "已分配 AI 员工";
+  }
+  const role = info.agent_role ? roleLabel(info.agent_role) : "角色未配置";
+  const scope = info.module_scope ? ` / ${info.module_scope}` : "";
+  return `${role}${scope}`;
 }
 
 function outputFolderFor(key: string): string {

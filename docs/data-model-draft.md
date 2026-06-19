@@ -1,8 +1,15 @@
 # agent蜂群数据模型草案
 
-日期：2026-06-11
+日期：2026-06-19
 
-这是一份当前态的数据模型草案，只描述 MVP-0.2 到 MVP-0.4 已经用到的核心表，以及阶段 2 真实模型调用准入设计中需要先固定的记录结构。本文不等于数据库迁移已经实现。
+这是一份数据模型说明和历史草案的混合文档。当前真实 schema 以 `data/migrations/` 和 Tauri/Rust service 为准；本文用于解释核心表、迁移背景和仍需遵守的数据边界。
+
+2026-06-19 当前事实：
+
+- P0 AI 员工配置核心表已由 migration 017 落地：`executor_configs`、`model_catalog`、`agent_templates`、`project_agents`、`executor_skills`、`agent_boundary_checks`。
+- migration 018 已放宽 `tasks.assigned_agent_id` 外键，任务分配优先绑定 `project_agents.id`，旧 `agents.id` 只作为 service 层兼容路径。
+- Runner preflight 已接入 `check_agent_boundary`，边界检查结果写入 `agent_boundary_checks`。
+- 本文中写着“只读 Runner request”“feature_disabled”“不执行”的段落，多数是旧 Node.js/Mock 阶段背景；判断当前能力时优先看 Tauri/Rust service 和入口文档。
 
 ## 设计目标
 
@@ -20,9 +27,9 @@
 - 时间字段统一用 ISO datetime。
 - 可变结构优先用 JSON 字段承载。
 
-## 第一版最小落库（当前阶段执行）
+## 第一版最小落库（历史骨架）
 
-以下四张表是 MVP 骨架阶段确认要建的，其他表暂缓。
+以下四张表是 MVP 骨架阶段确认要建的早期核心表。当前项目已经继续追加多轮 migration；不要把本节理解成当前只有这四张表。
 
 ### `projects`
 
@@ -63,7 +70,7 @@
 | description | TEXT | — | 描述 |
 | status | TEXT | NOT NULL | queued / running / completed / blocked |
 | priority | TEXT | NOT NULL | low / medium / high |
-| assigned_agent_id | TEXT | — | 分配给哪个 Agent |
+| assigned_agent_id | TEXT | — | 分配给哪个 Agent（P0 后优先绑定 `project_agents.id`，旧 `agents` 表 ID 仍由 service 层向后兼容；018 migration 已移除旧 `agents(id)` 外键） |
 | depends_on | TEXT | — | JSON 数组，如 `["task_001"]` |
 | risk_level | TEXT | — | low / medium / high |
 | created_at | TEXT | NOT NULL | ISO 时间 |
@@ -255,7 +262,7 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 
 受控模型目录表。核心字段：`id`, `project_id`, `provider`, `model_id`, `display_name`, `purpose`, `enabled`, `is_builtin`, `created_at`, `updated_at`。
 
-唯一索引：`(project_id, provider, model_id, purpose)`。
+唯一索引：P0 阶段 2/3 后为 `(project_id, executor_key, provider, model_id, purpose)`，允许不同执行器维护同名模型。
 
 约束：
 - 第一版 `provider` 固定 `openai_compat`，`purpose` 固定 `project_plan_generation`。
@@ -367,8 +374,9 @@ Git 保存点记录。核心字段：`id`, `project_id`, `commit_hash`, `message
 15. `015_enable_auto_runner_execution_locks` — 全自动 Runner 范围锁扩展。
 16. `016_open_runner_full_auto` — Runner 全自动主链路开放字段重建。
 17. `017_add_agent_config_core` — P0 AI 员工 / 执行器 / Skill / 边界检查核心配置表。
-18. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
-19. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
+18. `018_relax_tasks_assigned_agent_fk` — 放宽 `tasks.assigned_agent_id` 和 `agent_boundary_checks.agent_id` 的旧外键约束，让任务和边界检查可以记录真实 `project_agents.id`。
+19. 后续按需追加：`agent_relationships`、`agent_config_versions`、`agent_config_applications`、`workflows`。
+20. 辅助表按需：`knowledge_updates`、`git_checkpoints`、`runner_status`。
 
 ## 已定稿的几条规则
 

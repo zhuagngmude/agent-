@@ -421,9 +421,11 @@ pub fn upsert_executor_model(
     let existing_id: Option<String> = connection
         .query_row(
             "SELECT id FROM model_catalog
-             WHERE project_id = ?1 AND provider = ?2 AND model_id = ?3 AND purpose = ?4",
+             WHERE project_id = ?1 AND executor_key = ?2 AND provider = ?3
+               AND model_id = ?4 AND purpose = ?5",
             params![
                 project_id.as_str(),
+                executor_key.as_str(),
                 provider.as_str(),
                 model_id.as_str(),
                 purpose.as_str()
@@ -440,7 +442,7 @@ pub fn upsert_executor_model(
                 id, project_id, executor_key, provider, model_id, display_name,
                 purpose, enabled, is_builtin, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, ?10)
-            ON CONFLICT(project_id, provider, model_id, purpose) DO UPDATE SET
+            ON CONFLICT(project_id, executor_key, provider, model_id, purpose) DO UPDATE SET
                 executor_key = excluded.executor_key,
                 display_name = excluded.display_name,
                 enabled = excluded.enabled,
@@ -460,7 +462,14 @@ pub fn upsert_executor_model(
         )
         .map_err(|error| format!("database_error: upsert executor model failed: {error}"))?;
 
-    get_executor_model_by_identity(connection, &project_id, &provider, &model_id, &purpose)
+    get_executor_model_by_identity(
+        connection,
+        &project_id,
+        &executor_key,
+        &provider,
+        &model_id,
+        &purpose,
+    )
 }
 
 pub fn delete_executor_model(
@@ -476,8 +485,13 @@ pub fn delete_executor_model(
     let agent_refs: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM project_agents
-             WHERE project_id = ?1 AND model_id = ?2 AND removed_at IS NULL",
-            params![model.project_id.as_str(), model.model_id.as_str()],
+             WHERE project_id = ?1 AND executor_key = ?2 AND model_id = ?3
+               AND removed_at IS NULL",
+            params![
+                model.project_id.as_str(),
+                model.executor_key.as_str(),
+                model.model_id.as_str()
+            ],
             |row| row.get(0),
         )
         .map_err(|error| format!("database_error: dependency check failed: {error}"))?;
@@ -681,7 +695,7 @@ pub fn upsert_project_agent(
         Some(model_id) if !model_id.trim().is_empty() => {
             let value = validate_text(&model_id, "model_id", 120)?;
             validate_model_id(&value)?;
-            ensure_enabled_model_exists(connection, &project_id, &value)?;
+            ensure_enabled_model_exists(connection, &project_id, &executor_key, &value)?;
             Some(value)
         }
         _ => None,
@@ -956,6 +970,7 @@ fn get_agent_template_by_role_category(
 fn get_executor_model_by_identity(
     connection: &Connection,
     project_id: &str,
+    executor_key: &str,
     provider: &str,
     model_id: &str,
     purpose: &str,
@@ -966,8 +981,9 @@ fn get_executor_model_by_identity(
                 provider, model_id, display_name, purpose, enabled, is_builtin,
                 created_at, updated_at
              FROM model_catalog
-             WHERE project_id = ?1 AND provider = ?2 AND model_id = ?3 AND purpose = ?4",
-            params![project_id, provider, model_id, purpose],
+             WHERE project_id = ?1 AND executor_key = ?2 AND provider = ?3
+               AND model_id = ?4 AND purpose = ?5",
+            params![project_id, executor_key, provider, model_id, purpose],
             map_executor_model_row,
         )
         .map_err(|error| format!("database_error: load executor model failed: {error}"))
@@ -1063,13 +1079,14 @@ fn ensure_template_exists(connection: &Connection, template_id: &str) -> Result<
 fn ensure_enabled_model_exists(
     connection: &Connection,
     project_id: &str,
+    executor_key: &str,
     model_id: &str,
 ) -> Result<(), String> {
     let exists: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM model_catalog
-             WHERE project_id = ?1 AND model_id = ?2 AND enabled = 1",
-            params![project_id, model_id],
+             WHERE project_id = ?1 AND executor_key = ?2 AND model_id = ?3 AND enabled = 1",
+            params![project_id, executor_key, model_id],
             |row| row.get(0),
         )
         .map_err(|error| format!("database_error: lookup model catalog failed: {error}"))?;
@@ -1299,6 +1316,505 @@ fn current_timestamp() -> String {
         .to_string()
 }
 
+// ---------------------------------------------------------------------------
+// Checkpoint 3：总控确定性分派规则
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Clone)]
+pub struct RecommendProjectAgentsOutput {
+    pub project_id: String,
+    pub recommended_core_agents: Vec<ProjectAgentSummary>,
+    pub recommended_expert_agents: Vec<ProjectAgentSummary>,
+    pub reason: String,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecommendProjectAgentsInput {
+    pub project_id: Option<String>,
+    pub project_type: String,
+    pub tech_stack: Vec<String>,
+    pub risk_level: String,
+    pub phase: String,
+}
+
+/// 确定性规则分派：根据项目类型、技术栈、风险和阶段推荐核心员工和专家
+pub fn recommend_project_agents(
+    connection: &Connection,
+    input: RecommendProjectAgentsInput,
+) -> Result<RecommendProjectAgentsOutput, String> {
+    let project_id = match input.project_id {
+        Some(id) if !id.trim().is_empty() => validate_key(&id, "project_id")?,
+        _ => current_project_id(connection)?,
+    };
+    let project_type = validate_text(&input.project_type, "project_type", 80)?;
+    let risk_level = normalize_enum(&input.risk_level, &["low", "medium", "high"], "risk_level")?;
+    let phase = validate_text(&input.phase, "phase", 80)?;
+    let tech_stack: Vec<String> = input
+        .tech_stack
+        .into_iter()
+        .map(|t| t.trim().to_lowercase())
+        .filter(|t| !t.is_empty())
+        .take(20)
+        .collect();
+
+    let mut warnings: Vec<String> = Vec::new();
+    let mut reason_parts: Vec<String> = Vec::new();
+    reason_parts.push(format!("项目类型: {project_type}"));
+    reason_parts.push(format!("风险等级: {risk_level}"));
+    reason_parts.push(format!("阶段: {phase}"));
+
+    // 读取所有模板和已有项目成员
+    let templates = list_agent_templates(connection)?;
+    let existing_agents = list_project_agents(connection)?;
+    let existing_template_ids: std::collections::HashSet<String> = existing_agents
+        .iter()
+        .filter(|a| a.removed_at.is_none())
+        .map(|a| a.agent_template_id.clone())
+        .collect();
+
+    // --- 核心员工推荐 ---
+    let mut recommended_core: Vec<ProjectAgentSummary> = Vec::new();
+    let mut recommended_expert: Vec<ProjectAgentSummary> = Vec::new();
+
+    for template in &templates {
+        if !template.enabled {
+            continue;
+        }
+
+        let is_match = match template.category.as_str() {
+            "core" => {
+                // 核心员工：始终推荐，无需匹配
+                reason_parts.push(format!("核心员工 '{}' 默认包含", template.name));
+                true
+            }
+            "expert" => {
+                // 专家匹配：根据项目类型和技术栈决定
+                let matched =
+                    expert_matches_project(template, &project_type, &tech_stack, &risk_level);
+                if matched {
+                    reason_parts.push(format!(
+                        "专家 '{}' 匹配项目类型 '{}'",
+                        template.name, project_type
+                    ));
+                }
+                matched
+            }
+            _ => false,
+        };
+
+        if !is_match {
+            continue;
+        }
+
+        // 跳过已有项目成员
+        if existing_template_ids.contains(&template.id) {
+            continue;
+        }
+
+        // 构造推荐摘要
+        let model_id = template.default_model_id.clone();
+        let summary = ProjectAgentSummary {
+            id: format!("recommended_{}", template.id),
+            project_id: project_id.clone(),
+            agent_template_id: template.id.clone(),
+            name: template.name.clone(),
+            role: template.role.clone(),
+            source: "recommended".to_string(),
+            executor_key: template.default_executor_key.clone(),
+            model_id,
+            module_scope: template.module_scope.clone(),
+            status: "idle".to_string(),
+            joined_at: current_timestamp(),
+            removed_at: None,
+            created_at: current_timestamp(),
+            updated_at: current_timestamp(),
+        };
+
+        match template.category.as_str() {
+            "core" => recommended_core.push(summary),
+            "expert" => recommended_expert.push(summary),
+            _ => {}
+        }
+    }
+
+    // 跨模块警告
+    let modules: std::collections::HashSet<&str> =
+        templates.iter().map(|t| t.module_scope.as_str()).collect();
+    if modules.len() > 5 {
+        warnings.push("项目跨模块范围较大，建议总控拆分任务后再分派给各角色。".into());
+    }
+    if risk_level == "high" {
+        warnings.push("高风险项目：所有 Runner 执行前必须经过边界检查和审批。".into());
+    }
+
+    let reason = reason_parts.join("；");
+
+    Ok(RecommendProjectAgentsOutput {
+        project_id,
+        recommended_core_agents: recommended_core,
+        recommended_expert_agents: recommended_expert,
+        reason,
+        warnings,
+    })
+}
+
+/// 专家模板是否匹配当前项目
+fn expert_matches_project(
+    template: &AgentTemplateSummary,
+    project_type: &str,
+    tech_stack: &[String],
+    _risk_level: &str,
+) -> bool {
+    let pt = project_type.to_lowercase();
+    let stack_lower: Vec<String> = tech_stack.iter().map(|s| s.to_lowercase()).collect();
+
+    // 精确 rule 匹配
+    let rules: &[(&str, &[&str])] = &[
+        ("ux", &["frontend", "web", "mobile", "ui"]),
+        ("desktop", &["desktop", "tauri", "electron", "native"]),
+        ("security", &["auth", "security", "api"]),
+        (
+            "data",
+            &["database", "sqlite", "postgres", "data", "analytics"],
+        ),
+        ("devops", &["docker", "ci/cd", "deploy", "server"]),
+        ("qa", &["test", "qa", "quality"]),
+        ("ai_prompt", &["ai", "llm", "prompt", "model"]),
+        ("docs", &["docs", "documentation"]),
+        ("reviewer", &["review", "audit"]),
+    ];
+
+    for (role, keywords) in rules {
+        if template.role == *role {
+            for kw in *keywords {
+                if pt.contains(kw) || stack_lower.iter().any(|s| s.contains(kw)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 常规 fallback：高风险的 web 项目推荐安全专家
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Checkpoint 4：Runner 执行前边界强校验
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckAgentBoundaryInput {
+    pub agent_id: String,
+    pub task_id: Option<String>,
+    pub task_type: String,
+    pub module_scope: String,
+    pub target_path: Option<String>,
+    pub forbidden_actions: Vec<String>,
+    pub requested_action: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct CheckAgentBoundaryOutput {
+    pub check_id: String,
+    pub decision: String,
+    pub reason: String,
+}
+
+/// Runner 执行前边界检查：校验 agent、task_type、module_scope、target_path、forbidden_actions
+pub fn check_agent_boundary(
+    connection: &Connection,
+    input: CheckAgentBoundaryInput,
+) -> Result<CheckAgentBoundaryOutput, String> {
+    let project_id = current_project_id(connection)?;
+    let agent_id = validate_key(&input.agent_id, "agent_id")?;
+    let task_type = validate_key(&input.task_type, "task_type")?;
+    let module_scope = validate_key(&input.module_scope, "module_scope")?;
+    let requested_action = validate_text(&input.requested_action, "requested_action", 200)?;
+    let target_path = normalize_optional_text(input.target_path, "target_path", 500)?;
+
+    // 1. Agent 是否存在且属于当前项目
+    let agent = connection
+        .query_row(
+            "SELECT id, agent_template_id, status, module_scope, removed_at
+             FROM project_agents
+             WHERE id = ?1 AND project_id = ?2",
+            params![agent_id.as_str(), project_id.as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|e| format!("database_error: lookup agent failed: {e}"))?;
+
+    let (_agent_id_val, template_id, agent_status, agent_module, removed_at) = match agent {
+        Some(v) => v,
+        None => {
+            let (decision, reason) = ("denied", "Agent 不存在或不属于当前项目");
+            write_boundary_check(
+                connection,
+                &project_id,
+                input.task_id.as_deref(),
+                &agent_id,
+                &requested_action,
+                Some(&task_type),
+                &module_scope,
+                target_path.as_deref(),
+                decision,
+                reason,
+            )?;
+            return Ok(CheckAgentBoundaryOutput {
+                check_id: format!("boundary_check_{}", current_timestamp()),
+                decision: decision.into(),
+                reason: reason.into(),
+            });
+        }
+    };
+
+    // 2. Agent 已软移除
+    if removed_at.is_some() {
+        let (decision, reason) = ("denied", "Agent 已被移除");
+        write_boundary_check(
+            connection,
+            &project_id,
+            input.task_id.as_deref(),
+            &agent_id,
+            &requested_action,
+            Some(&task_type),
+            &module_scope,
+            target_path.as_deref(),
+            decision,
+            reason,
+        )?;
+        return Ok(CheckAgentBoundaryOutput {
+            check_id: format!("boundary_check_{}", current_timestamp()),
+            decision: decision.into(),
+            reason: reason.into(),
+        });
+    }
+
+    // 3. Agent 状态不是 active
+    if agent_status != "active" {
+        let (decision, reason) = ("needs_approval", "Agent 状态非活跃，需要审批");
+        write_boundary_check(
+            connection,
+            &project_id,
+            input.task_id.as_deref(),
+            &agent_id,
+            &requested_action,
+            Some(&task_type),
+            &module_scope,
+            target_path.as_deref(),
+            decision,
+            reason,
+        )?;
+        return Ok(CheckAgentBoundaryOutput {
+            check_id: format!("boundary_check_{}", current_timestamp()),
+            decision: decision.into(),
+            reason: reason.into(),
+        });
+    }
+
+    // 4. task_type 是否在模板允许范围
+    let template = connection
+        .query_row(
+            "SELECT allowed_task_types, allowed_paths, forbidden_actions
+             FROM agent_templates WHERE id = ?1",
+            params![template_id.as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|e| format!("database_error: lookup template failed: {e}"))?;
+
+    if let Some((allowed_task_types_json, allowed_paths_json, forbidden_actions_json)) = template {
+        let allowed_types: Vec<String> = parse_string_list(&allowed_task_types_json);
+        let allowed_paths: Vec<String> = parse_string_list(&allowed_paths_json);
+        let forbidden: Vec<String> = parse_string_list(&forbidden_actions_json);
+
+        // task_type 不在允许范围 → denied 或 needs_approval
+        if !allowed_types.is_empty() && !allowed_types.contains(&task_type) {
+            let (decision, reason) = ("needs_approval", "任务类型不在 Agent 模板允许范围");
+            write_boundary_check(
+                connection,
+                &project_id,
+                input.task_id.as_deref(),
+                &agent_id,
+                &requested_action,
+                Some(&task_type),
+                &module_scope,
+                target_path.as_deref(),
+                decision,
+                reason,
+            )?;
+            return Ok(CheckAgentBoundaryOutput {
+                check_id: format!("boundary_check_{}", current_timestamp()),
+                decision: decision.into(),
+                reason: reason.into(),
+            });
+        }
+
+        // 检查 target_path
+        if let Some(ref path) = target_path {
+            let path_allowed = allowed_paths.is_empty()
+                || allowed_paths
+                    .iter()
+                    .any(|allowed| path_matches(path, allowed));
+            if !path_allowed {
+                let (decision, reason) = ("denied", "目标路径不在 Agent 允许范围内");
+                write_boundary_check(
+                    connection,
+                    &project_id,
+                    input.task_id.as_deref(),
+                    &agent_id,
+                    &requested_action,
+                    Some(&task_type),
+                    &module_scope,
+                    target_path.as_deref(),
+                    decision,
+                    reason,
+                )?;
+                return Ok(CheckAgentBoundaryOutput {
+                    check_id: format!("boundary_check_{}", current_timestamp()),
+                    decision: decision.into(),
+                    reason: reason.into(),
+                });
+            }
+        }
+
+        // 检查 forbidden_actions
+        for action in &input.forbidden_actions {
+            if forbidden.contains(action) {
+                let (decision, reason) = ("denied", "操作命中模板禁止动作列表");
+                write_boundary_check(
+                    connection,
+                    &project_id,
+                    input.task_id.as_deref(),
+                    &agent_id,
+                    &requested_action,
+                    Some(&task_type),
+                    &module_scope,
+                    target_path.as_deref(),
+                    decision,
+                    reason,
+                )?;
+                return Ok(CheckAgentBoundaryOutput {
+                    check_id: format!("boundary_check_{}", current_timestamp()),
+                    decision: decision.into(),
+                    reason: reason.into(),
+                });
+            }
+        }
+    }
+
+    // 5. module_scope 不匹配 → needs_approval
+    if !agent_module.is_empty() && agent_module != module_scope && !module_scope.is_empty() {
+        let (decision, reason) = ("needs_approval", "模块范围与 Agent 配置不匹配");
+        write_boundary_check(
+            connection,
+            &project_id,
+            input.task_id.as_deref(),
+            &agent_id,
+            &requested_action,
+            Some(&task_type),
+            &module_scope,
+            target_path.as_deref(),
+            decision,
+            reason,
+        )?;
+        return Ok(CheckAgentBoundaryOutput {
+            check_id: format!("boundary_check_{}", current_timestamp()),
+            decision: decision.into(),
+            reason: reason.into(),
+        });
+    }
+
+    // 全部通过
+    let (decision, reason) = ("allowed", "边界检查通过");
+    write_boundary_check(
+        connection,
+        &project_id,
+        input.task_id.as_deref(),
+        &agent_id,
+        &requested_action,
+        Some(&task_type),
+        &module_scope,
+        target_path.as_deref(),
+        decision,
+        reason,
+    )?;
+    Ok(CheckAgentBoundaryOutput {
+        check_id: format!("boundary_check_{}", current_timestamp()),
+        decision: decision.into(),
+        reason: reason.into(),
+    })
+}
+
+/// 写入 agent_boundary_checks 表
+fn write_boundary_check(
+    connection: &Connection,
+    project_id: &str,
+    task_id: Option<&str>,
+    agent_id: &str,
+    requested_action: &str,
+    task_type: Option<&str>,
+    module_scope: &str,
+    target_path: Option<&str>,
+    decision: &str,
+    reason: &str,
+) -> Result<(), String> {
+    let id = format!("boundary_check_{}", current_timestamp());
+    let now = current_timestamp();
+    connection
+        .execute(
+            "INSERT INTO agent_boundary_checks (
+                id, project_id, task_id, agent_id, requested_action,
+                task_type, module_scope, target_path, decision, reason, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                id.as_str(),
+                project_id,
+                task_id,
+                agent_id,
+                requested_action,
+                task_type,
+                module_scope,
+                target_path,
+                decision,
+                reason,
+                now.as_str(),
+            ],
+        )
+        .map_err(|e| format!("database_error: write boundary check failed: {e}"))?;
+    Ok(())
+}
+
+/// 简化的 glob 匹配：支持 `**` 和 `*` 通配符
+fn path_matches(path: &str, pattern: &str) -> bool {
+    if pattern.contains("**") {
+        let prefix = pattern.trim_end_matches("**").trim_end_matches('/');
+        return path.starts_with(prefix);
+    }
+    if pattern.contains('*') {
+        let prefix = pattern.trim_end_matches('*');
+        return path.starts_with(prefix);
+    }
+    path == pattern || path.starts_with(&format!("{}/", pattern.trim_end_matches('/')))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1500,6 +2016,130 @@ mod tests {
             )
             .expect("checks");
             assert!(checks.is_empty());
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn executor_models_are_scoped_by_executor_key() {
+        let (state, test_dir) = test_db();
+        {
+            let conn = state.connection().expect("connection");
+            upsert_executor_config(
+                &conn,
+                UpsertExecutorConfigInput {
+                    key: "local_executor".into(),
+                    label: "本地执行器".into(),
+                    kind: "external_executor".into(),
+                    provider: Some("openai_compat".into()),
+                    base_url_status: Some("configured_by_system_settings".into()),
+                    executable_path: None,
+                    status: "active".into(),
+                },
+            )
+            .expect("executor should upsert");
+
+            let default_model = upsert_executor_model(
+                &conn,
+                UpsertExecutorModelInput {
+                    project_id: None,
+                    executor_key: "model_gateway_default".into(),
+                    provider: "openai_compat".into(),
+                    model_id: "shared-model".into(),
+                    display_name: "Shared Gateway".into(),
+                    purpose: "agent_task".into(),
+                    enabled: true,
+                },
+            )
+            .expect("default executor model should upsert");
+            let local_model = upsert_executor_model(
+                &conn,
+                UpsertExecutorModelInput {
+                    project_id: None,
+                    executor_key: "local_executor".into(),
+                    provider: "openai_compat".into(),
+                    model_id: "shared-model".into(),
+                    display_name: "Shared Local".into(),
+                    purpose: "agent_task".into(),
+                    enabled: true,
+                },
+            )
+            .expect("local executor model should upsert");
+
+            assert_ne!(default_model.id, local_model.id);
+            assert_eq!(default_model.executor_key, "model_gateway_default");
+            assert_eq!(local_model.executor_key, "local_executor");
+
+            let models = list_executor_models(
+                &conn,
+                ListExecutorModelsInput {
+                    project_id: None,
+                    executor_key: None,
+                    purpose: Some("agent_task".into()),
+                },
+            )
+            .expect("models should list");
+            assert_eq!(
+                models
+                    .iter()
+                    .filter(|entry| entry.model_id == "shared-model")
+                    .count(),
+                2
+            );
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn project_agent_model_must_belong_to_executor() {
+        let (state, test_dir) = test_db();
+        {
+            let conn = state.connection().expect("connection");
+            upsert_executor_config(
+                &conn,
+                UpsertExecutorConfigInput {
+                    key: "isolated_executor".into(),
+                    label: "隔离执行器".into(),
+                    kind: "external_executor".into(),
+                    provider: Some("openai_compat".into()),
+                    base_url_status: Some("configured_by_system_settings".into()),
+                    executable_path: None,
+                    status: "active".into(),
+                },
+            )
+            .expect("executor should upsert");
+            upsert_executor_model(
+                &conn,
+                UpsertExecutorModelInput {
+                    project_id: None,
+                    executor_key: "model_gateway_default".into(),
+                    provider: "openai_compat".into(),
+                    model_id: "gateway-only-model".into(),
+                    display_name: "Gateway Only".into(),
+                    purpose: "agent_task".into(),
+                    enabled: true,
+                },
+            )
+            .expect("model should upsert");
+
+            let err = upsert_project_agent(
+                &conn,
+                UpsertProjectAgentInput {
+                    project_id: None,
+                    agent_template_id: "agent_template_frontend".into(),
+                    name: "隔离前端执行员".into(),
+                    role: "frontend".into(),
+                    source: "manual".into(),
+                    executor_key: "isolated_executor".into(),
+                    model_id: Some("gateway-only-model".into()),
+                    module_scope: "frontend".into(),
+                    status: "active".into(),
+                },
+            )
+            .expect_err("model should not be assignable across executors");
+            assert!(err.contains("enabled model"));
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);

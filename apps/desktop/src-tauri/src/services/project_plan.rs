@@ -441,7 +441,7 @@ fn validate_template_row(
     validate_template_field(&t.risk_level, ALLOWED_RISK_LEVELS, "risk_level")?;
     validate_template_field(&t.operation_type, ALLOWED_OPERATION_TYPES, "operation_type")?;
     validate_affected_file(&t.affected_file)?;
-    // 校验 agent 存在
+    // 校验 agent 存在（旧表 + 新 project_agents 表）
     let agent_exists: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
@@ -449,7 +449,14 @@ fn validate_template_row(
             |row| row.get(0),
         )
         .map_err(|e| format!("database_error: check agent exists failed: {e}"))?;
-    if agent_exists == 0 {
+    let pa_exists: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![t.agent_id.as_str(), t.project_id.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+    if agent_exists == 0 && pa_exists == 0 {
         return Err(format!(
             "invalid_input: agent '{}' not found for template role '{}'",
             t.agent_id, t.role
@@ -609,7 +616,7 @@ fn generate_smart_tasks_with_ai(
         // 验证角色是否合法
         validate_template_field(&ai_task.role, ALLOWED_ROLES, "role")?;
 
-        // 验证 agent 是否存在
+        // 验证 agent 是否存在（旧表 + project_agents）
         let agent_exists: i64 = connection
             .query_row(
                 "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
@@ -617,8 +624,15 @@ fn generate_smart_tasks_with_ai(
                 |row| row.get(0),
             )
             .map_err(|e| format!("database_error: check agent exists failed: {}", e))?;
+        let pa_exists: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM project_agents WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+                params![ai_task.agent_id.as_str(), draft.project_id.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        if agent_exists == 0 {
+        if agent_exists == 0 && pa_exists == 0 {
             return Err(format!("AI 生成的 agent_id '{}' 不存在", ai_task.agent_id));
         }
 
@@ -1744,7 +1758,8 @@ fn ensure_agent_belongs_to_project(
     project_id: &str,
     agent_id: &str,
 ) -> Result<(), String> {
-    let count: i64 = connection
+    // 先查旧 agents 表（向后兼容）
+    let old_count: i64 = connection
         .query_row(
             "SELECT COUNT(*) FROM agents WHERE id = ?1 AND project_id = ?2",
             params![agent_id, project_id],
@@ -1752,13 +1767,26 @@ fn ensure_agent_belongs_to_project(
         )
         .map_err(|error| format!("database_error: check project plan agent failed: {error}"))?;
 
-    if count == 1 {
-        Ok(())
-    } else {
-        Err(format!(
-            "not_found: project plan agent not found: {agent_id}"
-        ))
+    if old_count == 1 {
+        return Ok(());
     }
+
+    // 再查 project_agents 表（新 P0 数据源；表不存在时视为 0）
+    let pa_count = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![agent_id, project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    if pa_count == 1 {
+        return Ok(());
+    }
+
+    Err(format!(
+        "not_found: project plan agent not found: {agent_id}"
+    ))
 }
 
 fn ensure_second_confirm(second_confirm: bool, confirm_text: String) -> Result<(), String> {

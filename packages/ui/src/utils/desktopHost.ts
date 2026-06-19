@@ -264,6 +264,39 @@ export async function listRuntimeEvents(): Promise<RuntimeEventSummary[]> {
   return invoke("list_runtime_events");
 }
 
+export type TaskAgentInfo = {
+  task_id: string;
+  project_agent_id: string | null;
+  agent_name: string | null;
+  agent_role: string | null;
+  executor_key: string | null;
+  model_id: string | null;
+  module_scope: string | null;
+  agent_status: string | null;
+};
+
+export type AssignProjectAgentsToTaskInput = {
+  task_id: string;
+  project_agent_id: string;
+};
+
+export type AssignProjectAgentsToTaskResponse = {
+  task: TaskSummary;
+  agent: TaskAgentInfo;
+};
+
+export async function getTaskAgentInfo(taskId: string): Promise<TaskAgentInfo | null> {
+  requireTauri();
+  return invoke("get_task_agent_info", { taskId });
+}
+
+export async function assignProjectAgentsToTask(
+  input: AssignProjectAgentsToTaskInput,
+): Promise<AssignProjectAgentsToTaskResponse> {
+  requireTauri();
+  return invoke("assign_project_agents_to_task", { input });
+}
+
 export async function requestProjectPlanModelDraft(
   input: ProjectPlanModelDraftInput,
 ): Promise<ProjectPlanModelDraftResponse> {
@@ -426,6 +459,248 @@ export async function chatWithController(
 ): Promise<ChatWithControllerResponse> {
   requireTauri();
   return invoke("chat_with_controller", { input });
+}
+
+// ---------------------------------------------------------------------------
+// P0：AI 员工 / 执行器 / 模型 / Skill 配置
+// ---------------------------------------------------------------------------
+
+export type ExecutorConfigSummary = {
+  id: string;
+  key: string;
+  label: string;
+  kind: "model_gateway" | "external_executor" | "local_tool";
+  provider: string | null;
+  base_url_status: string;
+  executable_path: string | null;
+  status: "active" | "disabled" | "error";
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExecutorModelSummary = {
+  id: string;
+  project_id: string;
+  executor_key: string;
+  provider: string;
+  model_id: string;
+  display_name: string;
+  purpose: string;
+  enabled: boolean;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentTemplateSummary = {
+  id: string;
+  name: string;
+  role: string;
+  category: "core" | "expert";
+  specialty: string | null;
+  stack: string | null;
+  module_scope: string;
+  allowed_task_types: string[];
+  allowed_paths: string[];
+  forbidden_actions: string[];
+  default_executor_key: string;
+  default_model_id: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectAgentSummary = {
+  id: string;
+  project_id: string;
+  agent_template_id: string;
+  name: string;
+  role: string;
+  source: "core" | "recommended" | "manual";
+  executor_key: string;
+  model_id: string | null;
+  module_scope: string;
+  status: "active" | "idle" | "disabled" | "removed";
+  joined_at: string;
+  removed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExecutorSkillSummary = {
+  id: string;
+  executor_key: string;
+  agent_template_id: string | null;
+  skill_name: string;
+  skill_scope: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentBoundaryCheckSummary = {
+  id: string;
+  project_id: string;
+  task_id: string | null;
+  agent_id: string;
+  requested_action: string;
+  task_type: string | null;
+  module_scope: string;
+  target_path: string | null;
+  decision: "allowed" | "denied" | "needs_approval";
+  reason: string;
+  created_at: string;
+};
+
+export type UpsertProjectAgentInput = {
+  project_id?: string | null;
+  agent_template_id: string;
+  name: string;
+  role: string;
+  source: "core" | "recommended" | "manual";
+  executor_key: string;
+  model_id?: string | null;
+  module_scope: string;
+  status: "active" | "idle" | "disabled" | "removed";
+};
+
+export type UpsertExecutorModelInput = {
+  project_id?: string | null;
+  executor_key: string;
+  provider: "openai_compat";
+  model_id: string;
+  display_name: string;
+  purpose: string;
+  enabled: boolean;
+};
+
+export type UpsertExecutorSkillInput = {
+  executor_key: string;
+  agent_template_id?: string | null;
+  skill_name: string;
+  skill_scope: string;
+  enabled: boolean;
+};
+
+export async function listExecutorConfigs(): Promise<ExecutorConfigSummary[]> {
+  requireTauri();
+  return invoke("list_executor_configs");
+}
+
+export async function listExecutorModels(input: {
+  project_id?: string | null;
+  executor_key?: string | null;
+  purpose?: string | null;
+} = {}): Promise<ExecutorModelSummary[]> {
+  requireTauri();
+  return invoke("list_executor_models", { input });
+}
+
+export async function upsertExecutorModel(input: UpsertExecutorModelInput): Promise<ExecutorModelSummary> {
+  requireTauri();
+  return invoke("upsert_executor_model", { input });
+}
+
+export async function deleteExecutorModel(modelRecordId: string): Promise<void> {
+  requireTauri();
+  return invoke("delete_executor_model", { input: { model_record_id: modelRecordId } });
+}
+
+export async function listAgentTemplates(): Promise<AgentTemplateSummary[]> {
+  requireTauri();
+  return invoke("list_agent_templates");
+}
+
+export async function listProjectAgents(): Promise<ProjectAgentSummary[]> {
+  requireTauri();
+  return invoke("list_project_agents");
+}
+
+export async function upsertProjectAgent(input: UpsertProjectAgentInput): Promise<ProjectAgentSummary> {
+  requireTauri();
+  return invoke("upsert_project_agent", { input });
+}
+
+export async function removeProjectAgent(projectAgentId: string): Promise<void> {
+  requireTauri();
+  return invoke("remove_project_agent", { input: { project_agent_id: projectAgentId } });
+}
+
+export async function listExecutorSkills(): Promise<ExecutorSkillSummary[]> {
+  requireTauri();
+  return invoke("list_executor_skills");
+}
+
+export async function upsertExecutorSkill(input: UpsertExecutorSkillInput): Promise<ExecutorSkillSummary> {
+  requireTauri();
+  return invoke("upsert_executor_skill", { input });
+}
+
+export async function deleteExecutorSkill(skillId: string): Promise<void> {
+  requireTauri();
+  return invoke("delete_executor_skill", { input: { skill_id: skillId } });
+}
+
+export async function listAgentBoundaryChecks(input: {
+  project_id?: string | null;
+  limit?: number | null;
+} = {}): Promise<AgentBoundaryCheckSummary[]> {
+  requireTauri();
+  return invoke("list_agent_boundary_checks", { input });
+}
+
+// ---------------------------------------------------------------------------
+// CP3：总控确定性分派规则
+// ---------------------------------------------------------------------------
+
+export type RecommendProjectAgentsInput = {
+  project_id?: string | null;
+  project_type: string;
+  tech_stack: string[];
+  risk_level: "low" | "medium" | "high";
+  phase: string;
+};
+
+export type RecommendProjectAgentsOutput = {
+  project_id: string;
+  recommended_core_agents: ProjectAgentSummary[];
+  recommended_expert_agents: ProjectAgentSummary[];
+  reason: string;
+  warnings: string[];
+};
+
+export async function recommendProjectAgents(
+  input: RecommendProjectAgentsInput,
+): Promise<RecommendProjectAgentsOutput> {
+  requireTauri();
+  return invoke("recommend_project_agents", { input });
+}
+
+// ---------------------------------------------------------------------------
+// CP4：Runner 执行前边界强校验
+// ---------------------------------------------------------------------------
+
+export type CheckAgentBoundaryInput = {
+  agent_id: string;
+  task_id?: string | null;
+  task_type: string;
+  module_scope: string;
+  target_path?: string | null;
+  forbidden_actions: string[];
+  requested_action: string;
+};
+
+export type CheckAgentBoundaryOutput = {
+  check_id: string;
+  decision: "allowed" | "denied" | "needs_approval";
+  reason: string;
+};
+
+export async function checkAgentBoundary(
+  input: CheckAgentBoundaryInput,
+): Promise<CheckAgentBoundaryOutput> {
+  requireTauri();
+  return invoke("check_agent_boundary", { input });
 }
 
 // ---------------------------------------------------------------------------

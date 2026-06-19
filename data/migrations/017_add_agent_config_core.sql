@@ -111,8 +111,7 @@ CREATE TABLE IF NOT EXISTS agent_boundary_checks (
   reason           TEXT NOT NULL,
   created_at       TEXT NOT NULL,
   FOREIGN KEY (project_id) REFERENCES projects(id),
-  FOREIGN KEY (task_id) REFERENCES tasks(id),
-  FOREIGN KEY (agent_id) REFERENCES project_agents(id)
+  FOREIGN KEY (task_id) REFERENCES tasks(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_agent_boundary_checks_project
@@ -120,4 +119,3 @@ CREATE INDEX IF NOT EXISTS idx_agent_boundary_checks_project
 
 CREATE INDEX IF NOT EXISTS idx_agent_boundary_checks_agent
   ON agent_boundary_checks (agent_id, decision);
-

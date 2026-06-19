@@ -4,6 +4,7 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+use super::agent_config::{check_agent_boundary, CheckAgentBoundaryInput};
 use super::approvals::ApprovalSummary;
 use super::project_plan::{ProjectPlanSideEffects, RunnerRequestSummary};
 use super::projects::get_current_project;
@@ -127,6 +128,33 @@ pub fn create_runner_preflight_review(
     // 读取关联 task
     let task = get_task(connection, &project_id, &rr.task_id)?
         .ok_or_else(|| "not_found: task not found".to_string())?;
+    if let Some(agent_id) = task.assigned_agent_id.as_deref() {
+        if project_agent_exists(connection, &project_id, agent_id)? {
+            let target_path = rr
+                .affected_files
+                .iter()
+                .find(|path| !path.starts_with("virtual/"))
+                .cloned();
+            let boundary = check_agent_boundary(
+                connection,
+                CheckAgentBoundaryInput {
+                    agent_id: agent_id.to_string(),
+                    task_id: Some(rr.task_id.clone()),
+                    task_type: infer_task_type(&rr.operation_types),
+                    module_scope: infer_module_scope(agent_id),
+                    target_path,
+                    forbidden_actions: rr.operation_types.clone(),
+                    requested_action: "runner_preflight".to_string(),
+                },
+            )?;
+            if boundary.decision == "denied" {
+                return Err(format!(
+                    "permission_denied: agent boundary check denied preflight: {}",
+                    boundary.reason
+                ));
+            }
+        }
+    }
 
     // 计算风险
     let risk_level = if task.risk_level.as_deref() == Some("high")
@@ -319,6 +347,7 @@ fn get_runner_request(
 
 struct TaskInfo {
     risk_level: Option<String>,
+    assigned_agent_id: Option<String>,
 }
 
 fn get_task(
@@ -328,16 +357,33 @@ fn get_task(
 ) -> Result<Option<TaskInfo>, String> {
     connection
         .query_row(
-            "SELECT risk_level FROM tasks WHERE id = ?1 AND project_id = ?2",
+            "SELECT risk_level, assigned_agent_id FROM tasks WHERE id = ?1 AND project_id = ?2",
             params![task_id, project_id],
             |row| {
                 Ok(TaskInfo {
                     risk_level: row.get(0)?,
+                    assigned_agent_id: row.get(1)?,
                 })
             },
         )
         .optional()
         .map_err(|e| format!("database_error: read task failed: {e}"))
+}
+
+fn project_agent_exists(
+    connection: &Connection,
+    project_id: &str,
+    agent_id: &str,
+) -> Result<bool, String> {
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM project_agents
+             WHERE id = ?1 AND project_id = ?2 AND removed_at IS NULL",
+            params![agent_id, project_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("database_error: lookup project agent failed: {e}"))?;
+    Ok(count == 1)
 }
 
 fn get_approval_by_id(
@@ -388,6 +434,23 @@ fn validate_affected_file(path: &str) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+fn infer_task_type(operation_types: &[String]) -> String {
+    if operation_types.iter().any(|op| op.contains("write")) {
+        "runner_request_write_files".to_string()
+    } else if let Some(first) = operation_types.first() {
+        first.clone()
+    } else {
+        "runner_preflight".to_string()
+    }
+}
+
+fn infer_module_scope(agent_id: &str) -> String {
+    if let Some(scope) = agent_id.strip_prefix("project_agent_") {
+        return scope.to_string();
+    }
+    "runner".to_string()
 }
 
 fn map_review_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RunnerPreflightReviewSummary> {
@@ -531,6 +594,28 @@ mod tests {
         id
     }
 
+    fn bind_runner_request_task_to_project_agent(connection: &Connection, runner_request_id: &str) {
+        connection
+            .execute(
+                "UPDATE tasks
+                 SET assigned_agent_id = 'project_agent_frontend'
+                 WHERE id = (
+                   SELECT task_id FROM runner_requests WHERE id = ?1
+                 )",
+                params![runner_request_id],
+            )
+            .expect("task should bind to project agent");
+        let assigned_agent_id: String = connection
+            .query_row(
+                "SELECT assigned_agent_id FROM tasks
+                 WHERE id = (SELECT task_id FROM runner_requests WHERE id = ?1)",
+                params![runner_request_id],
+                |row| row.get(0),
+            )
+            .expect("assigned agent should load");
+        assert_eq!(assigned_agent_id, "project_agent_frontend");
+    }
+
     fn valid_input(runner_request_id: &str) -> CreateRunnerPreflightReviewInput {
         CreateRunnerPreflightReviewInput {
             runner_request_id: runner_request_id.to_string(),
@@ -640,6 +725,7 @@ mod tests {
             let before_requests = count_rows(&connection, "runner_requests");
             let before_events = count_rows(&connection, "runtime_events");
             let before_mc = count_rows(&connection, "model_calls");
+            bind_runner_request_task_to_project_agent(&connection, &rid);
 
             let response = create_runner_preflight_review(&mut connection, valid_input(&rid))
                 .expect("create preflight should succeed");
@@ -659,6 +745,7 @@ mod tests {
             assert_eq!(count_rows(&connection, "runner_requests"), before_requests);
             assert_eq!(count_rows(&connection, "runtime_events"), before_events);
             assert_eq!(count_rows(&connection, "model_calls"), before_mc);
+            assert_eq!(count_rows(&connection, "agent_boundary_checks"), 1);
             // side effects
             let se = &response.side_effects;
             assert!(!se.creates_tasks);
@@ -750,6 +837,41 @@ mod tests {
                 err.contains("forbidden") || err.contains("invalid_input"),
                 "unexpected error: {err}"
             );
+        }
+        drop(state);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn create_preflight_rejects_denied_agent_boundary() {
+        let (state, test_dir) = test_db();
+        {
+            let mut connection = state.connection().expect("connection should be available");
+            let rid = create_sample_runner_request(&mut connection);
+            bind_runner_request_task_to_project_agent(&connection, &rid);
+            connection
+                .execute(
+                    "UPDATE agent_templates
+                     SET allowed_task_types = '[\"runner_request_write_files\"]',
+                         forbidden_actions = '[\"runner_request_write_files\", \"docs_write\", \"frontend_impl\"]'
+                     WHERE id = 'agent_template_frontend'",
+                    [],
+                )
+                .expect("forbid runner write operation");
+            connection
+                .execute(
+                    "UPDATE project_agents
+                     SET status = 'active'
+                     WHERE id = 'project_agent_frontend'",
+                    [],
+                )
+                .expect("activate project agent");
+
+            let err = create_runner_preflight_review(&mut connection, valid_input(&rid))
+                .expect_err("denied boundary should block preflight");
+            assert!(err.contains("permission_denied"), "unexpected error: {err}");
+            assert_eq!(count_rows(&connection, "agent_boundary_checks"), 1);
+            assert_eq!(count_rows(&connection, "runner_preflight_reviews"), 0);
         }
         drop(state);
         let _ = fs::remove_dir_all(test_dir);

@@ -26,16 +26,14 @@
 
 ## 当前下一步
 
-暂停继续堆 UI，优先把 `AI 员工` 页相关配置从前端本地状态落到 Tauri/Rust/SQLite：
+P0 AI 员工闭环已经进入可用状态：
 
-1. 执行器非敏感配置。
-2. 模型目录。
-3. Agent 模板。
-4. 项目成员。
-5. 专家推荐。
-6. Executor Skill 配置。
+1. AI 员工页读取 Tauri/Rust/SQLite 中的执行器、模型目录、Agent 模板、项目成员、专家推荐和 Skill。
+2. 任务可以绑定真实 `project_agents.id`；旧 `agents.id` 只作为兼容路径。
+3. Runner preflight 会对真实项目 Agent 调用 `check_agent_boundary`，`denied` 会阻断 preflight 并写入 `agent_boundary_checks`。
+4. 任务页可展示项目 Agent 名称、角色、执行器、模型和模块范围。
 
-API Key、Token、私钥不落普通数据库、不写日志、不显示给前端。
+后续优先增强 AgentRunsPage 的项目 Agent 上下文展示，并继续扩充专家模板 seed。API Key、Token、私钥仍不落普通数据库、不写日志、不显示给前端。
 
 ## Runner 和模型边界
 

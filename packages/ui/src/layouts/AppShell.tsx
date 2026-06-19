@@ -11,7 +11,7 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-const commandPages: PageKey[] = ["overview", "tasks"];
+const commandPages: PageKey[] = ["overview", "tasks", "projectPlan"];
 const modulePages: PageKey[] = ["workflow", "runs", "agents", "approvals"];
 const swarmPages: PageKey[] = ["settings"];
 
